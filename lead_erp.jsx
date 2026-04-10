@@ -246,6 +246,8 @@ const BotIcon = (p) => <Icon d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0
 const BarChartIcon = (p) => <Icon d="M12 20V10M18 20V4M6 20v-4" {...p} />;
 const SettingsIcon = (p) => <Icon d="M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.2.65.77 1.1 1.51 1H21a2 2 0 010 4h-.09c-.74.1-1.31.55-1.51 1.01z" {...p} />;
 const RefreshIcon = (p) => <Icon d="M23 4v6h-6M1 20v-6h6M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" {...p} />;
+const PhoneCallIcon = (p) => <Icon d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" {...p} />;
+const MicIcon = (p) => <Icon d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zM19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" {...p} />;
 const LinkedInIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="#0A66C2">
     <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
@@ -254,7 +256,12 @@ const LinkedInIcon = ({ size = 18 }) => (
 
 // ─── MAIN APP ────────────────────────────────────────────────────
 export default function App() {
-  const [leads, setLeads] = useState([]);
+  const [leads, setLeads] = useState(() => {
+    try {
+      const saved = localStorage.getItem("sns_leads");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [view, setView] = useState("dashboard"); // dashboard | leads | agent | pipeline | detail
   const [selectedLead, setSelectedLead] = useState(null);
   const [search, setSearch] = useState("");
@@ -274,6 +281,21 @@ export default function App() {
     lushaApiKey: "",
     snovClientId: "",
     snovClientSecret: "",
+    vapiApiKey: "",
+    vapiPhoneNumberId: "",
+    vapiVoiceProvider: "openai",
+    vapiVoice: "alloy",
+    vapiFirstMessage: "Merhaba, Sun&Sun Danışmanlık firmasından arıyorum. Birkaç dakikanız var mı?",
+    vapiPrompt: `Sen Sun&Sun Danışmanlık firması adına arama yapan profesyonel bir iş geliştirme uzmanısın. Görevin, potansiyel müşterilerle kısa ve nazik bir konuşma yaparak hizmetlerimize ilgi duyup duymadıklarını anlamak.
+
+Sun&Sun hizmetleri: Turquality danışmanlığı, KOSGEB hibeleri, ihracat geliştirme, AB hibeleri, TÜBİTAK projeleri, dijital pazarlama ve kalite yönetimi (ISO).
+
+Kurallar:
+- Kibar, samimi ve profesyonel ol
+- 2-3 dakikadan uzun süre konuşma
+- Eğer ilgilenirlerse bir toplantı öner
+- Eğer ilgilenmiyorlarsa nazikçe konuşmayı bitir
+- Türkçe konuş, ama gerekirse İngilizceye geç`,
     minCompanySize: "11",
     priorityIndustries: "Manufacturing, Software, Food",
     decisionMakerBoost: "+20 points",
@@ -281,6 +303,9 @@ export default function App() {
     notifyNewLeads: "Enabled",
     dailySummary: "09:00 AM",
   });
+  const [activeCall, setActiveCall] = useState(null); // { callId, lead, status, startTime }
+  const [showCallModal, setShowCallModal] = useState(false);
+  const callPollRef = useRef(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importPreview, setImportPreview] = useState([]);
@@ -288,6 +313,127 @@ export default function App() {
   const [importStats, setImportStats] = useState(null);
   const [newLead, setNewLead] = useState({ firstName: "", lastName: "", title: "", company: "", industry: "", city: "", companySize: "", email: "", phone: "", linkedinUrl: "", source: "", notes: "" });
   const logRef = useRef(null);
+
+  // Persist leads to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem("sns_leads", JSON.stringify(leads));
+  }, [leads]);
+
+  // ─── VAPI COLD CALL ──────────────────────────────────────────────
+  const initiateCall = async (lead) => {
+    if (!settings.vapiApiKey) {
+      alert("Add your Vapi API key in Settings first.");
+      return;
+    }
+    if (!lead.phone) {
+      alert("This lead has no phone number.");
+      return;
+    }
+    if (!settings.vapiPhoneNumberId) {
+      alert("Add your Vapi Phone Number ID in Settings first.");
+      return;
+    }
+
+    const callEntry = { callId: null, startTime: new Date().toISOString(), status: "dialing", transcript: "", outcome: "", duration: null };
+    setActiveCall({ ...callEntry, lead });
+    setShowCallModal(true);
+
+    try {
+      const res = await fetch("/api/vapi/call/phone", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${settings.vapiApiKey.trim()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phoneNumberId: settings.vapiPhoneNumberId.trim(),
+          customer: { number: lead.phone.trim() },
+          assistant: {
+            model: {
+              provider: "openai",
+              model: "gpt-4o",
+              messages: [{ role: "system", content: settings.vapiPrompt }],
+            },
+            voice: { provider: settings.vapiVoiceProvider || "openai", voiceId: settings.vapiVoice || "alloy" },
+            firstMessage: settings.vapiFirstMessage,
+            endCallFunctionEnabled: true,
+            recordingEnabled: true,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const callId = data.id;
+      setActiveCall((prev) => ({ ...prev, callId, status: "ringing" }));
+
+      // Poll for call status every 5 seconds
+      callPollRef.current = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`/api/vapi/call/${callId}`, {
+            headers: { "Authorization": `Bearer ${settings.vapiApiKey.trim()}` },
+          });
+          const callData = await statusRes.json();
+          const status = callData.status; // queued | ringing | in-progress | forwarding | ended
+          const transcript = callData.transcript || "";
+          const endedReason = callData.endedReason || "";
+
+          setActiveCall((prev) => ({ ...prev, status, transcript, endedReason }));
+
+          if (status === "ended") {
+            clearInterval(callPollRef.current);
+            const duration = callData.endedAt && callData.startedAt
+              ? Math.round((new Date(callData.endedAt) - new Date(callData.startedAt)) / 1000)
+              : null;
+
+            const outcome = endedReason === "customer-ended-call" ? "Completed"
+              : endedReason === "assistant-ended-call" ? "Completed"
+              : endedReason === "voicemail" ? "Voicemail"
+              : endedReason === "no-answer" ? "No Answer"
+              : endedReason || "Ended";
+
+            const historyEntry = {
+              callId,
+              date: new Date().toLocaleDateString(),
+              time: new Date(callData.startedAt || Date.now()).toLocaleTimeString(),
+              duration: duration ? `${duration}s` : "—",
+              status: outcome,
+              transcript,
+              endedReason,
+            };
+
+            setActiveCall((prev) => ({ ...prev, status: "ended", duration, outcome, transcript }));
+            updateLead(lead.id, {
+              lastContact: new Date().toISOString().split("T")[0],
+              callHistory: [historyEntry, ...(lead.callHistory || [])],
+              notes: transcript
+                ? `[Call ${historyEntry.date}] ${transcript.slice(0, 300)}${transcript.length > 300 ? "..." : ""}\n\n${lead.notes || ""}`
+                : lead.notes,
+            });
+            if (selectedLead?.id === lead.id) {
+              setSelectedLead((prev) => ({
+                ...prev,
+                lastContact: new Date().toISOString().split("T")[0],
+                callHistory: [historyEntry, ...(prev.callHistory || [])],
+              }));
+            }
+          }
+        } catch (_) { /* silent poll error */ }
+      }, 5000);
+    } catch (err) {
+      setActiveCall((prev) => ({ ...prev, status: "error", errorMessage: err.message }));
+    }
+  };
+
+  const endActiveCall = () => {
+    if (callPollRef.current) clearInterval(callPollRef.current);
+    setShowCallModal(false);
+    setActiveCall(null);
+  };
 
   const submitNewLead = () => {
     const lead = {
@@ -586,10 +732,13 @@ export default function App() {
     success: "#10B981", danger: "#EF4444", warning: "#F59E0B",
   };
 
+  const totalCalls = leads.reduce((acc, l) => acc + (l.callHistory?.length || 0), 0);
+
   const sidebarItems = [
     { id: "dashboard", label: "Dashboard", icon: <BarChartIcon size={18} /> },
     { id: "leads", label: "Leads", icon: <UserIcon size={18} /> },
     { id: "pipeline", label: "Pipeline", icon: <BriefcaseIcon size={18} /> },
+    { id: "calls", label: "Cold Calls", icon: <PhoneCallIcon size={18} />, badge: totalCalls || null },
     { id: "agent", label: "AI Agent", icon: <BotIcon size={18} /> },
     { id: "settings", label: "Settings", icon: <SettingsIcon size={18} /> },
   ];
@@ -625,6 +774,9 @@ export default function App() {
               {item.label}
               {item.id === "agent" && agentRunning && (
                 <span style={{ marginLeft: "auto", width: 8, height: 8, borderRadius: "50%", background: colors.success, animation: "pulse 1s infinite" }} />
+              )}
+              {item.badge && item.id !== "agent" && (
+                <span style={{ marginLeft: "auto", minWidth: 18, height: 18, borderRadius: 9, background: colors.primary, color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{item.badge}</span>
               )}
             </button>
           ))}
@@ -839,9 +991,18 @@ export default function App() {
         {/* ══════════ LEAD DETAIL ══════════ */}
         {view === "leads" && selectedLead && (
           <div style={{ animation: "slideIn .3s ease" }}>
-            <button onClick={() => setSelectedLead(null)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, cursor: "pointer", fontSize: 12, fontFamily: font, marginBottom: 20 }}>
-              ← Back to Leads
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <button onClick={() => setSelectedLead(null)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, cursor: "pointer", fontSize: 12, fontFamily: font }}>
+                ← Back to Leads
+              </button>
+              <button
+                onClick={() => initiateCall(selectedLead)}
+                disabled={!selectedLead.phone}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: selectedLead.phone ? colors.success : colors.border, border: "none", borderRadius: 8, color: selectedLead.phone ? "#fff" : colors.textDim, cursor: selectedLead.phone ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, fontFamily: font, transition: "all .15s" }}
+              >
+                <PhoneCallIcon size={14} /> Cold Call
+              </button>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
               {/* Left: Info */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
@@ -910,6 +1071,114 @@ export default function App() {
                     style={{ width: "100%", minHeight: 100, padding: 12, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 12, outline: "none", resize: "vertical", fontFamily: font }}
                   />
                 </div>
+                {/* Call History */}
+                {selectedLead.callHistory?.length > 0 && (
+                  <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                      <PhoneCallIcon size={14} color={colors.success} /> Call History
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {selectedLead.callHistory.map((c, i) => (
+                        <div key={i} style={{ padding: 12, background: colors.bg, borderRadius: 8, border: `1px solid ${colors.border}` }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600 }}>{c.date} {c.time}</span>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <span style={{ fontSize: 11, color: colors.textDim }}>{c.duration}</span>
+                              <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: c.status === "Completed" ? `${colors.success}20` : `${colors.warning}20`, color: c.status === "Completed" ? colors.success : colors.warning }}>{c.status}</span>
+                            </div>
+                          </div>
+                          {c.transcript && (
+                            <details style={{ marginTop: 4 }}>
+                              <summary style={{ fontSize: 11, color: colors.textMuted, cursor: "pointer" }}>View transcript</summary>
+                              <p style={{ fontSize: 11, color: colors.textDim, marginTop: 6, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{c.transcript}</p>
+                            </details>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════ COLD CALLS ══════════ */}
+        {view === "calls" && (
+          <div style={{ animation: "slideIn .3s ease" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+              <div>
+                <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Cold Calls</h1>
+                <p style={{ color: colors.textMuted, fontSize: 13 }}>AI-powered outbound calling via Vapi — all call history across leads</p>
+              </div>
+              {!settings.vapiApiKey && (
+                <div style={{ padding: "10px 16px", background: `${colors.warning}15`, border: `1px solid ${colors.warning}40`, borderRadius: 10, fontSize: 12, color: colors.warning, maxWidth: 280 }}>
+                  Add your Vapi API key in <button onClick={() => setView("settings")} style={{ background: "none", border: "none", color: colors.accent, cursor: "pointer", fontWeight: 600, padding: 0, fontSize: 12 }}>Settings</button> to enable calling.
+                </div>
+              )}
+            </div>
+
+            {/* Stats row */}
+            {(() => {
+              const allCalls = leads.flatMap((l) => (l.callHistory || []).map((c) => ({ ...c, lead: l })));
+              const completed = allCalls.filter((c) => c.status === "Completed").length;
+              const noAnswer = allCalls.filter((c) => c.status === "No Answer").length;
+              const voicemail = allCalls.filter((c) => c.status === "Voicemail").length;
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
+                  {[
+                    { label: "Total Calls", value: allCalls.length, color: colors.primary },
+                    { label: "Completed", value: completed, color: colors.success },
+                    { label: "No Answer", value: noAnswer, color: colors.warning },
+                    { label: "Voicemail", value: voicemail, color: colors.textMuted },
+                  ].map((s) => (
+                    <div key={s.label} style={{ background: colors.surface, borderRadius: 12, padding: "16px 20px", border: `1px solid ${colors.border}` }}>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: s.color }}>{s.value}</div>
+                      <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Leads eligible for calling */}
+            <div style={{ background: colors.surface, borderRadius: 12, border: `1px solid ${colors.border}`, overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 600 }}>
+                Leads with Phone Numbers ({leads.filter((l) => l.phone).length})
+              </div>
+              <div style={{ overflowY: "auto", maxHeight: 480 }}>
+                {leads.filter((l) => l.phone).length === 0 ? (
+                  <div style={{ padding: 32, textAlign: "center", color: colors.textDim, fontSize: 13 }}>No leads with phone numbers yet.</div>
+                ) : (
+                  leads.filter((l) => l.phone).map((lead) => (
+                    <div key={lead.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 20px", borderBottom: `1px solid ${colors.border}` }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = colors.surfaceHover)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${colors.primary}40, ${colors.accent}40)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                        {lead.firstName[0]}{lead.lastName[0]}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{lead.firstName} {lead.lastName}</div>
+                        <div style={{ fontSize: 11, color: colors.textMuted }}>{lead.title} · {lead.company}</div>
+                      </div>
+                      <div style={{ fontSize: 12, color: colors.textDim, fontFamily: mono }}>{lead.phone}</div>
+                      <div style={{ fontSize: 11, color: colors.textMuted, width: 80, textAlign: "center" }}>
+                        {lead.callHistory?.length ? `${lead.callHistory.length} call${lead.callHistory.length > 1 ? "s" : ""}` : "Not called"}
+                      </div>
+                      {lead.callHistory?.length > 0 && (
+                        <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: lead.callHistory[0].status === "Completed" ? `${colors.success}20` : `${colors.warning}20`, color: lead.callHistory[0].status === "Completed" ? colors.success : colors.warning }}>
+                          {lead.callHistory[0].status}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => initiateCall(lead)}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: colors.success, border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: font, flexShrink: 0 }}
+                      >
+                        <PhoneCallIcon size={13} /> Call
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -1041,6 +1310,84 @@ export default function App() {
           <div style={{ animation: "slideIn .3s ease", maxWidth: 600 }}>
             <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Settings</h1>
             <p style={{ color: colors.textMuted, fontSize: 13, marginBottom: 24 }}>Configure your ERP and agent settings</p>
+            {/* Vapi Cold Calling — custom section with textarea for prompt */}
+            <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Vapi Cold Calling</h3>
+              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>Sign up free at vapi.ai — no payment needed to get started.</p>
+              {[
+                { label: "API Key", key: "vapiApiKey", type: "password", placeholder: "vapi_..." },
+                { label: "Phone Number ID", key: "vapiPhoneNumberId", placeholder: "From Vapi dashboard → Phone Numbers" },
+                { label: "First Message (what AI says first)", key: "vapiFirstMessage", placeholder: "Hello, I'm calling from Sun&Sun..." },
+              ].map((f) => (
+                <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
+                  <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
+                  <input
+                    value={settings[f.key] || ""}
+                    type={f.type || "text"}
+                    placeholder={f.placeholder || ""}
+                    onChange={(e) => setSettings((p) => ({ ...p, [f.key]: e.target.value }))}
+                    style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", textAlign: "right", width: 280 }}
+                  />
+                </div>
+              ))}
+              {/* Voice provider + voice picker */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
+                <div>
+                  <span style={{ fontSize: 12, color: colors.textMuted }}>Voice Provider</span>
+                  <span style={{ fontSize: 10, color: colors.success, marginLeft: 8 }}>
+                    {settings.vapiVoiceProvider === "openai" ? "✓ Free with Vapi credits" : settings.vapiVoiceProvider === "11labs" ? "Requires ElevenLabs account" : ""}
+                  </span>
+                </div>
+                <select
+                  value={settings.vapiVoiceProvider || "openai"}
+                  onChange={(e) => setSettings((p) => ({ ...p, vapiVoiceProvider: e.target.value, vapiVoice: e.target.value === "openai" ? "alloy" : "" }))}
+                  style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", width: 180 }}
+                >
+                  <option value="openai">OpenAI TTS (recommended)</option>
+                  <option value="11labs">ElevenLabs (most human)</option>
+                  <option value="deepgram">Deepgram Aura (fast)</option>
+                  <option value="azure">Azure Neural</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
+                <div>
+                  <span style={{ fontSize: 12, color: colors.textMuted }}>Voice</span>
+                  {settings.vapiVoiceProvider === "openai" && (
+                    <span style={{ fontSize: 10, color: colors.textDim, marginLeft: 8 }}>alloy · echo · fable · onyx · nova · shimmer</span>
+                  )}
+                </div>
+                {settings.vapiVoiceProvider === "openai" ? (
+                  <select
+                    value={settings.vapiVoice || "alloy"}
+                    onChange={(e) => setSettings((p) => ({ ...p, vapiVoice: e.target.value }))}
+                    style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", width: 180 }}
+                  >
+                    <option value="alloy">alloy (neutral)</option>
+                    <option value="echo">echo (male, clear)</option>
+                    <option value="fable">fable (expressive)</option>
+                    <option value="onyx">onyx (deep male)</option>
+                    <option value="nova">nova (female, warm)</option>
+                    <option value="shimmer">shimmer (female, soft)</option>
+                  </select>
+                ) : (
+                  <input
+                    value={settings.vapiVoice || ""}
+                    placeholder={settings.vapiVoiceProvider === "11labs" ? "e.g. elliot, rachel" : settings.vapiVoiceProvider === "deepgram" ? "e.g. aura-asteria-en" : "voice ID"}
+                    onChange={(e) => setSettings((p) => ({ ...p, vapiVoice: e.target.value }))}
+                    style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", textAlign: "right", width: 280 }}
+                  />
+                )}
+              </div>
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 6 }}>AI System Prompt (the script / personality)</div>
+                <textarea
+                  value={settings.vapiPrompt || ""}
+                  onChange={(e) => setSettings((p) => ({ ...p, vapiPrompt: e.target.value }))}
+                  style={{ width: "100%", minHeight: 140, padding: 12, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 12, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
+                />
+              </div>
+            </div>
+
             {[
               { title: "Lusha Configuration", fields: [
                 { label: "API Provider", value: "Lusha (lusha.com)", disabled: true },
@@ -1205,6 +1552,80 @@ export default function App() {
               <button onClick={submitNewLead} disabled={!newLead.firstName || !newLead.lastName || !newLead.company}
                 style={{ padding: "8px 20px", background: !newLead.firstName || !newLead.lastName || !newLead.company ? colors.surfaceHover : colors.primary, border: "none", borderRadius: 8, color: !newLead.firstName || !newLead.lastName || !newLead.company ? colors.textDim : "#fff", cursor: !newLead.firstName || !newLead.lastName || !newLead.company ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: font }}>
                 Add Lead
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ══════════ CALL STATUS MODAL ══════════ */}
+      {showCallModal && activeCall && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
+          <div style={{ background: colors.surface, borderRadius: 20, padding: 32, width: 480, border: `1px solid ${colors.border}`, animation: "slideIn .2s ease" }}>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                background: activeCall.status === "ended" ? `${colors.success}20` : activeCall.status === "error" ? `${colors.danger}20` : `${colors.primary}20`,
+                animation: ["ringing", "in-progress", "dialing"].includes(activeCall.status) ? "pulse 1.5s infinite" : "none",
+              }}>
+                <PhoneCallIcon size={24} color={activeCall.status === "ended" ? colors.success : activeCall.status === "error" ? colors.danger : colors.primary} />
+              </div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>
+                  {activeCall.lead.firstName} {activeCall.lead.lastName}
+                </div>
+                <div style={{ fontSize: 12, color: colors.textMuted }}>{activeCall.lead.title} · {activeCall.lead.company}</div>
+              </div>
+            </div>
+
+            {/* Status */}
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 20px", borderRadius: 20,
+                background: activeCall.status === "ended" ? `${colors.success}20` : activeCall.status === "error" ? `${colors.danger}20` : `${colors.primary}20`,
+                color: activeCall.status === "ended" ? colors.success : activeCall.status === "error" ? colors.danger : colors.primaryLight,
+                fontSize: 13, fontWeight: 600,
+              }}>
+                {activeCall.status === "dialing" && "📞 Dialing..."}
+                {activeCall.status === "ringing" && "🔔 Ringing..."}
+                {activeCall.status === "in-progress" && "🎙️ In progress..."}
+                {activeCall.status === "ended" && `✅ Call ended${activeCall.outcome ? ` · ${activeCall.outcome}` : ""}`}
+                {activeCall.status === "error" && `❌ Error: ${activeCall.errorMessage}`}
+              </div>
+            </div>
+
+            {/* Live info */}
+            <div style={{ background: colors.bg, borderRadius: 10, padding: 14, marginBottom: 20, fontSize: 12, color: colors.textMuted }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Number</span>
+                <span style={{ fontFamily: mono, color: colors.text }}>{activeCall.lead.phone}</span>
+              </div>
+              {activeCall.duration != null && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                  <span>Duration</span>
+                  <span style={{ color: colors.text }}>{activeCall.duration}s</span>
+                </div>
+              )}
+            </div>
+
+            {/* Transcript */}
+            {activeCall.transcript && (
+              <div style={{ background: colors.bg, borderRadius: 10, padding: 14, marginBottom: 20, maxHeight: 160, overflowY: "auto" }}>
+                <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Transcript</div>
+                <p style={{ fontSize: 12, color: colors.text, lineHeight: 1.6, whiteSpace: "pre-wrap", margin: 0 }}>{activeCall.transcript}</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              {activeCall.status !== "ended" && activeCall.status !== "error" && (
+                <div style={{ fontSize: 12, color: colors.textDim, alignSelf: "center", marginRight: "auto" }}>Checking status every 5s...</div>
+              )}
+              <button
+                onClick={endActiveCall}
+                style={{ padding: "8px 20px", background: activeCall.status === "ended" || activeCall.status === "error" ? colors.primary : colors.danger, border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: font }}
+              >
+                {activeCall.status === "ended" || activeCall.status === "error" ? "Close" : "Dismiss"}
               </button>
             </div>
           </div>

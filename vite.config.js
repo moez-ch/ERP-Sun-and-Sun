@@ -15,6 +15,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/snov/, ""),
       },
+      "/api/vapi": {
+        target: "https://api.vapi.ai",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/vapi/, ""),
+      },
     },
   },
 });
