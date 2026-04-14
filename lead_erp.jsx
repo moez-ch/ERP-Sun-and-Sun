@@ -296,6 +296,9 @@ Kurallar:
 - Eğer ilgilenirlerse bir toplantı öner
 - Eğer ilgilenmiyorlarsa nazikçe konuşmayı bitir
 - Türkçe konuş, ama gerekirse İngilizceye geç`,
+    twilioAccountSid: "",
+    twilioAuthToken: "",
+    twilioFromNumber: "",
     minCompanySize: "11",
     priorityIndustries: "Manufacturing, Software, Food",
     decisionMakerBoost: "+20 points",
@@ -433,6 +436,115 @@ Kurallar:
     if (callPollRef.current) clearInterval(callPollRef.current);
     setShowCallModal(false);
     setActiveCall(null);
+  };
+
+  // ─── TWILIO COLD CALL ─────────────────────────────────────────────
+  const initiateTwilioCall = async (lead) => {
+    if (!settings.twilioAccountSid || !settings.twilioAuthToken) {
+      alert("Add your Twilio Account SID and Auth Token in Settings first.");
+      return;
+    }
+    if (!settings.twilioFromNumber) {
+      alert("Add your Twilio phone number in Settings first.");
+      return;
+    }
+    if (!lead.phone) {
+      alert("This lead has no phone number.");
+      return;
+    }
+
+    const callEntry = { callId: null, startTime: new Date().toISOString(), status: "dialing", transcript: "", outcome: "", duration: null };
+    setActiveCall({ ...callEntry, lead });
+    setShowCallModal(true);
+
+    const twiml = `<Response><Say voice="alice" language="tr-TR">${(settings.vapiFirstMessage || "Merhaba, Sun and Sun Danışmanlık firmasından arıyorum. Birkaç dakikanız var mı?").replace(/&/g, "&amp;")}</Say><Pause length="2"/><Say voice="alice" language="tr-TR">Eğer hizmetlerimiz hakkında bilgi almak isterseniz, lütfen bizi geri arayın. Teşekkürler, iyi günler.</Say></Response>`;
+
+    const body = new URLSearchParams({
+      To: lead.phone.trim(),
+      From: settings.twilioFromNumber.trim(),
+      Twiml: twiml,
+    });
+
+    const auth = btoa(`${settings.twilioAccountSid.trim()}:${settings.twilioAuthToken.trim()}`);
+
+    try {
+      const res = await fetch(`/api/twilio/2010-04-01/Accounts/${settings.twilioAccountSid.trim()}/Calls.json`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Basic ${auth}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: body.toString(),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const callSid = data.sid;
+      setActiveCall((prev) => ({ ...prev, callId: callSid, status: "ringing" }));
+
+      // Poll for call status every 5 seconds
+      callPollRef.current = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`/api/twilio/2010-04-01/Accounts/${settings.twilioAccountSid.trim()}/Calls/${callSid}.json`, {
+            headers: { "Authorization": `Basic ${auth}` },
+          });
+          const callData = await statusRes.json();
+          const status = callData.status; // queued | ringing | in-progress | canceled | completed | busy | no-answer | failed
+
+          const mappedStatus = status === "completed" ? "ended"
+            : status === "in-progress" ? "in-progress"
+            : status === "ringing" ? "ringing"
+            : status === "queued" ? "ringing"
+            : status === "failed" || status === "canceled" ? "ended"
+            : status;
+
+          setActiveCall((prev) => ({ ...prev, status: mappedStatus }));
+
+          if (["completed", "failed", "canceled", "busy", "no-answer"].includes(status)) {
+            clearInterval(callPollRef.current);
+
+            const startedAt = callData.start_time ? new Date(callData.start_time) : null;
+            const endedAt = callData.end_time ? new Date(callData.end_time) : null;
+            const duration = startedAt && endedAt ? Math.round((endedAt - startedAt) / 1000) : (parseInt(callData.duration) || null);
+
+            const outcome = status === "completed" ? "Completed"
+              : status === "busy" ? "Busy"
+              : status === "no-answer" ? "No Answer"
+              : status === "failed" ? "Failed"
+              : "Ended";
+
+            const historyEntry = {
+              callId: callSid,
+              date: new Date().toLocaleDateString(),
+              time: new Date().toLocaleTimeString(),
+              duration: duration ? `${duration}s` : "—",
+              status: outcome,
+              transcript: "",
+              provider: "twilio",
+            };
+
+            setActiveCall((prev) => ({ ...prev, status: "ended", duration, outcome }));
+            updateLead(lead.id, {
+              lastContact: new Date().toISOString().split("T")[0],
+              callHistory: [historyEntry, ...(lead.callHistory || [])],
+            });
+            if (selectedLead?.id === lead.id) {
+              setSelectedLead((prev) => ({
+                ...prev,
+                lastContact: new Date().toISOString().split("T")[0],
+                callHistory: [historyEntry, ...(prev.callHistory || [])],
+              }));
+            }
+          }
+        } catch (_) { /* silent poll error */ }
+      }, 5000);
+    } catch (err) {
+      setActiveCall((prev) => ({ ...prev, status: "error", errorMessage: err.message }));
+    }
   };
 
   const submitNewLead = () => {
@@ -996,11 +1108,11 @@ Kurallar:
                 ← Back to Leads
               </button>
               <button
-                onClick={() => initiateCall(selectedLead)}
+                onClick={() => settings.twilioAccountSid ? initiateTwilioCall(selectedLead) : initiateCall(selectedLead)}
                 disabled={!selectedLead.phone}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: selectedLead.phone ? colors.success : colors.border, border: "none", borderRadius: 8, color: selectedLead.phone ? "#fff" : colors.textDim, cursor: selectedLead.phone ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, fontFamily: font, transition: "all .15s" }}
               >
-                <PhoneCallIcon size={14} /> Cold Call
+                <PhoneCallIcon size={14} /> Cold Call {settings.twilioAccountSid ? "(Twilio)" : "(Vapi)"}
               </button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
@@ -1111,9 +1223,14 @@ Kurallar:
                 <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Cold Calls</h1>
                 <p style={{ color: colors.textMuted, fontSize: 13 }}>AI-powered outbound calling via Vapi — all call history across leads</p>
               </div>
-              {!settings.vapiApiKey && (
-                <div style={{ padding: "10px 16px", background: `${colors.warning}15`, border: `1px solid ${colors.warning}40`, borderRadius: 10, fontSize: 12, color: colors.warning, maxWidth: 280 }}>
-                  Add your Vapi API key in <button onClick={() => setView("settings")} style={{ background: "none", border: "none", color: colors.accent, cursor: "pointer", fontWeight: 600, padding: 0, fontSize: 12 }}>Settings</button> to enable calling.
+              {!settings.twilioAccountSid && !settings.vapiApiKey && (
+                <div style={{ padding: "10px 16px", background: `${colors.warning}15`, border: `1px solid ${colors.warning}40`, borderRadius: 10, fontSize: 12, color: colors.warning, maxWidth: 340 }}>
+                  Add your <strong>Twilio</strong> or Vapi credentials in <button onClick={() => setView("settings")} style={{ background: "none", border: "none", color: colors.accent, cursor: "pointer", fontWeight: 600, padding: 0, fontSize: 12 }}>Settings</button> to enable calling.
+                </div>
+              )}
+              {settings.twilioAccountSid && (
+                <div style={{ padding: "6px 12px", background: `${colors.success}15`, border: `1px solid ${colors.success}40`, borderRadius: 8, fontSize: 11, color: colors.success }}>
+                  ✓ Twilio connected
                 </div>
               )}
             </div>
@@ -1171,7 +1288,7 @@ Kurallar:
                         </span>
                       )}
                       <button
-                        onClick={() => initiateCall(lead)}
+                        onClick={() => settings.twilioAccountSid ? initiateTwilioCall(lead) : initiateCall(lead)}
                         style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: colors.success, border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: font, flexShrink: 0 }}
                       >
                         <PhoneCallIcon size={13} /> Call
@@ -1310,10 +1427,33 @@ Kurallar:
           <div style={{ animation: "slideIn .3s ease", maxWidth: 600 }}>
             <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Settings</h1>
             <p style={{ color: colors.textMuted, fontSize: 13, marginBottom: 24 }}>Configure your ERP and agent settings</p>
+            {/* Twilio Cold Calling (Test Mode) */}
+            <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Twilio Cold Calling <span style={{ fontSize: 11, color: colors.success, fontWeight: 400 }}>✓ Recommended for testing</span></h3>
+              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>Use your Twilio free trial to test calls. Find these in your <strong>Twilio Console → Account Info</strong>.</p>
+              {[
+                { label: "Account SID", key: "twilioAccountSid", placeholder: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
+                { label: "Auth Token", key: "twilioAuthToken", type: "password", placeholder: "Your Twilio Auth Token" },
+                { label: "From Number", key: "twilioFromNumber", placeholder: "+1xxxxxxxxxx (your Twilio number)" },
+              ].map((f) => (
+                <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
+                  <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
+                  <input
+                    value={settings[f.key] || ""}
+                    type={f.type || "text"}
+                    placeholder={f.placeholder || ""}
+                    onChange={(e) => setSettings((p) => ({ ...p, [f.key]: e.target.value }))}
+                    style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", textAlign: "right", width: 280 }}
+                  />
+                </div>
+              ))}
+              <p style={{ fontSize: 11, color: colors.textMuted, marginTop: 12 }}>⚠️ Free trial only calls <strong>verified numbers</strong>. Verify your test number at <strong>Twilio Console → Verified Caller IDs</strong>.</p>
+            </div>
+
             {/* Vapi Cold Calling — custom section with textarea for prompt */}
             <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Vapi Cold Calling</h3>
-              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>Sign up free at vapi.ai — no payment needed to get started.</p>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Vapi Cold Calling <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 400 }}>(human-like voice — upgrade required)</span></h3>
+              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>Sign up free at vapi.ai — upgrade needed to use phone numbers.</p>
               {[
                 { label: "API Key", key: "vapiApiKey", type: "password", placeholder: "vapi_..." },
                 { label: "Phone Number ID", key: "vapiPhoneNumberId", placeholder: "From Vapi dashboard → Phone Numbers" },
