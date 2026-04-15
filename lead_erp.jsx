@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import snsLogo from "./sns_logo.png";
 import * as XLSX from "xlsx";
+import LoginPage from "./LoginPage.jsx";
 
 // ─── CONSTANTS & UTILITIES ───────────────────────────────────────
 const INDUSTRIES = ["Manufacturing", "Software/IT", "Food & Beverage", "Tourism & Hospitality", "Textile & Fashion", "Agriculture", "Healthcare", "Education", "Energy", "Construction", "Automotive", "Defense"];
@@ -256,6 +257,40 @@ const LinkedInIcon = ({ size = 18 }) => (
 
 // ─── MAIN APP ────────────────────────────────────────────────────
 export default function App() {
+  const [authUser, setAuthUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem("sns_token");
+    if (!token) { setAuthLoading(false); return; }
+    fetch("/auth/me", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.user) setAuthUser(data.user);
+        else { localStorage.removeItem("sns_token"); localStorage.removeItem("sns_user"); }
+      })
+      .catch(() => {})
+      .finally(() => setAuthLoading(false));
+  }, []);
+
+  const handleLogin = (user) => setAuthUser(user);
+  const handleLogout = () => {
+    localStorage.removeItem("sns_token");
+    localStorage.removeItem("sns_user");
+    setAuthUser(null);
+  };
+
+  if (authLoading) return (
+    <div style={{ minHeight: "100vh", background: "#0A3E62", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, fontFamily: "sans-serif" }}>Loading...</div>
+    </div>
+  );
+  if (!authUser) return <LoginPage onLogin={handleLogin} />;
+  return <Dashboard authUser={authUser} onLogout={handleLogout} />;
+}
+
+function Dashboard({ authUser, onLogout: handleLogout }) {
+  // ── LEADS STATE ─────────────────────────────────────────────────
   const [leads, setLeads] = useState(() => {
     try {
       const saved = localStorage.getItem("sns_leads");
@@ -316,6 +351,82 @@ Kurallar:
   const [importStats, setImportStats] = useState(null);
   const [newLead, setNewLead] = useState({ firstName: "", lastName: "", title: "", company: "", industry: "", city: "", companySize: "", email: "", phone: "", linkedinUrl: "", source: "", notes: "" });
   const logRef = useRef(null);
+
+  // ── USER MANAGEMENT STATE (admin only) ──────────────────────────
+  const [umUsers, setUmUsers] = useState([]);
+  const [umLoading, setUmLoading] = useState(false);
+  const [umError, setUmError] = useState("");
+  const [umSuccess, setUmSuccess] = useState("");
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "user" });
+  const [pwModal, setPwModal] = useState(null); // { id, name } or null
+  const [newPw, setNewPw] = useState("");
+  const [newPwError, setNewPwError] = useState("");
+
+  const umFetch = useCallback(() => {
+    const token = localStorage.getItem("sns_token");
+    if (!token) return;
+    setUmLoading(true);
+    setUmError("");
+    fetch("/auth/users", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => setUmUsers(data))
+      .catch(() => setUmError("Failed to load users."))
+      .finally(() => setUmLoading(false));
+  }, []);
+
+  // Load users when admin enters settings
+  useEffect(() => {
+    if (view === "settings" && authUser?.role === "admin") umFetch();
+  }, [view, authUser, umFetch]);
+
+  const umAddUser = async () => {
+    setUmError(""); setUmSuccess("");
+    const { name, email, password, role } = newUser;
+    if (!name.trim() || !email.trim() || !password.trim())
+      return setUmError("Name, email and password are required.");
+    const token = localStorage.getItem("sns_token");
+    const r = await fetch("/auth/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name: name.trim(), email: email.trim(), password, role }),
+    });
+    const data = await r.json();
+    if (!r.ok) return setUmError(data.error || "Failed to add user.");
+    setUmSuccess(`${name} added successfully.`);
+    setNewUser({ name: "", email: "", password: "", role: "user" });
+    setShowAddUser(false);
+    umFetch();
+  };
+
+  const umDeleteUser = async (id, name) => {
+    if (!window.confirm(`Delete "${name}"?`)) return;
+    setUmError(""); setUmSuccess("");
+    const token = localStorage.getItem("sns_token");
+    const r = await fetch(`/auth/users/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await r.json();
+    if (!r.ok) return setUmError(data.error || "Failed to delete user.");
+    setUmSuccess(`${name} deleted.`);
+    umFetch();
+  };
+
+  const umChangePw = async () => {
+    setNewPwError("");
+    if (!newPw || newPw.length < 6) return setNewPwError("Password must be at least 6 characters.");
+    const token = localStorage.getItem("sns_token");
+    const r = await fetch(`/auth/users/${pwModal.id}/password`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ password: newPw }),
+    });
+    const data = await r.json();
+    if (!r.ok) return setNewPwError(data.error || "Failed to change password.");
+    setUmSuccess(`Password updated for ${pwModal.name}.`);
+    setPwModal(null); setNewPw("");
+  };
 
   // Persist leads to localStorage whenever they change
   useEffect(() => {
@@ -813,21 +924,45 @@ Kurallar:
   });
 
   // Stats
+  const wonCount  = leads.filter((l) => l.status === "Won").length;
+  const lostCount = leads.filter((l) => l.status === "Lost").length;
   const stats = {
     total: leads.length,
     new: leads.filter((l) => l.status === "New").length,
     qualified: leads.filter((l) => l.status === "Qualified").length,
-    won: leads.filter((l) => l.status === "Won").length,
+    won: wonCount,
+    lost: lostCount,
     avgScore: leads.length ? Math.round(leads.reduce((a, l) => a + l.score, 0) / leads.length) : 0,
+    winRate: (wonCount + lostCount) > 0 ? Math.round(wonCount / (wonCount + lostCount) * 100) : null,
     byIndustry: INDUSTRIES.map((ind) => ({ name: ind, count: leads.filter((l) => l.industry === ind).length })).filter((x) => x.count > 0).sort((a, b) => b.count - a.count),
     byStatus: LEAD_STATUSES.map((s) => ({ name: s, count: leads.filter((l) => l.status === s).length })),
     byCity: CITIES.map((c) => ({ name: c, count: leads.filter((l) => l.city === c).length })).filter((x) => x.count > 0).sort((a, b) => b.count - a.count).slice(0, 6),
     topNeeds: NEEDS.map((n) => ({ name: n, count: leads.filter((l) => l.needs.includes(n)).length })).sort((a, b) => b.count - a.count).slice(0, 6),
+    // Score distribution
+    hot:  leads.filter((l) => l.score >= 80).length,
+    warm: leads.filter((l) => l.score >= 60 && l.score < 80).length,
+    cold: leads.filter((l) => l.score < 60).length,
+    // Hot leads (top 5 by score, not Won/Lost)
+    hotLeads: [...leads].filter((l) => l.status !== "Won" && l.status !== "Lost").sort((a, b) => b.score - a.score).slice(0, 5),
+    // Recent leads (last 5 added)
+    recentLeads: [...leads].slice(0, 5),
+    // Lead source breakdown
+    bySource: ["XLS Import", "AI Agent", "Manual"].map((src) => ({ name: src, count: leads.filter((l) => l.source === src).length })),
+    // Call stats
+    totalCalls: leads.reduce((a, l) => a + (l.callHistory?.length || 0), 0),
+    completedCalls: leads.reduce((a, l) => a + (l.callHistory?.filter((c) => c.status === "Completed").length || 0), 0),
+    mostCalledLead: [...leads].sort((a, b) => (b.callHistory?.length || 0) - (a.callHistory?.length || 0))[0],
+    // Funnel counts
+    funnel: ["New","Contacted","Qualified","Proposal Sent","Negotiation","Won"].map((s) => ({
+      name: s, count: leads.filter((l) => l.status === s).length,
+    })),
   };
 
   const maxInd = Math.max(...stats.byIndustry.map((x) => x.count), 1);
   const maxCity = Math.max(...stats.byCity.map((x) => x.count), 1);
   const maxNeed = Math.max(...stats.topNeeds.map((x) => x.count), 1);
+  const maxSource = Math.max(...stats.bySource.map((x) => x.count), 1);
+  const funnelMax = Math.max(...stats.funnel.map((x) => x.count), 1);
 
   // Update lead
   const updateLead = (id, updates) => setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updates } : l)));
@@ -844,15 +979,17 @@ Kurallar:
     success: "#10B981", danger: "#EF4444", warning: "#F59E0B",
   };
 
-  const totalCalls = leads.reduce((acc, l) => acc + (l.callHistory?.length || 0), 0);
+  const isAdmin = authUser?.role === "admin";
 
   const sidebarItems = [
     { id: "dashboard", label: "Dashboard", icon: <BarChartIcon size={18} /> },
     { id: "leads", label: "Leads", icon: <UserIcon size={18} /> },
     { id: "pipeline", label: "Pipeline", icon: <BriefcaseIcon size={18} /> },
-    { id: "calls", label: "Cold Calls", icon: <PhoneCallIcon size={18} />, badge: totalCalls || null },
-    { id: "agent", label: "AI Agent", icon: <BotIcon size={18} /> },
-    { id: "settings", label: "Settings", icon: <SettingsIcon size={18} /> },
+    { id: "calls", label: "Cold Calls", icon: <PhoneCallIcon size={18} />, badge: stats.totalCalls || null },
+    ...(isAdmin ? [
+      { id: "agent", label: "AI Agent", icon: <BotIcon size={18} /> },
+      { id: "settings", label: "Settings", icon: <SettingsIcon size={18} /> },
+    ] : []),
   ];
 
   // ─── RENDER ──────────────────────────────────────────────────
@@ -893,8 +1030,26 @@ Kurallar:
             </button>
           ))}
         </nav>
-        <div style={{ padding: "12px 16px", borderTop: `1px solid ${colors.border}`, fontSize: 11, color: colors.textDim }}>
-          {leads.length} leads in database
+        {/* User + Logout */}
+        <div style={{ padding: "12px 16px", borderTop: `1px solid ${colors.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <div style={{ width: 30, height: 30, borderRadius: "50%", background: colors.primary, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+              {authUser.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+            </div>
+            <div style={{ overflow: "hidden" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: colors.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{authUser.name}</div>
+              <div style={{ fontSize: 10, color: colors.textDim, textTransform: "capitalize" }}>{authUser.role}</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 10, color: colors.textDim, marginBottom: 8 }}>{leads.length} leads in database</div>
+          <button
+            onClick={handleLogout}
+            style={{ width: "100%", padding: "7px 10px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textDim, fontSize: 11, fontWeight: 500, cursor: "pointer", fontFamily: font, textAlign: "left", transition: "all .15s" }}
+            onMouseEnter={(e) => { e.target.style.borderColor = colors.danger; e.target.style.color = colors.danger; }}
+            onMouseLeave={(e) => { e.target.style.borderColor = colors.border; e.target.style.color = colors.textDim; }}
+          >
+            ↩ Çıkış Yap
+          </button>
         </div>
       </div>
 
@@ -912,14 +1067,32 @@ Kurallar:
         {/* ══════════ DASHBOARD ══════════ */}
         {view === "dashboard" && (
           <div style={{ animation: "slideIn .3s ease" }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Dashboard</h1>
-            <p style={{ color: colors.textMuted, fontSize: 13, marginBottom: 24 }}>Overview of your lead pipeline and agent activity</p>
+            {/* Header + Quick Actions */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+              <div>
+                <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Dashboard</h1>
+                <p style={{ color: colors.textMuted, fontSize: 13 }}>Overview of your lead pipeline and agent activity</p>
+              </div>
+              {isAdmin && (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setShowAddModal(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: font }}>
+                    <PlusIcon size={14} /> Add Lead
+                  </button>
+                  <button onClick={() => setShowImportModal(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: font }}>
+                    ↑ Import XLS
+                  </button>
+                  <button onClick={() => setView("agent")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: `linear-gradient(135deg, #7C3AED, #4F46E5)`, border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: font }}>
+                    <BotIcon size={14} /> Run AI Agent
+                  </button>
+                </div>
+              )}
+            </div>
 
-            {/* Stat cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 28 }}>
+            {/* Row 1 — Stat cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
               {[
-                { label: "Total Leads", value: stats.total, color: colors.primary, sub: `+${stats.new} new` },
-                { label: "Qualified", value: stats.qualified, color: colors.success, sub: `${stats.total ? Math.round(stats.qualified / stats.total * 100) : 0}% rate` },
+                { label: "Total Leads", value: stats.total, color: colors.primary, sub: `${stats.new} new` },
+                { label: "Qualified", value: stats.qualified, color: colors.success, sub: `${stats.total ? Math.round(stats.qualified / stats.total * 100) : 0}% of pipeline` },
                 { label: "Won Deals", value: stats.won, color: colors.accent, sub: "closed successfully" },
                 { label: "Avg Score", value: stats.avgScore, color: colors.primaryLight, sub: "lead quality" },
               ].map((s, i) => (
@@ -931,16 +1104,97 @@ Kurallar:
               ))}
             </div>
 
-            {/* Charts row */}
+            {/* Row 2 — Win rate + Score distribution + Call stats */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
+              {/* Win Rate */}
+              <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <div style={{ fontSize: 11, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8 }}>Win Rate</div>
+                {stats.winRate !== null ? (
+                  <>
+                    <div style={{ fontSize: 42, fontWeight: 800, color: stats.winRate >= 50 ? colors.success : colors.warning, lineHeight: 1 }}>{stats.winRate}%</div>
+                    <div style={{ fontSize: 11, color: colors.textDim }}>{stats.won} won · {stats.lost} lost</div>
+                    <div style={{ width: "100%", height: 6, background: colors.border, borderRadius: 3, marginTop: 4, overflow: "hidden" }}>
+                      <div style={{ width: `${stats.winRate}%`, height: "100%", background: stats.winRate >= 50 ? colors.success : colors.warning, borderRadius: 3, transition: "width .5s" }} />
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 13, color: colors.textDim }}>No Won/Lost leads yet</div>
+                )}
+              </div>
+              {/* Score Distribution */}
+              <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Score Distribution</div>
+                {[
+                  { label: "Hot (80+)", count: stats.hot, color: colors.success },
+                  { label: "Warm (60–79)", count: stats.warm, color: colors.accent },
+                  { label: "Cold (<60)", count: stats.cold, color: colors.danger },
+                ].map((band) => (
+                  <div key={band.label} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: band.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: colors.textMuted, width: 80 }}>{band.label}</span>
+                    <div style={{ flex: 1, height: 6, background: colors.border, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${stats.total ? (band.count / stats.total) * 100 : 0}%`, height: "100%", background: band.color, borderRadius: 3, transition: "width .5s" }} />
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 600, width: 24, textAlign: "right" }}>{band.count}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Call Stats */}
+              <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Call Activity</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[
+                    { label: "Total Calls", value: stats.totalCalls, color: colors.primaryLight },
+                    { label: "Completed", value: stats.completedCalls, color: colors.success },
+                    { label: "Failed / Other", value: stats.totalCalls - stats.completedCalls, color: colors.danger },
+                  ].map((row) => (
+                    <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${colors.border}` }}>
+                      <span style={{ fontSize: 12, color: colors.textMuted }}>{row.label}</span>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: row.color }}>{row.value}</span>
+                    </div>
+                  ))}
+                  {stats.mostCalledLead && stats.totalCalls > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      <div style={{ fontSize: 10, color: colors.textDim, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Most Called</div>
+                      <div
+                        onClick={() => { setSelectedLead(stats.mostCalledLead); setView("leads"); }}
+                        style={{ fontSize: 12, color: colors.primaryLight, cursor: "pointer", fontWeight: 500 }}
+                      >
+                        {stats.mostCalledLead.firstName} {stats.mostCalledLead.lastName} ({stats.mostCalledLead.callHistory?.length || 0} calls)
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Row 3 — Conversion Funnel */}
+            <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Conversion Funnel</div>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 80 }}>
+                {stats.funnel.map((stage, i) => {
+                  const pct = funnelMax ? (stage.count / funnelMax) * 100 : 0;
+                  const opacity = 1 - i * 0.1;
+                  return (
+                    <div key={stage.name} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: colors.text }}>{stage.count}</div>
+                      <div style={{ width: "100%", height: `${Math.max(pct, 4)}%`, minHeight: 4, background: `rgba(59,130,246,${opacity})`, borderRadius: "4px 4px 0 0", transition: "height .5s" }} />
+                      <div style={{ fontSize: 9, color: colors.textDim, textAlign: "center", lineHeight: 1.2 }}>{stage.name}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Row 4 — Pipeline + Top Needs */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-              {/* By Status */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Pipeline Breakdown</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {stats.byStatus.filter(s => s.count > 0).map((s) => (
                     <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <span style={{ width: 8, height: 8, borderRadius: "50%", background: STATUS_COLORS[s.name]?.dot || "#666", flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, color: colors.textMuted, width: 90 }}>{s.name}</span>
+                      <span style={{ fontSize: 12, color: colors.textMuted, width: 100 }}>{s.name}</span>
                       <div style={{ flex: 1, height: 6, background: colors.border, borderRadius: 3, overflow: "hidden" }}>
                         <div style={{ width: `${(s.count / stats.total) * 100}%`, height: "100%", background: STATUS_COLORS[s.name]?.dot || "#666", borderRadius: 3, transition: "width .5s" }} />
                       </div>
@@ -949,7 +1203,6 @@ Kurallar:
                   ))}
                 </div>
               </div>
-              {/* Top Needs */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Top Client Needs</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -966,13 +1219,13 @@ Kurallar:
               </div>
             </div>
 
-            {/* Industry + City */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            {/* Row 5 — Industry + City + Source */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Leads by Industry</div>
                 {stats.byIndustry.slice(0, 6).map((ind) => (
                   <div key={ind.name} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, color: colors.textMuted, width: 120, flexShrink: 0 }}>{ind.name}</span>
+                    <span style={{ fontSize: 11, color: colors.textMuted, width: 110, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ind.name}</span>
                     <div style={{ flex: 1, height: 6, background: colors.border, borderRadius: 3, overflow: "hidden" }}>
                       <div style={{ width: `${(ind.count / maxInd) * 100}%`, height: "100%", background: colors.primaryLight, borderRadius: 3 }} />
                     </div>
@@ -984,11 +1237,81 @@ Kurallar:
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Leads by City</div>
                 {stats.byCity.map((c) => (
                   <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, color: colors.textMuted, width: 80, flexShrink: 0 }}>{c.name}</span>
+                    <span style={{ fontSize: 11, color: colors.textMuted, width: 70, flexShrink: 0 }}>{c.name}</span>
                     <div style={{ flex: 1, height: 6, background: colors.border, borderRadius: 3, overflow: "hidden" }}>
                       <div style={{ width: `${(c.count / maxCity) * 100}%`, height: "100%", background: colors.accent, borderRadius: 3 }} />
                     </div>
                     <span style={{ fontSize: 12, fontWeight: 600, width: 20, textAlign: "right" }}>{c.count}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Lead Source</div>
+                {stats.bySource.map((src) => (
+                  <div key={src.name} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <span style={{ fontSize: 12, color: colors.textMuted, width: 80, flexShrink: 0 }}>{src.name}</span>
+                    <div style={{ flex: 1, height: 6, background: colors.border, borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${(src.count / maxSource) * 100}%`, height: "100%", background: `linear-gradient(90deg, ${colors.accent}, ${colors.primaryLight})`, borderRadius: 3 }} />
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 600, width: 24, textAlign: "right" }}>{src.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Row 6 — Hot Leads + Recent Leads */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* Hot Leads */}
+              <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                  🔥 Hot Leads
+                  <span style={{ fontSize: 10, color: colors.textDim, fontWeight: 400 }}>score 80+ · not closed</span>
+                </div>
+                {stats.hotLeads.length === 0 ? (
+                  <div style={{ fontSize: 12, color: colors.textDim }}>No hot leads yet.</div>
+                ) : stats.hotLeads.map((lead) => (
+                  <div key={lead.id} onClick={() => { setSelectedLead(lead); setView("leads"); }}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid ${colors.border}`, cursor: "pointer" }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = "0.75"}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+                  >
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, ${colors.primary}40, ${colors.accent}40)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                      {lead.firstName[0]}{lead.lastName[0]}
+                    </div>
+                    <div style={{ flex: 1, overflow: "hidden" }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lead.firstName} {lead.lastName}</div>
+                      <div style={{ fontSize: 11, color: colors.textDim, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lead.title} · {lead.company}</div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: colors.success }}>{lead.score}</div>
+                      <div style={{ fontSize: 9, color: colors.textDim }}>score</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Recent Leads */}
+              <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                  🕐 Recently Added
+                </div>
+                {stats.recentLeads.length === 0 ? (
+                  <div style={{ fontSize: 12, color: colors.textDim }}>No leads yet.</div>
+                ) : stats.recentLeads.map((lead) => (
+                  <div key={lead.id} onClick={() => { setSelectedLead(lead); setView("leads"); }}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid ${colors.border}`, cursor: "pointer" }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = "0.75"}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+                  >
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: `${colors.primary}20`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                      {lead.firstName[0]}{lead.lastName[0]}
+                    </div>
+                    <div style={{ flex: 1, overflow: "hidden" }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lead.firstName} {lead.lastName}</div>
+                      <div style={{ fontSize: 11, color: colors.textDim, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lead.company} · {lead.industry}</div>
+                    </div>
+                    <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: STATUS_COLORS[lead.status]?.bg || colors.border, color: STATUS_COLORS[lead.status]?.text || colors.textDim, fontWeight: 600, flexShrink: 0 }}>
+                      {lead.status || "—"}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1005,9 +1328,11 @@ Kurallar:
                 <p style={{ color: colors.textMuted, fontSize: 13 }}>{filtered.length} of {leads.length} leads shown</p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => setShowImportModal(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: colors.surface, color: colors.textMuted, border: `1px solid ${colors.border}`, borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: font }}>
-                  ↑ Import XLS
-                </button>
+                {isAdmin && (
+                  <button onClick={() => setShowImportModal(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: colors.surface, color: colors.textMuted, border: `1px solid ${colors.border}`, borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: font }}>
+                    ↑ Import XLS
+                  </button>
+                )}
                 <button onClick={() => setShowAddModal(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: colors.primary, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: font }}>
                   <PlusIcon size={16} /> Add Lead
                 </button>
@@ -1114,6 +1439,14 @@ Kurallar:
               >
                 <PhoneCallIcon size={14} /> Cold Call {settings.twilioAccountSid ? "(Twilio)" : "(Vapi)"}
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => { if (window.confirm(`Delete "${selectedLead.firstName} ${selectedLead.lastName}"? This cannot be undone.`)) { setLeads((prev) => prev.filter((l) => l.id !== selectedLead.id)); setSelectedLead(null); } }}
+                  style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "transparent", border: `1px solid ${colors.danger}60`, borderRadius: 8, color: colors.danger, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: font, transition: "all .15s" }}
+                >
+                  🗑 Delete Lead
+                </button>
+              )}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
               {/* Left: Info */}
@@ -1225,7 +1558,11 @@ Kurallar:
               </div>
               {!settings.twilioAccountSid && !settings.vapiApiKey && (
                 <div style={{ padding: "10px 16px", background: `${colors.warning}15`, border: `1px solid ${colors.warning}40`, borderRadius: 10, fontSize: 12, color: colors.warning, maxWidth: 340 }}>
-                  Add your <strong>Twilio</strong> or Vapi credentials in <button onClick={() => setView("settings")} style={{ background: "none", border: "none", color: colors.accent, cursor: "pointer", fontWeight: 600, padding: 0, fontSize: 12 }}>Settings</button> to enable calling.
+                  {isAdmin ? (
+                    <>Add your <strong>Twilio</strong> or Vapi credentials in <button onClick={() => setView("settings")} style={{ background: "none", border: "none", color: colors.accent, cursor: "pointer", fontWeight: 600, padding: 0, fontSize: 12 }}>Settings</button> to enable calling.</>
+                  ) : (
+                    <>Ask an admin to configure Twilio or Vapi credentials to enable calling.</>
+                  )}
                 </div>
               )}
               {settings.twilioAccountSid && (
@@ -1343,7 +1680,14 @@ Kurallar:
         )}
 
         {/* ══════════ AI AGENT ══════════ */}
-        {view === "agent" && (
+        {view === "agent" && !isAdmin && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 12 }}>
+            <div style={{ fontSize: 36 }}>🔒</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>Admin Access Required</div>
+            <div style={{ fontSize: 13, color: colors.textMuted }}>The AI Agent is restricted to admin accounts.</div>
+          </div>
+        )}
+        {view === "agent" && isAdmin && (
           <div style={{ animation: "slideIn .3s ease" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div>
@@ -1423,7 +1767,14 @@ Kurallar:
         )}
 
         {/* ══════════ SETTINGS ══════════ */}
-        {view === "settings" && (
+        {view === "settings" && !isAdmin && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 12 }}>
+            <div style={{ fontSize: 36 }}>🔒</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>Admin Access Required</div>
+            <div style={{ fontSize: 13, color: colors.textMuted }}>Settings are restricted to admin accounts.</div>
+          </div>
+        )}
+        {view === "settings" && isAdmin && (
           <div style={{ animation: "slideIn .3s ease", maxWidth: 600 }}>
             <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Settings</h1>
             <p style={{ color: colors.textMuted, fontSize: 13, marginBottom: 24 }}>Configure your ERP and agent settings</p>
@@ -1566,9 +1917,155 @@ Kurallar:
                 ))}
               </div>
             ))}
+
+            {/* ══ ADMIN: USER MANAGEMENT ══ */}
+            {authUser?.role === "admin" && (
+              <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <div>
+                    <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>User Management</h3>
+                    <p style={{ fontSize: 11, color: colors.textMuted, margin: 0 }}>Manage users who have access to the ERP</p>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={umFetch} style={{ padding: "6px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 11, cursor: "pointer" }}>↻ Refresh</button>
+                    <button onClick={() => { setShowAddUser(true); setUmError(""); setUmSuccess(""); }} style={{ padding: "6px 14px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>+ Add User</button>
+                  </div>
+                </div>
+
+                {umError && <div style={{ background: "rgba(220,53,69,0.1)", border: "1px solid rgba(220,53,69,0.25)", borderRadius: 6, padding: "8px 12px", color: "#e57373", fontSize: 12, marginBottom: 12 }}>⚠ {umError}</div>}
+                {umSuccess && <div style={{ background: "rgba(67,160,71,0.1)", border: "1px solid rgba(67,160,71,0.25)", borderRadius: 6, padding: "8px 12px", color: "#81c784", fontSize: 12, marginBottom: 12 }}>✓ {umSuccess}</div>}
+
+                {showAddUser && (
+                  <div style={{ background: colors.bg, borderRadius: 8, padding: 16, marginBottom: 16, border: `1px solid ${colors.border}` }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12, color: colors.text }}>New User</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                      {[
+                        { label: "Full Name", key: "name", placeholder: "Ahmet Yılmaz" },
+                        { label: "Email", key: "email", placeholder: "ahmet@sunandsun.com.tr" },
+                        { label: "Password", key: "password", placeholder: "At least 6 characters", type: "password" },
+                      ].map((f) => (
+                        <div key={f.key}>
+                          <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>{f.label}</div>
+                          <input
+                            type={f.type || "text"}
+                            value={newUser[f.key]}
+                            placeholder={f.placeholder}
+                            onChange={(e) => setNewUser((p) => ({ ...p, [f.key]: e.target.value }))}
+                            style={{ width: "100%", padding: "7px 10px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box" }}
+                          />
+                        </div>
+                      ))}
+                      <div>
+                        <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Role</div>
+                        <select
+                          value={newUser.role}
+                          onChange={(e) => setNewUser((p) => ({ ...p, role: e.target.value }))}
+                          style={{ width: "100%", padding: "7px 10px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none" }}
+                        >
+                          <option value="user">User</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={umAddUser} style={{ padding: "7px 16px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Save</button>
+                      <button onClick={() => { setShowAddUser(false); setNewUser({ name: "", email: "", password: "", role: "user" }); }} style={{ padding: "7px 14px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {umLoading ? (
+                  <div style={{ textAlign: "center", padding: 24, color: colors.textMuted, fontSize: 13 }}>Loading...</div>
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
+                          {["Full Name", "Email", "Role", "Last Login", ""].map((h) => (
+                            <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontSize: 10, fontWeight: 600, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {umUsers.map((u) => (
+                          <tr key={u.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                            <td style={{ padding: "10px 10px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ width: 28, height: 28, borderRadius: "50%", background: colors.primary, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+                                  {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                                </div>
+                                <span style={{ fontWeight: 500 }}>{u.name}</span>
+                                {u.id === authUser.id && <span style={{ fontSize: 9, background: "rgba(8,143,196,0.15)", color: colors.primary, borderRadius: 4, padding: "1px 5px", fontWeight: 600 }}>YOU</span>}
+                              </div>
+                            </td>
+                            <td style={{ padding: "10px 10px", color: colors.textMuted }}>{u.email}</td>
+                            <td style={{ padding: "10px 10px" }}>
+                              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: u.role === "admin" ? "rgba(8,143,196,0.15)" : "rgba(255,255,255,0.06)", color: u.role === "admin" ? colors.primary : colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                                {u.role === "admin" ? "Admin" : "User"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "10px 10px", color: colors.textMuted, fontSize: 11 }}>
+                              {u.last_login ? new Date(u.last_login).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                            </td>
+                            <td style={{ padding: "10px 10px" }}>
+                              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                                <button
+                                  onClick={() => { setPwModal({ id: u.id, name: u.name }); setNewPw(""); setNewPwError(""); }}
+                                  style={{ padding: "4px 10px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.textMuted, fontSize: 11, cursor: "pointer" }}
+                                >
+                                  Password
+                                </button>
+                                {u.id !== authUser.id && (
+                                  <button
+                                    onClick={() => umDeleteUser(u.id, u.name)}
+                                    style={{ padding: "4px 10px", background: "transparent", border: "1px solid rgba(220,53,69,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {umUsers.length === 0 && !umLoading && (
+                          <tr><td colSpan={5} style={{ textAlign: "center", padding: 24, color: colors.textMuted, fontSize: 12 }}>No users found</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Change Password Modal */}
+      {pwModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }} onClick={() => setPwModal(null)}>
+          <div style={{ background: colors.surface, borderRadius: 12, padding: 28, width: 360, border: `1px solid ${colors.border}` }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>Change Password</h3>
+            <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 20 }}>{pwModal.name}</p>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>New Password</div>
+              <input
+                type="password"
+                value={newPw}
+                placeholder="At least 6 characters"
+                onChange={(e) => setNewPw(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && umChangePw()}
+                autoFocus
+                style={{ width: "100%", padding: "9px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}
+              />
+              {newPwError && <div style={{ fontSize: 11, color: "#e57373", marginTop: 6 }}>⚠ {newPwError}</div>}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={umChangePw} style={{ flex: 1, padding: "9px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Save</button>
+              <button onClick={() => setPwModal(null)} style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══════════ IMPORT XLS MODAL ══════════ */}
       {showImportModal && (
