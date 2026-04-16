@@ -340,7 +340,20 @@ Kurallar:
     emailNotifications: "info@sunandsun.com.tr",
     notifyNewLeads: "Enabled",
     dailySummary: "09:00 AM",
+    sendgridApiKey: "",
+    sendgridFromEmail: "info@sunandsun.com.tr",
+    sendgridFromName: "Sun & Sun International",
   });
+
+  // ── EMAIL CAMPAIGN STATE ────────────────────────────────────────
+  const [emailCampaigns, setEmailCampaigns] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("sns_email_campaigns") || "[]"); } catch { return []; }
+  });
+  const [emailDraft, setEmailDraft] = useState({ subject: "", body: "" });
+  const [emailFilter, setEmailFilter] = useState({ statuses: [], industries: [], hasEmail: true });
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailResult, setEmailResult] = useState(null); // { sent, failed, errors }
+  const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
   const [activeCall, setActiveCall] = useState(null); // { callId, lead, status, startTime }
   const [showCallModal, setShowCallModal] = useState(false);
   const callPollRef = useRef(null);
@@ -432,6 +445,10 @@ Kurallar:
   useEffect(() => {
     localStorage.setItem("sns_leads", JSON.stringify(leads));
   }, [leads]);
+
+  useEffect(() => {
+    localStorage.setItem("sns_email_campaigns", JSON.stringify(emailCampaigns));
+  }, [emailCampaigns]);
 
   // ─── VAPI COLD CALL ──────────────────────────────────────────────
   const initiateCall = async (lead) => {
@@ -987,6 +1004,7 @@ Kurallar:
     { id: "pipeline", label: "Pipeline", icon: <BriefcaseIcon size={18} /> },
     { id: "calls", label: "Cold Calls", icon: <PhoneCallIcon size={18} />, badge: stats.totalCalls || null },
     ...(isAdmin ? [
+      { id: "email", label: "Email", icon: <MailIcon size={18} /> },
       { id: "agent", label: "AI Agent", icon: <BotIcon size={18} /> },
       { id: "settings", label: "Settings", icon: <SettingsIcon size={18} /> },
     ] : []),
@@ -1767,6 +1785,225 @@ Kurallar:
         )}
 
         {/* ══════════ SETTINGS ══════════ */}
+        {/* ══════════ EMAIL CAMPAIGNS ══════════ */}
+        {view === "email" && (() => {
+          // Compute recipients based on filter
+          const emailRecipients = leads.filter((l) => {
+            if (emailFilter.hasEmail && !l.email) return false;
+            if (emailFilter.statuses.length > 0 && !emailFilter.statuses.includes(l.status)) return false;
+            if (emailFilter.industries.length > 0 && !emailFilter.industries.includes(l.industry)) return false;
+            return true;
+          });
+
+          const sendCampaign = async () => {
+            if (!settings.sendgridApiKey) { alert("Add your SendGrid API key in Settings → SendGrid Configuration first."); return; }
+            if (!emailDraft.subject.trim()) { alert("Subject is required."); return; }
+            if (!emailDraft.body.trim()) { alert("Email body is required."); return; }
+            if (emailRecipients.length === 0) { alert("No recipients match the current filter."); return; }
+            if (!window.confirm(`Send to ${emailRecipients.length} recipient(s)?`)) return;
+
+            setEmailSending(true);
+            setEmailResult(null);
+            const token = localStorage.getItem("sns_token");
+            try {
+              const res = await fetch("/email/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                  apiKey: settings.sendgridApiKey,
+                  fromEmail: settings.sendgridFromEmail,
+                  fromName: settings.sendgridFromName,
+                  subject: emailDraft.subject,
+                  htmlBody: emailDraft.body.replace(/\n/g, "<br>"),
+                  recipients: emailRecipients.map((l) => ({ email: l.email, name: `${l.firstName} ${l.lastName}`.trim() })),
+                }),
+              });
+              const data = await res.json();
+              setEmailResult(data);
+              if (data.sent > 0) {
+                const campaign = {
+                  id: Date.now(),
+                  date: new Date().toISOString(),
+                  subject: emailDraft.subject,
+                  recipients: emailRecipients.length,
+                  sent: data.sent,
+                  failed: data.failed,
+                };
+                setEmailCampaigns((p) => [campaign, ...p]);
+              }
+            } catch (e) {
+              setEmailResult({ sent: 0, failed: emailRecipients.length, errors: [e.message] });
+            } finally {
+              setEmailSending(false);
+            }
+          };
+
+          return (
+            <div style={{ animation: "slideIn .3s ease" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+                <div>
+                  <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Email Campaigns</h1>
+                  <p style={{ color: colors.textMuted, fontSize: 13 }}>Send bulk emails to your leads via SendGrid</p>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20, marginBottom: 24 }}>
+                {/* COMPOSE */}
+                <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 20 }}>Compose</h3>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Subject</div>
+                    <input
+                      value={emailDraft.subject}
+                      onChange={(e) => setEmailDraft((p) => ({ ...p, subject: e.target.value }))}
+                      placeholder="e.g. Turquality Programı Hakkında Bilgi"
+                      style={{ width: "100%", padding: "10px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Body</div>
+                    <textarea
+                      value={emailDraft.body}
+                      onChange={(e) => setEmailDraft((p) => ({ ...p, body: e.target.value }))}
+                      placeholder={"Sayın [İsim],\n\nSun & Sun Danışmanlık olarak size ulaşıyoruz..."}
+                      rows={14}
+                      style={{ width: "100%", padding: "10px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
+                    />
+                    <div style={{ fontSize: 11, color: colors.textDim, marginTop: 4 }}>Plain text. Line breaks are converted to &lt;br&gt; automatically.</div>
+                  </div>
+
+                  {/* Result banner */}
+                  {emailResult && (
+                    <div style={{ borderRadius: 8, padding: "12px 16px", marginBottom: 16, background: emailResult.failed === 0 ? "rgba(67,160,71,0.1)" : "rgba(220,53,69,0.1)", border: `1px solid ${emailResult.failed === 0 ? "rgba(67,160,71,0.25)" : "rgba(220,53,69,0.25)"}`, fontSize: 13 }}>
+                      {emailResult.sent > 0 && <div style={{ color: "#81c784" }}>✓ {emailResult.sent} email(s) sent successfully</div>}
+                      {emailResult.failed > 0 && <div style={{ color: "#e57373" }}>✗ {emailResult.failed} failed{emailResult.errors?.length ? `: ${emailResult.errors[0]}` : ""}</div>}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={sendCampaign}
+                    disabled={emailSending}
+                    style={{ padding: "11px 24px", background: emailSending ? colors.border : colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: emailSending ? "not-allowed" : "pointer", fontFamily: font }}
+                  >
+                    {emailSending ? "Sending..." : `Send to ${emailRecipients.length} Lead${emailRecipients.length !== 1 ? "s" : ""} →`}
+                  </button>
+                </div>
+
+                {/* FILTERS */}
+                <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 20 }}>Recipients</h3>
+
+                  {/* Has email toggle */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${colors.border}` }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 500 }}>Has email address</div>
+                      <div style={{ fontSize: 11, color: colors.textDim }}>Only leads with an email</div>
+                    </div>
+                    <button
+                      onClick={() => setEmailFilter((p) => ({ ...p, hasEmail: !p.hasEmail }))}
+                      style={{ width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer", background: emailFilter.hasEmail ? colors.primary : colors.border, position: "relative", transition: "background .2s" }}
+                    >
+                      <div style={{ position: "absolute", top: 3, left: emailFilter.hasEmail ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left .2s" }} />
+                    </button>
+                  </div>
+
+                  {/* Status filter */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Filter by Status</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {LEAD_STATUSES.map((s) => {
+                        const active = emailFilter.statuses.includes(s);
+                        return (
+                          <button key={s} onClick={() => setEmailFilter((p) => ({ ...p, statuses: active ? p.statuses.filter((x) => x !== s) : [...p.statuses, s] }))}
+                            style={{ padding: "4px 10px", borderRadius: 20, border: `1px solid ${active ? colors.primary : colors.border}`, background: active ? `${colors.primary}20` : "transparent", color: active ? colors.primary : colors.textMuted, fontSize: 11, cursor: "pointer", fontFamily: font }}>
+                            {s}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {emailFilter.statuses.length > 0 && <div style={{ fontSize: 10, color: colors.textDim, marginTop: 4 }}>All statuses if none selected</div>}
+                  </div>
+
+                  {/* Industry filter */}
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Filter by Industry</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {INDUSTRIES.map((ind) => {
+                        const active = emailFilter.industries.includes(ind);
+                        return (
+                          <button key={ind} onClick={() => setEmailFilter((p) => ({ ...p, industries: active ? p.industries.filter((x) => x !== ind) : [...p.industries, ind] }))}
+                            style={{ padding: "4px 10px", borderRadius: 20, border: `1px solid ${active ? colors.accent : colors.border}`, background: active ? `${colors.accent}20` : "transparent", color: active ? colors.accent : colors.textMuted, fontSize: 11, cursor: "pointer", fontFamily: font }}>
+                            {ind}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Count */}
+                  <div style={{ background: colors.bg, borderRadius: 8, padding: 14, textAlign: "center" }}>
+                    <div style={{ fontSize: 32, fontWeight: 700, color: colors.primary }}>{emailRecipients.length}</div>
+                    <div style={{ fontSize: 12, color: colors.textMuted }}>leads selected</div>
+                    <div style={{ fontSize: 11, color: colors.textDim, marginTop: 4 }}>{emailRecipients.filter((l) => l.email).length} with email address</div>
+                  </div>
+
+                  {/* Clear filters */}
+                  {(emailFilter.statuses.length > 0 || emailFilter.industries.length > 0) && (
+                    <button onClick={() => setEmailFilter({ statuses: [], industries: [], hasEmail: emailFilter.hasEmail })}
+                      style={{ width: "100%", marginTop: 12, padding: "8px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 11, cursor: "pointer", fontFamily: font }}>
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* CAMPAIGN HISTORY */}
+              <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600 }}>Campaign History</h3>
+                  {emailCampaigns.length > 0 && (
+                    <button onClick={() => { if (window.confirm("Clear all campaign history?")) setEmailCampaigns([]); }}
+                      style={{ padding: "4px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 11, cursor: "pointer" }}>
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {emailCampaigns.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "32px 0", color: colors.textDim, fontSize: 13 }}>No campaigns sent yet</div>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
+                        {["Date", "Subject", "Recipients", "Sent", "Failed", "Rate"].map((h) => (
+                          <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 10, fontWeight: 600, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {emailCampaigns.map((c) => (
+                        <tr key={c.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                          <td style={{ padding: "10px 10px", color: colors.textMuted }}>{new Date(c.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                          <td style={{ padding: "10px 10px", fontWeight: 500, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subject}</td>
+                          <td style={{ padding: "10px 10px", color: colors.textMuted }}>{c.recipients}</td>
+                          <td style={{ padding: "10px 10px", color: colors.success }}>{c.sent}</td>
+                          <td style={{ padding: "10px 10px", color: c.failed > 0 ? "#e57373" : colors.textDim }}>{c.failed}</td>
+                          <td style={{ padding: "10px 10px" }}>
+                            <span style={{ padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: c.sent / c.recipients >= 0.9 ? "rgba(67,160,71,0.15)" : "rgba(255,167,38,0.15)", color: c.sent / c.recipients >= 0.9 ? colors.success : colors.accent }}>
+                              {Math.round((c.sent / c.recipients) * 100)}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {view === "settings" && !isAdmin && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 12 }}>
             <div style={{ fontSize: 36 }}>🔒</div>
@@ -1778,6 +2015,28 @@ Kurallar:
           <div style={{ animation: "slideIn .3s ease", maxWidth: 600 }}>
             <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Settings</h1>
             <p style={{ color: colors.textMuted, fontSize: 13, marginBottom: 24 }}>Configure your ERP and agent settings</p>
+            {/* SendGrid Email */}
+            <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>SendGrid Email <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 400 }}>(bulk email campaigns)</span></h3>
+              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>Sign up at sendgrid.com → Settings → API Keys → Create API Key (Full Access). Domain must be verified first.</p>
+              {[
+                { label: "API Key", key: "sendgridApiKey", type: "password", placeholder: "SG.xxxxxxxxxxxxxxxxxxxx" },
+                { label: "From Email", key: "sendgridFromEmail", placeholder: "info@sunandsun.com.tr" },
+                { label: "From Name", key: "sendgridFromName", placeholder: "Sun & Sun International" },
+              ].map((f) => (
+                <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
+                  <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
+                  <input
+                    value={settings[f.key] || ""}
+                    type={f.type || "text"}
+                    placeholder={f.placeholder || ""}
+                    onChange={(e) => setSettings((p) => ({ ...p, [f.key]: e.target.value }))}
+                    style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", textAlign: "right", width: 280 }}
+                  />
+                </div>
+              ))}
+            </div>
+
             {/* Twilio Cold Calling (Test Mode) */}
             <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
               <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Twilio Cold Calling <span style={{ fontSize: 11, color: colors.success, fontWeight: 400 }}>✓ Recommended for testing</span></h3>

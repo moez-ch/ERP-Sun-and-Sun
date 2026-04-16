@@ -164,6 +164,49 @@ app.put("/auth/users/:id/password", authenticate, (req, res) => {
   res.json({ success: true });
 });
 
+// POST /email/send — send bulk email via SendGrid (admin)
+app.post("/email/send", authenticate, requireAdmin, async (req, res) => {
+  const { apiKey, fromEmail, fromName, subject, htmlBody, recipients } = req.body || {};
+  if (!apiKey) return res.status(400).json({ error: "SendGrid API key is required" });
+  if (!fromEmail || !subject || !htmlBody) return res.status(400).json({ error: "fromEmail, subject and htmlBody are required" });
+  if (!Array.isArray(recipients) || recipients.length === 0) return res.status(400).json({ error: "No recipients provided" });
+
+  // SendGrid allows up to 1000 personalizations per request
+  const CHUNK = 1000;
+  let totalSent = 0;
+  let totalFailed = 0;
+  const errors = [];
+
+  for (let i = 0; i < recipients.length; i += CHUNK) {
+    const chunk = recipients.slice(i, i + CHUNK);
+    const payload = {
+      personalizations: chunk.map((r) => ({ to: [{ email: r.email, name: r.name || "" }] })),
+      from: { email: fromEmail, name: fromName || "Sun & Sun" },
+      subject,
+      content: [{ type: "text/html", value: htmlBody }],
+    };
+    try {
+      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (sgRes.ok || sgRes.status === 202) {
+        totalSent += chunk.length;
+      } else {
+        const errBody = await sgRes.json().catch(() => ({}));
+        totalFailed += chunk.length;
+        errors.push(errBody?.errors?.[0]?.message || `HTTP ${sgRes.status}`);
+      }
+    } catch (e) {
+      totalFailed += chunk.length;
+      errors.push(e.message);
+    }
+  }
+
+  res.json({ sent: totalSent, failed: totalFailed, errors });
+});
+
 app.listen(PORT, () => {
   console.log(`🔐 Sun & Sun ERP Auth Server → http://localhost:${PORT}`);
 });
