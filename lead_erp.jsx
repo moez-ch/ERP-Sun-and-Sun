@@ -512,6 +512,7 @@ Kurallar:
   const [selectedSignature, setSelectedSignature] = useState("merve");
   const [newTemplateModal, setNewTemplateModal] = useState(false);
   const [newTemplateDraft, setNewTemplateDraft] = useState({ label: "", subject: "", body: "" });
+  const [showOnlyWithEmail, setShowOnlyWithEmail] = useState(true);
   const [mondayBulkDraft, setMondayBulkDraft] = useState({
     subject: "Test E-Postası — Lütfen Yanıtlamayınız",
     body: "Bu e-posta yalnızca sistem testi amacıyla gönderilmiştir. Herhangi bir işlem yapmanıza gerek yoktur; lütfen bu e-postayı yanıtlamayınız.\n\nİyi çalışmalar dileriz.",
@@ -2569,11 +2570,16 @@ Kurallar:
             ...(mailKonulariCol ? [mailKonulariCol] : []),
             ...otherCols,
           ];
-          const allIds = mondayItems.map(i => i.id);
+          const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+          const isEmailOk = (email) => email && isValidEmail(email) && mondayEmailVerification[email] !== false && !mondayBounces.has(email.toLowerCase());
+          const hasValidName = (item) => item.name && item.name.trim() && item.name.toLowerCase() !== "item";
+
+          const visibleItems = showOnlyWithEmail
+            ? mondayItems.filter(i => { const colMap = {}; i.column_values.forEach(cv => { colMap[cv.id] = cv.text; }); const email = emailCol ? (colMap[emailCol.id] || "") : ""; return isEmailOk(email) && hasValidName(i); })
+            : mondayItems;
+          const allIds = visibleItems.map(i => i.id);
           const allChecked = allIds.length > 0 && allIds.every(id => mondaySelected.has(id));
           const selectedItems = mondayItems.filter(i => mondaySelected.has(i.id));
-
-          const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 
           const buildSalutation = (name, colMap) => {
             const rawName = (name || "").trim();
@@ -2585,9 +2591,6 @@ Kurallar:
             if (/han[ıi]m|kad[ıi]n|bayan|female|ms|mrs/i.test(genderVal)) return `Merhaba ${firstName} Hanım,`;
             return `Merhaba ${firstName},`;
           };
-
-          const isEmailOk = (email) => email && isValidEmail(email) && mondayEmailVerification[email] !== false && !mondayBounces.has(email.toLowerCase());
-          const hasValidName = (item) => item.name && item.name.trim() && item.name.toLowerCase() !== "item";
 
           const selectedWithEmail = selectedItems.filter(i => {
             const colMap = {};
@@ -2913,6 +2916,13 @@ Kurallar:
 
               {mondayItems.length > 0 && (
                 <div style={{ overflowX: "auto" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.textMuted, cursor: "pointer", userSelect: "none" }}>
+                      <input type="checkbox" checked={showOnlyWithEmail} onChange={e => setShowOnlyWithEmail(e.target.checked)} />
+                      Sadece geçerli e-postası olanları göster
+                    </label>
+                    <span style={{ fontSize: 11, color: colors.textMuted }}>({visibleItems.length} / {mondayItems.length})</span>
+                  </div>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                     <thead>
                       <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
@@ -2927,7 +2937,7 @@ Kurallar:
                       </tr>
                     </thead>
                     <tbody>
-                      {mondayItems.map(item => {
+                      {visibleItems.map(item => {
                         const colMap = {};
                         item.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
                         const emailVal = emailCol ? colMap[emailCol.id] : "";
