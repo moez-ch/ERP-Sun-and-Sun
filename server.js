@@ -653,7 +653,7 @@ app.post("/monday/update-columns", authenticate, async (req, res) => {
     try {
       let inlineValue;
       if (value === "" || value === null) {
-        inlineValue = '""';
+        inlineValue = '"{}"';
       } else if (colType === "tag") {
         inlineValue = JSON.stringify(JSON.stringify({ tag_ids: value }));
       } else {
@@ -666,6 +666,7 @@ app.post("/monday/update-columns", authenticate, async (req, res) => {
         body: JSON.stringify({ query: mutation }),
       });
       const data = await r.json();
+      console.log(`[update-columns] item=${itemId} col=${columnId} val=${JSON.stringify(value)} → monday:`, JSON.stringify(data));
       results.push({ itemId, columnId, ok: !data.errors, errors: data.errors });
     } catch (e) {
       results.push({ itemId, columnId, ok: false, error: e.message });

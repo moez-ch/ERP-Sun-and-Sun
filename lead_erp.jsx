@@ -2673,11 +2673,17 @@ Kurallar:
                     });
                     const data = await res.json();
                     if (!res.ok) { alert(`Sunucu hatası: ${data.error || res.status}`); return; }
-                    const clearedIds = new Set(entries.map(({ item }) => item.id));
-                    setMondayItems(prev => prev.map(i => {
-                      if (!clearedIds.has(i.id)) return i;
-                      return { ...i, column_values: i.column_values.map(cv => cv.id === emailCol.id ? { ...cv, text: "" } : cv) };
-                    }));
+                    const failed = (data.results || []).filter(r => !r.ok);
+                    const succeededIds = new Set((data.results || []).filter(r => r.ok).map(r => r.itemId));
+                    if (failed.length > 0) {
+                      alert(`${failed.length} e-posta temizlenemedi:\n${failed.map(f => `ID ${f.itemId}: ${JSON.stringify(f.errors?.[0]?.message || f.error)}`).join("\n")}`);
+                    }
+                    if (succeededIds.size > 0) {
+                      setMondayItems(prev => prev.map(i => {
+                        if (!succeededIds.has(i.id)) return i;
+                        return { ...i, column_values: i.column_values.map(cv => cv.id === emailCol.id ? { ...cv, text: "" } : cv) };
+                      }));
+                    }
                   } catch (e) { alert("Hata: " + e.message); }
                 };
 
