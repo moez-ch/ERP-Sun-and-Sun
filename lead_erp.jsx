@@ -2575,7 +2575,7 @@ Kurallar:
           const hasValidName = (item) => item.name && item.name.trim() && item.name.toLowerCase() !== "item";
 
           const visibleItems = showOnlyWithEmail
-            ? mondayItems.filter(i => { const colMap = {}; i.column_values.forEach(cv => { colMap[cv.id] = cv.text; }); const email = emailCol ? (colMap[emailCol.id] || "") : ""; return isEmailOk(email) && hasValidName(i); })
+            ? mondayItems.filter(i => { const colMap = {}; i.column_values.forEach(cv => { colMap[cv.id] = cv.text; }); const email = emailCol ? (colMap[emailCol.id] || "") : ""; return isEmailOk(email); })
             : mondayItems;
           const allIds = visibleItems.map(i => i.id);
           const allChecked = allIds.length > 0 && allIds.every(id => mondaySelected.has(id));
