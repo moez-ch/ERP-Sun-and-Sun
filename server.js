@@ -498,6 +498,44 @@ app.get("/email/bounces", authenticate, (req, res) => {
   res.json(rows);
 });
 
+// POST /email/bounces/sync — pull bounces/invalids/spam from SendGrid and store locally
+app.post("/email/bounces/sync", authenticate, async (req, res) => {
+  const { apiKey } = req.body || {};
+  if (!apiKey) return res.status(400).json({ error: "SendGrid API key is required" });
+
+  const endpoints = [
+    { url: "https://api.sendgrid.com/v3/suppression/bounces", event: "bounce" },
+    { url: "https://api.sendgrid.com/v3/suppression/invalid_emails", event: "invalid" },
+    { url: "https://api.sendgrid.com/v3/suppression/spam_reports", event: "spamreport" },
+  ];
+
+  const insert = db.prepare(
+    "INSERT OR REPLACE INTO bounced_emails (email, event, reason, bounced_at) VALUES (?, ?, ?, datetime('now'))"
+  );
+  let synced = 0;
+
+  for (const { url, event } of endpoints) {
+    try {
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+      if (!r.ok) continue;
+      const data = await r.json();
+      if (Array.isArray(data)) {
+        for (const item of data) {
+          if (item.email) {
+            insert.run(item.email.toLowerCase(), event, item.reason || null);
+            synced++;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  const rows = db.prepare(
+    "SELECT email, event, reason, bounced_at FROM bounced_emails ORDER BY bounced_at DESC"
+  ).all();
+  res.json({ synced, bounces: rows });
+});
+
 // ── MONDAY.COM ───────────────────────────────────────────────────────────────
 
 // POST /monday/board — fetch items from a Monday.com board

@@ -401,6 +401,8 @@ Kurallar:
   const [mondayEmailVerification, setMondayEmailVerification] = useState({});
   const [mondayVerifying, setMondayVerifying] = useState(false);
   const [mondayBounces, setMondayBounces] = useState(new Set());
+  const [bounceSyncing, setBounceSyncing] = useState(false);
+  const [bounceLastSync, setBounceLastSync] = useState(null);
   const [mondayMailKonulari, setMondayMailKonulari] = useState("");
   const [mondayOrtakMail, setMondayOrtakMail] = useState("");
   const [mondayTags, setMondayTags] = useState([]);
@@ -468,6 +470,27 @@ Kurallar:
       setMondayError(e.message);
     } finally {
       setMondayLoading(false);
+    }
+  };
+
+  const syncBounces = async () => {
+    if (!settings.sendgridApiKey) { alert("SendGrid API key is missing. Add it in Settings."); return; }
+    setBounceSyncing(true);
+    try {
+      const token = localStorage.getItem("sns_token");
+      const res = await fetch("/email/bounces/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ apiKey: settings.sendgridApiKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "Sync failed"); return; }
+      setMondayBounces(new Set(data.bounces.map(b => b.email.toLowerCase())));
+      setBounceLastSync(data.synced);
+    } catch (e) {
+      alert("Bounce sync failed: " + e.message);
+    } finally {
+      setBounceSyncing(false);
     }
   };
 
@@ -2502,6 +2525,14 @@ Kurallar:
                       {t("monday_sendBulk", mondaySelected.size)}
                     </button>
                   )}
+                  <button
+                    onClick={syncBounces}
+                    disabled={bounceSyncing}
+                    title={bounceLastSync !== null ? `Last sync: ${bounceLastSync} suppression(s) found` : "Pull bounces, invalids and spam reports from SendGrid"}
+                    style={{ padding: "8px 18px", background: "rgba(229,115,115,0.15)", border: "1px solid rgba(229,115,115,0.4)", borderRadius: 8, color: "#e57373", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: bounceSyncing ? 0.6 : 1 }}
+                  >
+                    {bounceSyncing ? "Syncing…" : bounceLastSync !== null ? `↻ Bounces (${mondayBounces.size})` : "↻ Check Bounces"}
+                  </button>
                   <button
                     onClick={fetchMondayBoard}
                     disabled={mondayLoading}
