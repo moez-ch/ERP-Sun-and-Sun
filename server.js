@@ -266,7 +266,7 @@ const SIGNATORIES = {
   merve:  { name: "Merve Çöloğlu",  title: "Müşteri İletişim Sorumlusu",               phone: "541 634 9576",    tel: "+905416349576", email: "merve.cologlu@sundanismanlik.net" },
   sura:   { name: "Şura Kurtoğlu",  title: "Müşteri İletişim Sorumlusu",               phone: "0 543 459 71 57", tel: "+905434597157", email: "sura.kurtoglu@sundanismanlik.net" },
   ahmet:  { name: "Ahmet Sungur",   title: "Genel Müdür",                              phone: "0 533 506 32 32", tel: "+905335063232", email: "ahmet.sungur@sundanismanlik.net" },
-  esra:   { name: "Esra Serin",     title: "İdari İşler Koordinatörü",                 phone: "0 505 039 47 67", tel: "+905050394767", email: null },
+  esra:   { name: "Esra Serin",     title: "İdari İşler Koordinatörü",                 phone: "0 505 039 47 67", tel: "+905050394767", email: "esra.serin@sundanismanlik.net" },
   melek:  { name: "Melek Çıtak",    title: "Proje Geliştirme ve Yürütme Koordinatörü", phone: "0532 778 50 31",  tel: "+905327785031", email: null },
 };
 

@@ -2458,7 +2458,7 @@ Kurallar:
                       <option value="merve">Merve Çöloğlu — merve.cologlu@sundanismanlik.net</option>
                       <option value="sura">Şura Kurtoğlu — sura.kurtoglu@sundanismanlik.net</option>
                       <option value="ahmet">Ahmet Sungur — ahmet.sungur@sundanismanlik.net</option>
-                      <option value="esra">Esra Serin — (e-posta henüz eklenmedi)</option>
+                      <option value="esra">Esra Serin — esra.serin@sundanismanlik.net</option>
                       <option value="melek">Melek Çıtak — (e-posta henüz eklenmedi)</option>
                     </select>
                   </div>
@@ -2679,7 +2679,7 @@ Kurallar:
                       <option value="merve">Merve Çöloğlu — merve.cologlu@sundanismanlik.net</option>
                       <option value="sura">Şura Kurtoğlu — sura.kurtoglu@sundanismanlik.net</option>
                       <option value="ahmet">Ahmet Sungur — ahmet.sungur@sundanismanlik.net</option>
-                      <option value="esra">Esra Serin — (e-posta henüz eklenmedi)</option>
+                      <option value="esra">Esra Serin — esra.serin@sundanismanlik.net</option>
                       <option value="melek">Melek Çıtak — (e-posta henüz eklenmedi)</option>
                     </select>
                   </div>
