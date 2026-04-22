@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import snsLogo from "./sns_logo.png";
 import * as XLSX from "xlsx";
 import LoginPage from "./LoginPage.jsx";
+import { TRANSLATIONS } from "./i18n.js";
 
 // ─── CONSTANTS & UTILITIES ───────────────────────────────────────
 const INDUSTRIES = ["Manufacturing", "Software/IT", "Food & Beverage", "Tourism & Hospitality", "Textile & Fashion", "Agriculture", "Healthcare", "Education", "Energy", "Construction", "Automotive", "Defense"];
@@ -10,6 +11,31 @@ const CITIES = ["İstanbul", "Ankara", "İzmir", "Bursa", "Konya", "Antalya", "G
 const COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-500", "500+"];
 const LEAD_STATUSES = ["New", "Contacted", "Qualified", "Proposal Sent", "Negotiation", "Won", "Lost"];
 const NEEDS = ["Turquality Consultancy", "KOSGEB Grants", "Export Development", "Digital Marketing", "EU Grants", "HR Consulting", "KVKK/GDPR Compliance", "Brand Strategy", "Investment Incentives", "TÜBİTAK Projects", "Lean Production", "Quality Management (ISO)"];
+
+const DEFAULT_EMAIL_TEMPLATES = [
+  {
+    id: "t_interested",
+    label: "İlgileniyoruz ✓",
+    color: "#2e7d32",
+    subject: "Finansman Desteği Hakkında",
+    body: "Merhaba,\n\nPaylaştığınız finansman desteği ile ilgileniyoruz. Detayları görüşmek üzere sizinle iletişime geçmek isteriz.\n\nİyi çalışmalar,\n\nSaygılarımla,",
+  },
+  {
+    id: "t_wrong_sector",
+    label: "Sektör Dışı ✗",
+    color: "#c62828",
+    subject: "Finansman Desteği – Sektör Kapsamı Dışı",
+    body: "Merhaba,\n\nPaylaştığınız finansman desteği için teşekkür ederiz. Ancak firmamızın faaliyet gösterdiği sektör bu program kapsamında yer almadığı için değerlendiremiyoruz.\n\nSaygılarımla",
+  },
+  {
+    id: "t_not_interested",
+    label: "İlgilenmiyoruz ✗",
+    color: "#e65100",
+    subject: "Finansman Desteği – Şu An İçin Uygun Değil",
+    body: "Merhaba,\n\nPaylaştığınız finansman desteği için teşekkür ederiz, ancak şu an için ilgilenmiyoruz.\n\nİyi çalışmalar dileriz.\n\nSaygılarımla",
+  },
+];
+
 function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function randN(arr, n) {
   const s = new Set();
@@ -244,6 +270,8 @@ const PlusIcon = (p) => <Icon d="M12 5v14M5 12h14" {...p} />;
 const XIcon = (p) => <Icon d="M18 6L6 18M6 6l12 12" {...p} />;
 const ChevronDown = (p) => <Icon d="M6 9l6 6 6-6" {...p} />;
 const BotIcon = (p) => <Icon d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 110 2h-1v1a7 7 0 01-7 7H10a7 7 0 01-7-7v-1H2a1 1 0 110-2h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2zM9.5 14a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm5 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" {...p} />;
+const InboxIcon = (p) => <Icon d="M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" {...p} />;
+const GridIcon = (p) => <Icon d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" {...p} />;
 const BarChartIcon = (p) => <Icon d="M12 20V10M18 20V4M6 20v-4" {...p} />;
 const SettingsIcon = (p) => <Icon d="M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.2.65.77 1.1 1.51 1H21a2 2 0 010 4h-.09c-.74.1-1.31.55-1.51 1.01z" {...p} />;
 const RefreshIcon = (p) => <Icon d="M23 4v6h-6M1 20v-6h6M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" {...p} />;
@@ -312,16 +340,17 @@ function Dashboard({ authUser, onLogout: handleLogout }) {
     companySize: "11-50, 51-200, 201-500",
     maxLeads: 25,
   });
-  const [settings, setSettings] = useState({
-    lushaApiKey: "",
-    snovClientId: "",
-    snovClientSecret: "",
-    vapiApiKey: "",
-    vapiPhoneNumberId: "",
-    vapiVoiceProvider: "openai",
-    vapiVoice: "alloy",
-    vapiFirstMessage: "Merhaba, Sun&Sun Danışmanlık firmasından arıyorum. Birkaç dakikanız var mı?",
-    vapiPrompt: `Sen Sun&Sun Danışmanlık firması adına arama yapan profesyonel bir iş geliştirme uzmanısın. Görevin, potansiyel müşterilerle kısa ve nazik bir konuşma yaparak hizmetlerimize ilgi duyup duymadıklarını anlamak.
+  const [settings, setSettings] = useState(() => {
+    const defaults = {
+      lushaApiKey: "",
+      snovClientId: "",
+      snovClientSecret: "",
+      vapiApiKey: "",
+      vapiPhoneNumberId: "",
+      vapiVoiceProvider: "openai",
+      vapiVoice: "alloy",
+      vapiFirstMessage: "Merhaba, Sun&Sun Danışmanlık firmasından arıyorum. Birkaç dakikanız var mı?",
+      vapiPrompt: `Sen Sun&Sun Danışmanlık firması adına arama yapan profesyonel bir iş geliştirme uzmanısın. Görevin, potansiyel müşterilerle kısa ve nazik bir konuşma yaparak hizmetlerimize ilgi duyup duymadıklarını anlamak.
 
 Sun&Sun hizmetleri: Turquality danışmanlığı, KOSGEB hibeleri, ihracat geliştirme, AB hibeleri, TÜBİTAK projeleri, dijital pazarlama ve kalite yönetimi (ISO).
 
@@ -331,19 +360,116 @@ Kurallar:
 - Eğer ilgilenirlerse bir toplantı öner
 - Eğer ilgilenmiyorlarsa nazikçe konuşmayı bitir
 - Türkçe konuş, ama gerekirse İngilizceye geç`,
-    twilioAccountSid: "",
-    twilioAuthToken: "",
-    twilioFromNumber: "",
-    minCompanySize: "11",
-    priorityIndustries: "Manufacturing, Software, Food",
-    decisionMakerBoost: "+20 points",
-    emailNotifications: "info@sunandsun.com.tr",
-    notifyNewLeads: "Enabled",
-    dailySummary: "09:00 AM",
-    sendgridApiKey: "",
-    sendgridFromEmail: "info@sunandsun.com.tr",
-    sendgridFromName: "Sun & Sun International",
+      twilioAccountSid: "",
+      twilioAuthToken: "",
+      twilioFromNumber: "",
+      minCompanySize: "11",
+      priorityIndustries: "Manufacturing, Software, Food",
+      decisionMakerBoost: "+20 points",
+      emailNotifications: "info@sunandsun.com.tr",
+      notifyNewLeads: "Enabled",
+      dailySummary: "09:00 AM",
+      sendgridApiKey: "",
+      sendgridFromEmail: "info@sunandsun.com.tr",
+      sendgridFromName: "Sun & Sun International",
+      mondayApiKey: "",
+      mondayBoardId: "8368915",
+    };
+    try {
+      const saved = localStorage.getItem("sns_settings");
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch { return defaults; }
   });
+
+  // ── EMAIL CAMPAIGN STATE ────────────────────────────────────────
+  // ── MONDAY STATE ───────────────────────────────────────────────
+  const [mondayItems, setMondayItems] = useState([]);
+  const [mondayColumns, setMondayColumns] = useState([]);
+  const [mondayBoardName, setMondayBoardName] = useState("");
+  const [mondayLoading, setMondayLoading] = useState(false);
+  const [mondayError, setMondayError] = useState("");
+  const [mondayTestEmail, setMondayTestEmail] = useState(null);
+  const [mondaySelected, setMondaySelected] = useState(new Set());
+  const [mondayBulkModal, setMondayBulkModal] = useState(false);
+  const [mondayBulkDraft, setMondayBulkDraft] = useState({
+    subject: "Test E-Postası — Lütfen Yanıtlamayınız",
+    body: "Bu e-posta yalnızca sistem testi amacıyla gönderilmiştir. Herhangi bir işlem yapmanıza gerek yoktur; lütfen bu e-postayı yanıtlamayınız.\n\nİyi çalışmalar dileriz.",
+  });
+  const [mondayBulkSending, setMondayBulkSending] = useState(false);
+  const [mondayCampaigns, setMondayCampaigns] = useState([]);
+  const [mondayAttachments, setMondayAttachments] = useState([]);
+  const [mondayEmailVerification, setMondayEmailVerification] = useState({});
+  const [mondayVerifying, setMondayVerifying] = useState(false);
+  const [mondayBounces, setMondayBounces] = useState(new Set());
+  const [mondayMailKonulari, setMondayMailKonulari] = useState("");
+  const [mondayOrtakMail, setMondayOrtakMail] = useState("");
+  const [mondayTags, setMondayTags] = useState([]);
+
+  const fetchMondayCampaigns = async () => {
+    try {
+      const token = localStorage.getItem("sns_token");
+      const r = await fetch("/email/campaigns", { headers: { Authorization: `Bearer ${token}` } });
+      if (r.ok) setMondayCampaigns(await r.json());
+    } catch {}
+  };
+
+  const fetchMondayBoard = async () => {
+    if (!settings.mondayApiKey || !settings.mondayBoardId) {
+      setMondayError("Add your Monday.com API key and Board ID in Settings first.");
+      return;
+    }
+    setMondayLoading(true);
+    setMondayError("");
+    try {
+      const token = localStorage.getItem("sns_token");
+      const r = await fetch("/monday/board", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ apiKey: settings.mondayApiKey, boardId: settings.mondayBoardId }),
+      });
+      const data = await r.json();
+      if (data.errors) { setMondayError(data.errors[0]?.message || "Monday API error"); return; }
+      const board = data?.data?.boards?.[0];
+      if (!board) { setMondayError("Board not found. Check your Board ID."); return; }
+      setMondayBoardName(board.name);
+      setMondayColumns(board.columns || []);
+      const items = board.items_page?.items || [];
+      setMondayItems(items);
+      // verify email domains in background
+      const emailColDef = (board.columns || []).find(c => c.type === "email") || (board.columns || []).find(c => /e[\s-]?posta|e-?mail/i.test(c.title));
+      if (emailColDef) {
+        const emails = items.map(i => {
+          const cv = i.column_values.find(v => v.id === emailColDef.id);
+          return cv?.text || "";
+        }).filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e));
+        if (emails.length > 0) {
+          setMondayVerifying(true);
+          const token = localStorage.getItem("sns_token");
+          fetch("/email/verify-domains", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ emails }),
+          }).then(r => r.json()).then(data => setMondayEmailVerification(data)).finally(() => setMondayVerifying(false));
+        }
+      }
+      // fetch bounced emails in background
+      fetch("/email/bounces", {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(r => r.json()).then(rows => {
+        setMondayBounces(new Set(rows.map(r => r.email.toLowerCase())));
+      }).catch(() => {});
+      // fetch all Monday tags in background
+      fetch("/monday/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ apiKey: settings.mondayApiKey }),
+      }).then(r => r.json()).then(d => { if (d.tags) setMondayTags(d.tags); }).catch(() => {});
+    } catch (e) {
+      setMondayError(e.message);
+    } finally {
+      setMondayLoading(false);
+    }
+  };
 
   // ── EMAIL CAMPAIGN STATE ────────────────────────────────────────
   const [emailCampaigns, setEmailCampaigns] = useState(() => {
@@ -352,8 +478,20 @@ Kurallar:
   const [emailDraft, setEmailDraft] = useState({ subject: "", body: "" });
   const [emailFilter, setEmailFilter] = useState({ statuses: [], industries: [], hasEmail: true });
   const [emailSending, setEmailSending] = useState(false);
-  const [emailResult, setEmailResult] = useState(null); // { sent, failed, errors }
+  const [emailResult, setEmailResult] = useState(null);
   const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
+  const [emailTemplates, setEmailTemplates] = useState([]);
+  const [templateMgrOpen, setTemplateMgrOpen] = useState(false);
+  const [templateEdit, setTemplateEdit] = useState(null);
+
+  // ── INBOX / ML STATE ────────────────────────────────────────────
+  const [inboxText, setInboxText]       = useState("");
+  const [inboxResult, setInboxResult]   = useState(null);
+  const [inboxLoading, setInboxLoading] = useState(false);
+  const [inboxLabeling, setInboxLabeling] = useState(false);
+  const [mlStatus, setMlStatus]         = useState(null);
+  const [mlTraining, setMlTraining]     = useState(false);
+  const [mlTrainResult, setMlTrainResult] = useState(null);
   const [activeCall, setActiveCall] = useState(null); // { callId, lead, status, startTime }
   const [showCallModal, setShowCallModal] = useState(false);
   const callPollRef = useRef(null);
@@ -391,6 +529,7 @@ Kurallar:
   // Load users when admin enters settings
   useEffect(() => {
     if (view === "settings" && authUser?.role === "admin") umFetch();
+    if (view === "monday") fetchMondayCampaigns();
   }, [view, authUser, umFetch]);
 
   const umAddUser = async () => {
@@ -441,6 +580,11 @@ Kurallar:
     setPwModal(null); setNewPw("");
   };
 
+  // Persist settings (API keys etc.) to localStorage
+  useEffect(() => {
+    localStorage.setItem("sns_settings", JSON.stringify(settings));
+  }, [settings]);
+
   // Persist leads to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem("sns_leads", JSON.stringify(leads));
@@ -449,6 +593,26 @@ Kurallar:
   useEffect(() => {
     localStorage.setItem("sns_email_campaigns", JSON.stringify(emailCampaigns));
   }, [emailCampaigns]);
+
+  const fetchEmailTemplates = useCallback(async () => {
+    const token = localStorage.getItem("sns_token");
+    try {
+      const res = await fetch("/email/templates", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setEmailTemplates(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchEmailTemplates(); }, [fetchEmailTemplates]);
+
+  const fetchMlStatus = useCallback(async () => {
+    const token = localStorage.getItem("sns_token");
+    try {
+      const res = await fetch("/ml/status", { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setMlStatus(await res.json());
+    } catch { setMlStatus(null); }
+  }, []);
+
+  useEffect(() => { fetchMlStatus(); }, [fetchMlStatus]);
 
   // ─── VAPI COLD CALL ──────────────────────────────────────────────
   const initiateCall = async (lead) => {
@@ -998,16 +1162,26 @@ Kurallar:
 
   const isAdmin = authUser?.role === "admin";
 
+  const [lang, setLang] = useState(() => localStorage.getItem("sns_lang") || "tr");
+  useEffect(() => { localStorage.setItem("sns_lang", lang); }, [lang]);
+  const t = (key, ...args) => {
+    const dict = TRANSLATIONS[lang] ?? TRANSLATIONS.en;
+    const val = dict[key] ?? TRANSLATIONS.en[key] ?? key;
+    return typeof val === "function" ? val(...args) : val;
+  };
+
   const sidebarItems = [
-    { id: "dashboard", label: "Dashboard", icon: <BarChartIcon size={18} /> },
-    { id: "leads", label: "Leads", icon: <UserIcon size={18} /> },
-    { id: "pipeline", label: "Pipeline", icon: <BriefcaseIcon size={18} /> },
-    { id: "calls", label: "Cold Calls", icon: <PhoneCallIcon size={18} />, badge: stats.totalCalls || null },
+    { id: "dashboard", label: t("nav_dashboard"), icon: <BarChartIcon size={18} /> },
+    { id: "leads", label: t("nav_leads"), icon: <UserIcon size={18} /> },
+    { id: "pipeline", label: t("nav_pipeline"), icon: <BriefcaseIcon size={18} /> },
+    { id: "calls", label: t("nav_coldCalls"), icon: <PhoneCallIcon size={18} />, badge: stats.totalCalls || null },
+    { id: "email", label: t("nav_email"), icon: <MailIcon size={18} /> },
+    { id: "monday", label: t("nav_monday"), icon: <GridIcon size={18} /> },
     ...(isAdmin ? [
-      { id: "email", label: "Email", icon: <MailIcon size={18} /> },
-      { id: "agent", label: "AI Agent", icon: <BotIcon size={18} /> },
-      { id: "settings", label: "Settings", icon: <SettingsIcon size={18} /> },
+      { id: "inbox", label: t("nav_inbox"), icon: <InboxIcon size={18} /> },
+      { id: "agent", label: t("nav_agent"), icon: <BotIcon size={18} /> },
     ] : []),
+    { id: "settings", label: t("nav_settings"), icon: <SettingsIcon size={18} /> },
   ];
 
   // ─── RENDER ──────────────────────────────────────────────────
@@ -1059,14 +1233,23 @@ Kurallar:
               <div style={{ fontSize: 10, color: colors.textDim, textTransform: "capitalize" }}>{authUser.role}</div>
             </div>
           </div>
-          <div style={{ fontSize: 10, color: colors.textDim, marginBottom: 8 }}>{leads.length} leads in database</div>
+          <div style={{ fontSize: 10, color: colors.textDim, marginBottom: 8 }}>{t("nav_leadsInDb", leads.length)}</div>
+          {/* Language toggle */}
+          <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+            {["tr", "en"].map(l => (
+              <button key={l} onClick={() => setLang(l)}
+                style={{ flex: 1, padding: "5px 0", border: `1px solid ${lang === l ? colors.primary : colors.border}`, borderRadius: 5, background: lang === l ? `${colors.primary}22` : "transparent", color: lang === l ? colors.primaryLight : colors.textDim, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: font, textTransform: "uppercase", letterSpacing: 0.5, transition: "all .15s" }}>
+                {l}
+              </button>
+            ))}
+          </div>
           <button
             onClick={handleLogout}
             style={{ width: "100%", padding: "7px 10px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textDim, fontSize: 11, fontWeight: 500, cursor: "pointer", fontFamily: font, textAlign: "left", transition: "all .15s" }}
             onMouseEnter={(e) => { e.target.style.borderColor = colors.danger; e.target.style.color = colors.danger; }}
             onMouseLeave={(e) => { e.target.style.borderColor = colors.border; e.target.style.color = colors.textDim; }}
           >
-            ↩ Çıkış Yap
+            ↩ {t("nav_logout")}
           </button>
         </div>
       </div>
@@ -1088,19 +1271,19 @@ Kurallar:
             {/* Header + Quick Actions */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
               <div>
-                <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Dashboard</h1>
-                <p style={{ color: colors.textMuted, fontSize: 13 }}>Overview of your lead pipeline and agent activity</p>
+                <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("dash_title")}</h1>
+                <p style={{ color: colors.textMuted, fontSize: 13 }}>{t("dash_subtitle")}</p>
               </div>
               {isAdmin && (
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => setShowAddModal(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: font }}>
-                    <PlusIcon size={14} /> Add Lead
+                    <PlusIcon size={14} /> {t("dash_addLead")}
                   </button>
                   <button onClick={() => setShowImportModal(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: font }}>
-                    ↑ Import XLS
+                    {t("dash_importXls")}
                   </button>
                   <button onClick={() => setView("agent")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: `linear-gradient(135deg, #7C3AED, #4F46E5)`, border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: font }}>
-                    <BotIcon size={14} /> Run AI Agent
+                    <BotIcon size={14} /> {t("dash_runAgent")}
                   </button>
                 </div>
               )}
@@ -1109,10 +1292,10 @@ Kurallar:
             {/* Row 1 — Stat cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
               {[
-                { label: "Total Leads", value: stats.total, color: colors.primary, sub: `${stats.new} new` },
-                { label: "Qualified", value: stats.qualified, color: colors.success, sub: `${stats.total ? Math.round(stats.qualified / stats.total * 100) : 0}% of pipeline` },
-                { label: "Won Deals", value: stats.won, color: colors.accent, sub: "closed successfully" },
-                { label: "Avg Score", value: stats.avgScore, color: colors.primaryLight, sub: "lead quality" },
+                { label: t("dash_totalLeads"), value: stats.total, color: colors.primary, sub: t("dash_new", stats.new) },
+                { label: t("dash_qualified"), value: stats.qualified, color: colors.success, sub: t("dash_pctOfPipeline", stats.total ? Math.round(stats.qualified / stats.total * 100) : 0) },
+                { label: t("dash_wonDeals"), value: stats.won, color: colors.accent, sub: t("dash_closedSuccessfully") },
+                { label: t("dash_avgScore"), value: stats.avgScore, color: colors.primaryLight, sub: t("dash_leadQuality") },
               ].map((s, i) => (
                 <div key={i} style={{ background: colors.surface, borderRadius: 12, padding: "18px 20px", border: `1px solid ${colors.border}` }}>
                   <div style={{ fontSize: 11, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 }}>{s.label}</div>
@@ -1126,26 +1309,26 @@ Kurallar:
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
               {/* Win Rate */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <div style={{ fontSize: 11, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8 }}>Win Rate</div>
+                <div style={{ fontSize: 11, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8 }}>{t("dash_winRate")}</div>
                 {stats.winRate !== null ? (
                   <>
                     <div style={{ fontSize: 42, fontWeight: 800, color: stats.winRate >= 50 ? colors.success : colors.warning, lineHeight: 1 }}>{stats.winRate}%</div>
-                    <div style={{ fontSize: 11, color: colors.textDim }}>{stats.won} won · {stats.lost} lost</div>
+                    <div style={{ fontSize: 11, color: colors.textDim }}>{t("dash_wonLost", stats.won, stats.lost)}</div>
                     <div style={{ width: "100%", height: 6, background: colors.border, borderRadius: 3, marginTop: 4, overflow: "hidden" }}>
                       <div style={{ width: `${stats.winRate}%`, height: "100%", background: stats.winRate >= 50 ? colors.success : colors.warning, borderRadius: 3, transition: "width .5s" }} />
                     </div>
                   </>
                 ) : (
-                  <div style={{ fontSize: 13, color: colors.textDim }}>No Won/Lost leads yet</div>
+                  <div style={{ fontSize: 13, color: colors.textDim }}>{t("dash_noWonLost")}</div>
                 )}
               </div>
               {/* Score Distribution */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Score Distribution</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t("dash_scoreDist")}</div>
                 {[
-                  { label: "Hot (80+)", count: stats.hot, color: colors.success },
-                  { label: "Warm (60–79)", count: stats.warm, color: colors.accent },
-                  { label: "Cold (<60)", count: stats.cold, color: colors.danger },
+                  { label: t("dash_hot"), count: stats.hot, color: colors.success },
+                  { label: t("dash_warm"), count: stats.warm, color: colors.accent },
+                  { label: t("dash_cold"), count: stats.cold, color: colors.danger },
                 ].map((band) => (
                   <div key={band.label} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: band.color, flexShrink: 0 }} />
@@ -1159,12 +1342,12 @@ Kurallar:
               </div>
               {/* Call Stats */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Call Activity</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t("dash_callActivity")}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {[
-                    { label: "Total Calls", value: stats.totalCalls, color: colors.primaryLight },
-                    { label: "Completed", value: stats.completedCalls, color: colors.success },
-                    { label: "Failed / Other", value: stats.totalCalls - stats.completedCalls, color: colors.danger },
+                    { label: t("dash_totalCalls"), value: stats.totalCalls, color: colors.primaryLight },
+                    { label: t("dash_completed"), value: stats.completedCalls, color: colors.success },
+                    { label: t("dash_failedOther"), value: stats.totalCalls - stats.completedCalls, color: colors.danger },
                   ].map((row) => (
                     <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${colors.border}` }}>
                       <span style={{ fontSize: 12, color: colors.textMuted }}>{row.label}</span>
@@ -1173,12 +1356,12 @@ Kurallar:
                   ))}
                   {stats.mostCalledLead && stats.totalCalls > 0 && (
                     <div style={{ marginTop: 4 }}>
-                      <div style={{ fontSize: 10, color: colors.textDim, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Most Called</div>
+                      <div style={{ fontSize: 10, color: colors.textDim, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>{t("dash_mostCalled")}</div>
                       <div
                         onClick={() => { setSelectedLead(stats.mostCalledLead); setView("leads"); }}
                         style={{ fontSize: 12, color: colors.primaryLight, cursor: "pointer", fontWeight: 500 }}
                       >
-                        {stats.mostCalledLead.firstName} {stats.mostCalledLead.lastName} ({stats.mostCalledLead.callHistory?.length || 0} calls)
+                        {stats.mostCalledLead.firstName} {stats.mostCalledLead.lastName} ({t("dash_nCalls", stats.mostCalledLead.callHistory?.length || 0)})
                       </div>
                     </div>
                   )}
@@ -1188,7 +1371,7 @@ Kurallar:
 
             {/* Row 3 — Conversion Funnel */}
             <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Conversion Funnel</div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t("dash_funnel")}</div>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 80 }}>
                 {stats.funnel.map((stage, i) => {
                   const pct = funnelMax ? (stage.count / funnelMax) * 100 : 0;
@@ -1207,7 +1390,7 @@ Kurallar:
             {/* Row 4 — Pipeline + Top Needs */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Pipeline Breakdown</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t("dash_pipelineBreakdown")}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {stats.byStatus.filter(s => s.count > 0).map((s) => (
                     <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1222,7 +1405,7 @@ Kurallar:
                 </div>
               </div>
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Top Client Needs</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t("dash_topNeeds")}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {stats.topNeeds.map((n) => (
                     <div key={n.name} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1240,7 +1423,7 @@ Kurallar:
             {/* Row 5 — Industry + City + Source */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Leads by Industry</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t("dash_byIndustry")}</div>
                 {stats.byIndustry.slice(0, 6).map((ind) => (
                   <div key={ind.name} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                     <span style={{ fontSize: 11, color: colors.textMuted, width: 110, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ind.name}</span>
@@ -1252,7 +1435,7 @@ Kurallar:
                 ))}
               </div>
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Leads by City</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t("dash_byCity")}</div>
                 {stats.byCity.map((c) => (
                   <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                     <span style={{ fontSize: 11, color: colors.textMuted, width: 70, flexShrink: 0 }}>{c.name}</span>
@@ -1264,7 +1447,7 @@ Kurallar:
                 ))}
               </div>
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Lead Source</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t("dash_leadSource")}</div>
                 {stats.bySource.map((src) => (
                   <div key={src.name} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                     <span style={{ fontSize: 12, color: colors.textMuted, width: 80, flexShrink: 0 }}>{src.name}</span>
@@ -1282,11 +1465,11 @@ Kurallar:
               {/* Hot Leads */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                  🔥 Hot Leads
-                  <span style={{ fontSize: 10, color: colors.textDim, fontWeight: 400 }}>score 80+ · not closed</span>
+                  🔥 {t("dash_hotLeads")}
+                  <span style={{ fontSize: 10, color: colors.textDim, fontWeight: 400 }}>{t("dash_hotLeadsSub")}</span>
                 </div>
                 {stats.hotLeads.length === 0 ? (
-                  <div style={{ fontSize: 12, color: colors.textDim }}>No hot leads yet.</div>
+                  <div style={{ fontSize: 12, color: colors.textDim }}>{t("dash_noHotLeads")}</div>
                 ) : stats.hotLeads.map((lead) => (
                   <div key={lead.id} onClick={() => { setSelectedLead(lead); setView("leads"); }}
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid ${colors.border}`, cursor: "pointer" }}
@@ -1302,7 +1485,7 @@ Kurallar:
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
                       <div style={{ fontSize: 15, fontWeight: 700, color: colors.success }}>{lead.score}</div>
-                      <div style={{ fontSize: 9, color: colors.textDim }}>score</div>
+                      <div style={{ fontSize: 9, color: colors.textDim }}>{t("dash_score")}</div>
                     </div>
                   </div>
                 ))}
@@ -1310,10 +1493,10 @@ Kurallar:
               {/* Recent Leads */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                  🕐 Recently Added
+                  🕐 {t("dash_recentlyAdded")}
                 </div>
                 {stats.recentLeads.length === 0 ? (
-                  <div style={{ fontSize: 12, color: colors.textDim }}>No leads yet.</div>
+                  <div style={{ fontSize: 12, color: colors.textDim }}>{t("dash_noLeads")}</div>
                 ) : stats.recentLeads.map((lead) => (
                   <div key={lead.id} onClick={() => { setSelectedLead(lead); setView("leads"); }}
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid ${colors.border}`, cursor: "pointer" }}
@@ -1342,17 +1525,17 @@ Kurallar:
           <div style={{ animation: "slideIn .3s ease" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div>
-                <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Leads</h1>
-                <p style={{ color: colors.textMuted, fontSize: 13 }}>{filtered.length} of {leads.length} leads shown</p>
+                <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("leads_title")}</h1>
+                <p style={{ color: colors.textMuted, fontSize: 13 }}>{t("leads_shown", filtered.length, leads.length)}</p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {isAdmin && (
                   <button onClick={() => setShowImportModal(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: colors.surface, color: colors.textMuted, border: `1px solid ${colors.border}`, borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: font }}>
-                    ↑ Import XLS
+                    {t("leads_importXls")}
                   </button>
                 )}
                 <button onClick={() => setShowAddModal(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: colors.primary, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: font }}>
-                  <PlusIcon size={16} /> Add Lead
+                  <PlusIcon size={16} /> {t("leads_addLead")}
                 </button>
               </div>
             </div>
@@ -1362,15 +1545,15 @@ Kurallar:
               <div style={{ flex: 1, minWidth: 200, position: "relative" }}>
                 <input
                   value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search leads by name, company, need..."
+                  placeholder={t("leads_searchPlaceholder")}
                   style={{ width: "100%", padding: "8px 12px 8px 32px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 13, outline: "none", position: "relative" }}
                 />
                 <span style={{ position: "absolute", left: 10, top: 10 }}><SearchIcon size={14} color={colors.textDim} /></span>
               </div>
               {[
-                { label: "Industry", value: filterIndustry, set: setFilterIndustry, options: ["All", ...INDUSTRIES] },
-                { label: "Status", value: filterStatus, set: setFilterStatus, options: ["All", ...LEAD_STATUSES] },
-                { label: "City", value: filterCity, set: setFilterCity, options: ["All", ...CITIES] },
+                { label: t("leads_filterIndustry"), value: filterIndustry, set: setFilterIndustry, options: ["All", ...INDUSTRIES] },
+                { label: t("leads_filterStatus"), value: filterStatus, set: setFilterStatus, options: ["All", ...LEAD_STATUSES] },
+                { label: t("leads_filterCity"), value: filterCity, set: setFilterCity, options: ["All", ...CITIES] },
               ].map((f) => (
                 <select key={f.label} value={f.value} onChange={(e) => f.set(e.target.value)}
                   style={{ padding: "8px 12px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer" }}>
@@ -1384,7 +1567,7 @@ Kurallar:
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: colors.surfaceHover }}>
-                    {["#", "Name", "Company", "Title", "Industry", "City", "Score", "Status", "Needs", "Contact"].map((h) => (
+                    {[t("leads_colHash"), t("leads_colName"), t("leads_colCompany"), t("leads_colTitle"), t("leads_colIndustry"), t("leads_colCity"), t("leads_colScore"), t("leads_colStatus"), t("leads_colNeeds"), t("leads_colContact")].map((h) => (
                       <th key={h} style={{ padding: "10px 12px", textAlign: "left", color: colors.textMuted, fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, borderBottom: `1px solid ${colors.border}` }}>{h}</th>
                     ))}
                   </tr>
@@ -1415,7 +1598,7 @@ Kurallar:
                             color: STATUS_COLORS[lead.status]?.text || colors.textDim,
                           }}
                         >
-                          <option value="">— Select —</option>
+                          <option value="">{t("leads_select")}</option>
                           {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                         </select>
                       </td>
@@ -1448,21 +1631,21 @@ Kurallar:
           <div style={{ animation: "slideIn .3s ease" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
               <button onClick={() => setSelectedLead(null)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, cursor: "pointer", fontSize: 12, fontFamily: font }}>
-                ← Back to Leads
+                {t("detail_back")}
               </button>
               <button
                 onClick={() => settings.twilioAccountSid ? initiateTwilioCall(selectedLead) : initiateCall(selectedLead)}
                 disabled={!selectedLead.phone}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: selectedLead.phone ? colors.success : colors.border, border: "none", borderRadius: 8, color: selectedLead.phone ? "#fff" : colors.textDim, cursor: selectedLead.phone ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, fontFamily: font, transition: "all .15s" }}
               >
-                <PhoneCallIcon size={14} /> Cold Call {settings.twilioAccountSid ? "(Twilio)" : "(Vapi)"}
+                <PhoneCallIcon size={14} /> {t("detail_coldCall", settings.twilioAccountSid ? "Twilio" : "Vapi")}
               </button>
               {isAdmin && (
                 <button
-                  onClick={() => { if (window.confirm(`Delete "${selectedLead.firstName} ${selectedLead.lastName}"? This cannot be undone.`)) { setLeads((prev) => prev.filter((l) => l.id !== selectedLead.id)); setSelectedLead(null); } }}
+                  onClick={() => { if (window.confirm(t("detail_deleteConfirm", `${selectedLead.firstName} ${selectedLead.lastName}`))) { setLeads((prev) => prev.filter((l) => l.id !== selectedLead.id)); setSelectedLead(null); } }}
                   style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "transparent", border: `1px solid ${colors.danger}60`, borderRadius: 8, color: colors.danger, cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: font, transition: "all .15s" }}
                 >
-                  🗑 Delete Lead
+                  {t("detail_deleteLead")}
                 </button>
               )}
             </div>
@@ -1479,12 +1662,12 @@ Kurallar:
                   </div>
                 </div>
                 {[
-                  { icon: <MailIcon size={14} />, label: "Email", value: selectedLead.email },
-                  { icon: <PhoneIcon size={14} />, label: "Phone", value: selectedLead.phone },
-                  { icon: <LinkedInIcon size={14} />, label: "LinkedIn", value: selectedLead.linkedinUrl },
-                  { icon: <BriefcaseIcon size={14} />, label: "Industry", value: selectedLead.industry },
-                  { icon: <UserIcon size={14} />, label: "Company Size", value: selectedLead.companySize + " employees" },
-                  { icon: <FilterIcon size={14} />, label: "Source", value: selectedLead.source },
+                  { icon: <MailIcon size={14} />, label: t("detail_email"), value: selectedLead.email },
+                  { icon: <PhoneIcon size={14} />, label: t("detail_phone"), value: selectedLead.phone },
+                  { icon: <LinkedInIcon size={14} />, label: t("detail_linkedin"), value: selectedLead.linkedinUrl },
+                  { icon: <BriefcaseIcon size={14} />, label: t("detail_industry"), value: selectedLead.industry },
+                  { icon: <UserIcon size={14} />, label: t("detail_companySize"), value: selectedLead.companySize + " " + t("detail_employees") },
+                  { icon: <FilterIcon size={14} />, label: t("detail_source"), value: selectedLead.source },
                 ].map((f, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
                     <span style={{ color: colors.textDim }}>{f.icon}</span>
@@ -1493,7 +1676,7 @@ Kurallar:
                   </div>
                 ))}
                 <div style={{ marginTop: 16 }}>
-                  <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 8 }}>Tags</div>
+                  <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 8 }}>{t("detail_tags")}</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {selectedLead.tags.map((t) => (
                       <span key={t} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 11, background: `${colors.accent}20`, color: colors.accentLight }}>{t}</span>
@@ -1504,7 +1687,7 @@ Kurallar:
               {/* Right: Needs + Status + Notes */}
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Client Needs</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{t("detail_clientNeeds")}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {selectedLead.needs.map((n) => (
                       <div key={n} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: `${colors.success}12`, borderRadius: 6, fontSize: 12, color: colors.success }}>
@@ -1514,22 +1697,22 @@ Kurallar:
                   </div>
                 </div>
                 <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Status & Score</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{t("detail_statusScore")}</div>
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
                     <select value={selectedLead.status} onChange={(e) => { updateLead(selectedLead.id, { status: e.target.value }); setSelectedLead((p) => ({ ...p, status: e.target.value })); }}
                       style={{ padding: "6px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 12, outline: "none" }}>
-                      <option value="">— Select —</option>
+                      <option value="">{t("leads_select")}</option>
                       {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <span style={{ fontSize: 24, fontWeight: 700, color: selectedLead.score >= 80 ? colors.success : colors.accent }}>{selectedLead.score}</span>
-                    <span style={{ fontSize: 11, color: colors.textDim }}>/ 100 lead score</span>
+                    <span style={{ fontSize: 11, color: colors.textDim }}>{t("detail_leadScore")}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: colors.textDim }}>Added: {selectedLead.dateAdded} · Last contact: {selectedLead.lastContact ?? "Never"}</div>
+                  <div style={{ fontSize: 11, color: colors.textDim }}>{t("detail_added")} {selectedLead.dateAdded} · {t("detail_lastContact")} {selectedLead.lastContact ?? t("detail_never")}</div>
                 </div>
                 <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Notes</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{t("detail_notes")}</div>
                   <textarea
-                    value={selectedLead.notes} placeholder="Add notes about this lead..."
+                    value={selectedLead.notes} placeholder={t("detail_notesPlaceholder")}
                     onChange={(e) => { updateLead(selectedLead.id, { notes: e.target.value }); setSelectedLead((p) => ({ ...p, notes: e.target.value })); }}
                     style={{ width: "100%", minHeight: 100, padding: 12, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 12, outline: "none", resize: "vertical", fontFamily: font }}
                   />
@@ -1538,7 +1721,7 @@ Kurallar:
                 {selectedLead.callHistory?.length > 0 && (
                   <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                      <PhoneCallIcon size={14} color={colors.success} /> Call History
+                      <PhoneCallIcon size={14} color={colors.success} /> {t("detail_callHistory")}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {selectedLead.callHistory.map((c, i) => (
@@ -1552,7 +1735,7 @@ Kurallar:
                           </div>
                           {c.transcript && (
                             <details style={{ marginTop: 4 }}>
-                              <summary style={{ fontSize: 11, color: colors.textMuted, cursor: "pointer" }}>View transcript</summary>
+                              <summary style={{ fontSize: 11, color: colors.textMuted, cursor: "pointer" }}>{t("detail_viewTranscript")}</summary>
                               <p style={{ fontSize: 11, color: colors.textDim, marginTop: 6, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{c.transcript}</p>
                             </details>
                           )}
@@ -1571,21 +1754,21 @@ Kurallar:
           <div style={{ animation: "slideIn .3s ease" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
               <div>
-                <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Cold Calls</h1>
-                <p style={{ color: colors.textMuted, fontSize: 13 }}>AI-powered outbound calling via Vapi — all call history across leads</p>
+                <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("calls_title")}</h1>
+                <p style={{ color: colors.textMuted, fontSize: 13 }}>{t("calls_subtitle")}</p>
               </div>
               {!settings.twilioAccountSid && !settings.vapiApiKey && (
                 <div style={{ padding: "10px 16px", background: `${colors.warning}15`, border: `1px solid ${colors.warning}40`, borderRadius: 10, fontSize: 12, color: colors.warning, maxWidth: 340 }}>
                   {isAdmin ? (
-                    <>Add your <strong>Twilio</strong> or Vapi credentials in <button onClick={() => setView("settings")} style={{ background: "none", border: "none", color: colors.accent, cursor: "pointer", fontWeight: 600, padding: 0, fontSize: 12 }}>Settings</button> to enable calling.</>
+                    <>{t("calls_setupAdmin")} <button onClick={() => setView("settings")} style={{ background: "none", border: "none", color: colors.accent, cursor: "pointer", fontWeight: 600, padding: 0, fontSize: 12 }}>{t("nav_settings")}</button></>
                   ) : (
-                    <>Ask an admin to configure Twilio or Vapi credentials to enable calling.</>
+                    <>{t("calls_setupUser")}</>
                   )}
                 </div>
               )}
               {settings.twilioAccountSid && (
                 <div style={{ padding: "6px 12px", background: `${colors.success}15`, border: `1px solid ${colors.success}40`, borderRadius: 8, fontSize: 11, color: colors.success }}>
-                  ✓ Twilio connected
+                  {t("calls_twilioConnected")}
                 </div>
               )}
             </div>
@@ -1599,10 +1782,10 @@ Kurallar:
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
                   {[
-                    { label: "Total Calls", value: allCalls.length, color: colors.primary },
-                    { label: "Completed", value: completed, color: colors.success },
-                    { label: "No Answer", value: noAnswer, color: colors.warning },
-                    { label: "Voicemail", value: voicemail, color: colors.textMuted },
+                    { label: t("calls_totalCalls"), value: allCalls.length, color: colors.primary },
+                    { label: t("calls_completed"), value: completed, color: colors.success },
+                    { label: t("calls_noAnswer"), value: noAnswer, color: colors.warning },
+                    { label: t("calls_voicemail"), value: voicemail, color: colors.textMuted },
                   ].map((s) => (
                     <div key={s.label} style={{ background: colors.surface, borderRadius: 12, padding: "16px 20px", border: `1px solid ${colors.border}` }}>
                       <div style={{ fontSize: 24, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -1616,11 +1799,11 @@ Kurallar:
             {/* Leads eligible for calling */}
             <div style={{ background: colors.surface, borderRadius: 12, border: `1px solid ${colors.border}`, overflow: "hidden" }}>
               <div style={{ padding: "14px 20px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 600 }}>
-                Leads with Phone Numbers ({leads.filter((l) => l.phone).length})
+                {t("calls_leadsWithPhone", leads.filter((l) => l.phone).length)}
               </div>
               <div style={{ overflowY: "auto", maxHeight: 480 }}>
                 {leads.filter((l) => l.phone).length === 0 ? (
-                  <div style={{ padding: 32, textAlign: "center", color: colors.textDim, fontSize: 13 }}>No leads with phone numbers yet.</div>
+                  <div style={{ padding: 32, textAlign: "center", color: colors.textDim, fontSize: 13 }}>{t("calls_noLeadsWithPhone")}</div>
                 ) : (
                   leads.filter((l) => l.phone).map((lead) => (
                     <div key={lead.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 20px", borderBottom: `1px solid ${colors.border}` }}
@@ -1635,7 +1818,7 @@ Kurallar:
                       </div>
                       <div style={{ fontSize: 12, color: colors.textDim, fontFamily: mono }}>{lead.phone}</div>
                       <div style={{ fontSize: 11, color: colors.textMuted, width: 80, textAlign: "center" }}>
-                        {lead.callHistory?.length ? `${lead.callHistory.length} call${lead.callHistory.length > 1 ? "s" : ""}` : "Not called"}
+                        {lead.callHistory?.length ? t("calls_nCalls", lead.callHistory.length) : t("calls_notCalled")}
                       </div>
                       {lead.callHistory?.length > 0 && (
                         <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: lead.callHistory[0].status === "Completed" ? `${colors.success}20` : `${colors.warning}20`, color: lead.callHistory[0].status === "Completed" ? colors.success : colors.warning }}>
@@ -1646,7 +1829,7 @@ Kurallar:
                         onClick={() => settings.twilioAccountSid ? initiateTwilioCall(lead) : initiateCall(lead)}
                         style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: colors.success, border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: font, flexShrink: 0 }}
                       >
-                        <PhoneCallIcon size={13} /> Call
+                        <PhoneCallIcon size={13} /> {t("calls_call")}
                       </button>
                     </div>
                   ))
@@ -1659,8 +1842,8 @@ Kurallar:
         {/* ══════════ PIPELINE ══════════ */}
         {view === "pipeline" && (
           <div style={{ animation: "slideIn .3s ease" }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Pipeline</h1>
-            <p style={{ color: colors.textMuted, fontSize: 13, marginBottom: 20 }}>Drag-free Kanban view of your leads by status</p>
+            <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("pipeline_title")}</h1>
+            <p style={{ color: colors.textMuted, fontSize: 13, marginBottom: 20 }}>{t("pipeline_subtitle")}</p>
             <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 16 }}>
               {LEAD_STATUSES.map((status) => {
                 const sLeads = leads.filter((l) => l.status === status);
@@ -1688,7 +1871,7 @@ Kurallar:
                           </div>
                         </div>
                       ))}
-                      {sLeads.length > 8 && <div style={{ fontSize: 11, color: colors.textDim, textAlign: "center", padding: 8 }}>+{sLeads.length - 8} more</div>}
+                      {sLeads.length > 8 && <div style={{ fontSize: 11, color: colors.textDim, textAlign: "center", padding: 8 }}>{t("pipeline_more", sLeads.length - 8)}</div>}
                     </div>
                   </div>
                 );
@@ -1698,28 +1881,176 @@ Kurallar:
         )}
 
         {/* ══════════ AI AGENT ══════════ */}
+        {view === "inbox" && (() => {
+          const token = localStorage.getItem("sns_token");
+
+          const classify = async () => {
+            if (!inboxText.trim()) return;
+            setInboxLoading(true); setInboxResult(null);
+            try {
+              const r = await fetch("/ml/classify", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ text: inboxText }) });
+              setInboxResult(await r.json());
+            } catch { setInboxResult({ error: "ML service offline. Start it with: cd ml_service && python app.py" }); }
+            setInboxLoading(false);
+          };
+
+          const labelEmail = async (label) => {
+            if (!inboxText.trim()) return;
+            setInboxLabeling(true);
+            await fetch("/ml/label", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ text: inboxText, label }) });
+            await fetchMlStatus();
+            setInboxLabeling(false);
+            setInboxText(""); setInboxResult(null);
+            alert(t("inbox_labeled", label));
+          };
+
+          const retrain = async () => {
+            setMlTraining(true); setMlTrainResult(null);
+            const r = await fetch("/ml/train", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+            const data = await r.json();
+            setMlTrainResult(data);
+            if (data.success) await fetchMlStatus();
+            setMlTraining(false);
+          };
+
+          const confidencePct = inboxResult?.confidence ? Math.round(inboxResult.confidence * 100) : null;
+          const isPositive = inboxResult?.label === "positive";
+
+          return (
+            <div style={{ padding: "28px 32px", maxWidth: 860 }}>
+              <div style={{ marginBottom: 24 }}>
+                <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("inbox_title")}</h1>
+                <p style={{ color: colors.textMuted, fontSize: 13 }}>{t("inbox_subtitle")}</p>
+              </div>
+
+              {/* Model status banner */}
+              <div style={{ background: colors.surface, borderRadius: 12, padding: 18, border: `1px solid ${colors.border}`, marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: mlStatus ? (mlStatus.model_type === "fine-tuned" ? "#43a047" : "#f9a825") : "#888", flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                      {mlStatus ? (mlStatus.model_type === "fine-tuned" ? "Fine-tuned BERTurk" : "Zero-shot XLM-RoBERTa") : t("inbox_offline")}
+                    </div>
+                    {mlStatus && (
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                        {mlStatus.positive_total} positive · {mlStatus.negative_total} negative · {mlStatus.total_labeled} labeled via ERP
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {mlStatus && (
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    {mlStatus.can_train ? (
+                      <button onClick={retrain} disabled={mlTraining}
+                        style={{ padding: "7px 16px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontSize: 12, fontWeight: 600, cursor: mlTraining ? "not-allowed" : "pointer", fontFamily: font, opacity: mlTraining ? 0.7 : 1 }}>
+                        {mlTraining ? t("inbox_training") : t("inbox_retrain")}
+                      </button>
+                    ) : (
+                      <div style={{ fontSize: 11, color: colors.textDim }}>
+                        {t("inbox_needMore", Math.max(0, 10 - mlStatus.positive_total), Math.max(0, 10 - mlStatus.negative_total))}
+                      </div>
+                    )}
+                    <button onClick={fetchMlStatus} style={{ padding: "7px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 7, color: colors.textMuted, fontSize: 12, cursor: "pointer", fontFamily: font }}>↻</button>
+                  </div>
+                )}
+              </div>
+
+              {mlTrainResult && (
+                <div style={{ borderRadius: 8, padding: "12px 16px", marginBottom: 20, background: mlTrainResult.success ? "rgba(67,160,71,0.1)" : "rgba(220,53,69,0.1)", border: `1px solid ${mlTrainResult.success ? "rgba(67,160,71,0.3)" : "rgba(220,53,69,0.3)"}`, fontSize: 13 }}>
+                  {mlTrainResult.success ? `✓ Model retrained on ${mlTrainResult.samples} samples (${mlTrainResult.positive} positive, ${mlTrainResult.negative} negative). Reload page to use the updated model.` : `✗ ${mlTrainResult.error}`}
+                </div>
+              )}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 20 }}>
+                {/* Paste & classify */}
+                <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
+                  <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>{t("inbox_pasteLabel")}</div>
+                  <textarea
+                    value={inboxText}
+                    onChange={(e) => { setInboxText(e.target.value); setInboxResult(null); }}
+                    placeholder={"Merhaba,\n\nPaylaştığınız finansman desteği ile ilgileniyoruz..."}
+                    rows={14}
+                    style={{ width: "100%", padding: "10px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
+                  />
+
+                  {/* Result */}
+                  {inboxResult && !inboxResult.error && (
+                    <div style={{ marginTop: 14, padding: "14px 16px", borderRadius: 8, background: isPositive ? "rgba(46,125,50,0.1)" : "rgba(198,40,40,0.1)", border: `1px solid ${isPositive ? "rgba(46,125,50,0.3)" : "rgba(198,40,40,0.3)"}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: isPositive ? "#66bb6a" : "#ef5350" }}>
+                          {isPositive ? t("inbox_positive") : t("inbox_negative")}
+                        </div>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 3 }}>
+                          {t("inbox_confidence")} {confidencePct}% · {t("inbox_modelLabel")} {inboxResult.model_type}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 28, fontWeight: 800, color: isPositive ? "#66bb6a" : "#ef5350" }}>{confidencePct}%</div>
+                    </div>
+                  )}
+                  {inboxResult?.error && (
+                    <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 8, background: "rgba(220,53,69,0.08)", border: "1px solid rgba(220,53,69,0.25)", fontSize: 12, color: "#e57373" }}>
+                      ✗ {inboxResult.error}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                    <button onClick={classify} disabled={inboxLoading || !inboxText.trim()}
+                      style={{ flex: 1, padding: "10px", background: inboxLoading || !inboxText.trim() ? colors.border : colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: inboxLoading || !inboxText.trim() ? "not-allowed" : "pointer", fontFamily: font }}>
+                      {inboxLoading ? t("inbox_classifying") : t("inbox_classify")}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Label panel */}
+                <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>{t("inbox_labelTrain")}</h3>
+                  <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 20, lineHeight: 1.6 }}>
+                    {t("inbox_labelDesc")}
+                  </p>
+
+                  <button onClick={() => labelEmail("positive")} disabled={inboxLabeling || !inboxText.trim()}
+                    style={{ width: "100%", marginBottom: 10, padding: "11px", background: "rgba(46,125,50,0.12)", border: "1px solid rgba(46,125,50,0.4)", borderRadius: 8, color: "#66bb6a", fontSize: 13, fontWeight: 600, cursor: inboxLabeling || !inboxText.trim() ? "not-allowed" : "pointer", fontFamily: font }}>
+                    {t("inbox_savePositive")}
+                  </button>
+                  <button onClick={() => labelEmail("negative")} disabled={inboxLabeling || !inboxText.trim()}
+                    style={{ width: "100%", padding: "11px", background: "rgba(198,40,40,0.1)", border: "1px solid rgba(198,40,40,0.3)", borderRadius: 8, color: "#ef5350", fontSize: 13, fontWeight: 600, cursor: inboxLabeling || !inboxText.trim() ? "not-allowed" : "pointer", fontFamily: font }}>
+                    {t("inbox_saveNegative")}
+                  </button>
+
+                  <div style={{ marginTop: 24, padding: 14, background: colors.bg, borderRadius: 8, fontSize: 11, color: colors.textDim, lineHeight: 1.7 }}>
+                    <strong style={{ color: colors.textMuted }}>{t("inbox_trainingFolders")}</strong><br />
+                    You can also drop <code>.txt</code> files directly into:<br />
+                    <code style={{ color: colors.primaryLight }}>ml_service/data/positive/</code><br />
+                    <code style={{ color: "#ef5350" }}>ml_service/data/negative/</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {view === "agent" && !isAdmin && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 12 }}>
             <div style={{ fontSize: 36 }}>🔒</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>Admin Access Required</div>
-            <div style={{ fontSize: 13, color: colors.textMuted }}>The AI Agent is restricted to admin accounts.</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{t("agent_adminRequired")}</div>
+            <div style={{ fontSize: 13, color: colors.textMuted }}>{t("agent_adminDesc")}</div>
           </div>
         )}
         {view === "agent" && isAdmin && (
           <div style={{ animation: "slideIn .3s ease" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div>
-                <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>AI Scraping Agent</h1>
-                <p style={{ color: colors.textMuted, fontSize: 13 }}>Configure and run the LinkedIn lead scraping agent</p>
+                <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("agent_title")}</h1>
+                <p style={{ color: colors.textMuted, fontSize: 13 }}>{t("agent_subtitle")}</p>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={runSnovAgent} disabled={agentRunning}
                   style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", border: "none", borderRadius: 10, cursor: agentRunning ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 700, fontFamily: font, transition: "all .2s", background: agentRunning ? colors.surfaceHover : `linear-gradient(135deg, #7C3AED, #4F46E5)`, color: agentRunning ? colors.textDim : "#fff", boxShadow: agentRunning ? "none" : "0 4px 15px #7C3AED50" }}>
-                  {agentRunning ? <><RefreshIcon size={16} /> Running...</> : <><BotIcon size={16} /> Run Snov.io</>}
+                  {agentRunning ? <><RefreshIcon size={16} /> {t("agent_running")}</> : <><BotIcon size={16} /> {t("agent_runSnov")}</>}
                 </button>
                 <button onClick={runAgent} disabled={agentRunning}
                   style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", border: "none", borderRadius: 10, cursor: agentRunning ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 700, fontFamily: font, transition: "all .2s", background: agentRunning ? colors.surfaceHover : `linear-gradient(135deg, ${colors.primary}, ${colors.accent})`, color: agentRunning ? colors.textDim : "#fff", boxShadow: agentRunning ? "none" : `0 4px 15px ${colors.primary}50` }}>
-                  {agentRunning ? <><RefreshIcon size={16} /> Running...</> : <><BotIcon size={16} /> Run Lusha</>}
+                  {agentRunning ? <><RefreshIcon size={16} /> {t("agent_running")}</> : <><BotIcon size={16} /> {t("agent_runLusha")}</>}
                 </button>
               </div>
             </div>
@@ -1727,12 +2058,12 @@ Kurallar:
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
               {/* Config Panel */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
-                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Search Configuration</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>{t("agent_config")}</h3>
                 {[
-                  { key: "titles", label: "Job Titles", placeholder: "CEO, Founder, Export Manager..." },
-                  { key: "industries", label: "Industries", placeholder: "Manufacturing, Software..." },
-                  { key: "cities", label: "Cities", placeholder: "İstanbul, Ankara, İzmir..." },
-                  { key: "companySize", label: "Company Size", placeholder: "11-50, 51-200..." },
+                  { key: "titles", label: t("agent_jobTitles"), placeholder: "CEO, Founder, Export Manager..." },
+                  { key: "industries", label: t("agent_industries"), placeholder: "Manufacturing, Software..." },
+                  { key: "cities", label: t("agent_cities"), placeholder: "İstanbul, Ankara, İzmir..." },
+                  { key: "companySize", label: t("agent_companySize"), placeholder: "11-50, 51-200..." },
                 ].map((field) => (
                   <div key={field.key} style={{ marginBottom: 14 }}>
                     <label style={{ display: "block", fontSize: 11, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>{field.label}</label>
@@ -1745,7 +2076,7 @@ Kurallar:
                   </div>
                 ))}
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: "block", fontSize: 11, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>Max Leads per Run</label>
+                  <label style={{ display: "block", fontSize: 11, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>{t("agent_maxLeads")}</label>
                   <input
                     type="number" value={agentConfig.maxLeads}
                     onChange={(e) => setAgentConfig((p) => ({ ...p, maxLeads: Math.max(1, parseInt(e.target.value) || 1) }))}
@@ -1753,9 +2084,9 @@ Kurallar:
                   />
                 </div>
                 <div style={{ marginTop: 16, padding: 12, background: `${colors.warning}10`, borderRadius: 8, border: `1px solid ${colors.warning}30` }}>
-                  <div style={{ fontSize: 11, color: colors.warning, fontWeight: 600, marginBottom: 4 }}>⚠️ Important Notice</div>
+                  <div style={{ fontSize: 11, color: colors.warning, fontWeight: 600, marginBottom: 4 }}>{t("agent_notice")}</div>
                   <div style={{ fontSize: 11, color: colors.textMuted, lineHeight: 1.5 }}>
-                    This agent uses Lusha's Prospecting API to find leads. Each contact revealed costs credits from your Lusha plan. Check your usage at lusha.com/dashboard.
+                    {t("agent_noticeDesc")}
                   </div>
                 </div>
               </div>
@@ -1763,14 +2094,14 @@ Kurallar:
               {/* Agent Log */}
               <div style={{ background: colors.surface, borderRadius: 12, border: `1px solid ${colors.border}`, display: "flex", flexDirection: "column" }}>
                 <div style={{ padding: "16px 20px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 600 }}>Agent Log</h3>
-                  {agentRunning && <span style={{ fontSize: 11, color: colors.success, display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: colors.success, animation: "pulse 1s infinite" }} /> Live</span>}
+                  <h3 style={{ fontSize: 14, fontWeight: 600 }}>{t("agent_log")}</h3>
+                  {agentRunning && <span style={{ fontSize: 11, color: colors.success, display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: colors.success, animation: "pulse 1s infinite" }} /> {t("agent_live")}</span>}
                 </div>
                 <div ref={logRef} style={{ flex: 1, padding: 16, overflowY: "auto", maxHeight: 420, fontFamily: mono, fontSize: 11, lineHeight: 1.8 }}>
                   {agentLog.length === 0 && (
                     <div style={{ color: colors.textDim, textAlign: "center", paddingTop: 60 }}>
                       <BotIcon size={40} color={colors.textDim} />
-                      <p style={{ marginTop: 12 }}>Agent is idle. Click "Run Agent" to start scraping.</p>
+                      <p style={{ marginTop: 12 }}>{t("agent_idle")}</p>
                     </div>
                   )}
                   {agentLog.map((log, i) => (
@@ -1811,8 +2142,8 @@ Kurallar:
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify({
                   apiKey: settings.sendgridApiKey,
-                  fromEmail: settings.sendgridFromEmail,
-                  fromName: settings.sendgridFromName,
+                  fromEmail: authUser.email,
+                  fromName: authUser.name || settings.sendgridFromName,
                   subject: emailDraft.subject,
                   htmlBody: emailDraft.body.replace(/\n/g, "<br>"),
                   recipients: emailRecipients.map((l) => ({ email: l.email, name: `${l.firstName} ${l.lastName}`.trim() })),
@@ -1842,18 +2173,122 @@ Kurallar:
             <div style={{ animation: "slideIn .3s ease" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
                 <div>
-                  <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Email Campaigns</h1>
-                  <p style={{ color: colors.textMuted, fontSize: 13 }}>Send bulk emails to your leads via SendGrid</p>
+                  <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("email_title")}</h1>
+                  <p style={{ color: colors.textMuted, fontSize: 13 }}>{t("email_subtitle")}</p>
                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20, marginBottom: 24 }}>
                 {/* COMPOSE */}
                 <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 20 }}>Compose</h3>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{t("email_compose")}</h3>
+                    <button onClick={() => { setTemplateMgrOpen((p) => !p); setTemplateEdit(null); }}
+                      style={{ fontSize: 11, color: colors.primary, background: "none", border: `1px solid ${colors.primary}40`, borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontFamily: font }}>
+                      {templateMgrOpen ? t("email_closeTemplates") : t("email_manageTemplates")}
+                    </button>
+                  </div>
+
+                  {/* Quick Reply Templates */}
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>{t("email_quickReply")}</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {emailTemplates.map((t) => (
+                        <button key={t.id} onClick={() => setEmailDraft({ subject: t.subject, body: t.body })}
+                          title={t.subject}
+                          style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${t.color}`, background: `${t.color}18`, color: t.color, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Template Manager */}
+                  {templateMgrOpen && (
+                    <div style={{ background: colors.bg, borderRadius: 8, padding: 16, marginBottom: 20, border: `1px solid ${colors.border}` }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12 }}>{t("email_templates")}</div>
+                      {emailTemplates.map((tmpl, i) => (
+                        <div key={tmpl.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: "8px 10px", background: colors.surface, borderRadius: 6 }}>
+                          <div style={{ width: 10, height: 10, borderRadius: "50%", background: tmpl.color, flexShrink: 0 }} />
+                          <div style={{ flex: 1, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tmpl.label}</div>
+                          <button onClick={() => setTemplateEdit({ ...tmpl, _index: i })}
+                            style={{ padding: "3px 10px", fontSize: 11, background: "none", border: `1px solid ${colors.border}`, borderRadius: 4, color: colors.textMuted, cursor: "pointer", fontFamily: font }}>
+                            {t("email_edit")}
+                          </button>
+                          <button onClick={async () => {
+                            if (!window.confirm(`Delete "${tmpl.label}"?`)) return;
+                            const token = localStorage.getItem("sns_token");
+                            await fetch(`/email/templates/${tmpl.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                            await fetchEmailTemplates();
+                          }}
+                            style={{ padding: "3px 10px", fontSize: 11, background: "none", border: "1px solid rgba(220,53,69,0.4)", borderRadius: 4, color: "#e57373", cursor: "pointer", fontFamily: font }}>
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      <button onClick={() => setTemplateEdit({ id: null, label: "", color: "#088FC4", subject: "", body: "", _index: -1 })}
+                        style={{ marginTop: 4, padding: "6px 14px", background: `${colors.primary}20`, border: `1px dashed ${colors.primary}`, borderRadius: 6, color: colors.primary, fontSize: 12, cursor: "pointer", fontFamily: font }}>
+                        {t("email_addTemplate")}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Template Edit Modal */}
+                  {templateEdit && (
+                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ background: colors.surface, borderRadius: 12, padding: 28, width: 540, maxWidth: "92vw", border: `1px solid ${colors.border}` }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>{templateEdit._index === -1 ? "New Template" : "Edit Template"}</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 90px", gap: 12, marginBottom: 14 }}>
+                          <div>
+                            <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Label</div>
+                            <input value={templateEdit.label} onChange={(e) => setTemplateEdit((p) => ({ ...p, label: e.target.value }))}
+                              placeholder="e.g. İlgileniyoruz ✓"
+                              style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Color</div>
+                            <input type="color" value={templateEdit.color} onChange={(e) => setTemplateEdit((p) => ({ ...p, color: e.target.value }))}
+                              style={{ width: "100%", height: 36, padding: 2, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, cursor: "pointer" }} />
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Subject</div>
+                          <input value={templateEdit.subject} onChange={(e) => setTemplateEdit((p) => ({ ...p, subject: e.target.value }))}
+                            placeholder="Email subject line"
+                            style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                        </div>
+                        <div style={{ marginBottom: 22 }}>
+                          <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Body</div>
+                          <textarea value={templateEdit.body} onChange={(e) => setTemplateEdit((p) => ({ ...p, body: e.target.value }))} rows={9}
+                            style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }} />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                          <button onClick={() => setTemplateEdit(null)}
+                            style={{ padding: "8px 18px", background: "none", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 13, cursor: "pointer", fontFamily: font }}>
+                            {t("email_cancel")}
+                          </button>
+                          <button onClick={async () => {
+                            if (!templateEdit.label.trim() || !templateEdit.subject.trim()) return alert("Label and subject are required.");
+                            const token = localStorage.getItem("sns_token");
+                            const body = { label: templateEdit.label, color: templateEdit.color, subject: templateEdit.subject, body: templateEdit.body };
+                            if (templateEdit._index === -1) {
+                              await fetch("/email/templates", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+                            } else {
+                              await fetch(`/email/templates/${templateEdit.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+                            }
+                            await fetchEmailTemplates();
+                            setTemplateEdit(null);
+                          }}
+                            style={{ padding: "8px 20px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: font }}>
+                            {t("email_saveTemplate")}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Subject</div>
+                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>{t("email_subjectField")}</div>
                     <input
                       value={emailDraft.subject}
                       onChange={(e) => setEmailDraft((p) => ({ ...p, subject: e.target.value }))}
@@ -1863,7 +2298,7 @@ Kurallar:
                   </div>
 
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Body</div>
+                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>{t("email_bodyField")}</div>
                     <textarea
                       value={emailDraft.body}
                       onChange={(e) => setEmailDraft((p) => ({ ...p, body: e.target.value }))}
@@ -1871,14 +2306,14 @@ Kurallar:
                       rows={14}
                       style={{ width: "100%", padding: "10px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
                     />
-                    <div style={{ fontSize: 11, color: colors.textDim, marginTop: 4 }}>Plain text. Line breaks are converted to &lt;br&gt; automatically.</div>
+                    <div style={{ fontSize: 11, color: colors.textDim, marginTop: 4 }}>{t("email_signatureNote")}</div>
                   </div>
 
                   {/* Result banner */}
                   {emailResult && (
                     <div style={{ borderRadius: 8, padding: "12px 16px", marginBottom: 16, background: emailResult.failed === 0 ? "rgba(67,160,71,0.1)" : "rgba(220,53,69,0.1)", border: `1px solid ${emailResult.failed === 0 ? "rgba(67,160,71,0.25)" : "rgba(220,53,69,0.25)"}`, fontSize: 13 }}>
-                      {emailResult.sent > 0 && <div style={{ color: "#81c784" }}>✓ {emailResult.sent} email(s) sent successfully</div>}
-                      {emailResult.failed > 0 && <div style={{ color: "#e57373" }}>✗ {emailResult.failed} failed{emailResult.errors?.length ? `: ${emailResult.errors[0]}` : ""}</div>}
+                      {emailResult.sent > 0 && <div style={{ color: "#81c784" }}>{t("email_sent", emailResult.sent)}</div>}
+                      {emailResult.failed > 0 && <div style={{ color: "#e57373" }}>{t("email_failed", emailResult.failed, emailResult.errors?.[0])}</div>}
                     </div>
                   )}
 
@@ -1887,19 +2322,19 @@ Kurallar:
                     disabled={emailSending}
                     style={{ padding: "11px 24px", background: emailSending ? colors.border : colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: emailSending ? "not-allowed" : "pointer", fontFamily: font }}
                   >
-                    {emailSending ? "Sending..." : `Send to ${emailRecipients.length} Lead${emailRecipients.length !== 1 ? "s" : ""} →`}
+                    {emailSending ? t("email_sending") : t("email_sendTo", emailRecipients.length)}
                   </button>
                 </div>
 
                 {/* FILTERS */}
                 <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 20 }}>Recipients</h3>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 20 }}>{t("email_recipients")}</h3>
 
                   {/* Has email toggle */}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${colors.border}` }}>
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 500 }}>Has email address</div>
-                      <div style={{ fontSize: 11, color: colors.textDim }}>Only leads with an email</div>
+                      <div style={{ fontSize: 12, fontWeight: 500 }}>{t("email_hasEmail")}</div>
+                      <div style={{ fontSize: 11, color: colors.textDim }}>{t("email_hasEmailSub")}</div>
                     </div>
                     <button
                       onClick={() => setEmailFilter((p) => ({ ...p, hasEmail: !p.hasEmail }))}
@@ -1911,7 +2346,7 @@ Kurallar:
 
                   {/* Status filter */}
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Filter by Status</div>
+                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>{t("email_filterByStatus")}</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {LEAD_STATUSES.map((s) => {
                         const active = emailFilter.statuses.includes(s);
@@ -1923,12 +2358,12 @@ Kurallar:
                         );
                       })}
                     </div>
-                    {emailFilter.statuses.length > 0 && <div style={{ fontSize: 10, color: colors.textDim, marginTop: 4 }}>All statuses if none selected</div>}
+                    {emailFilter.statuses.length > 0 && <div style={{ fontSize: 10, color: colors.textDim, marginTop: 4 }}>{t("email_allStatuses")}</div>}
                   </div>
 
                   {/* Industry filter */}
                   <div style={{ marginBottom: 20 }}>
-                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Filter by Industry</div>
+                    <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>{t("email_filterByIndustry")}</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {INDUSTRIES.map((ind) => {
                         const active = emailFilter.industries.includes(ind);
@@ -1945,15 +2380,15 @@ Kurallar:
                   {/* Count */}
                   <div style={{ background: colors.bg, borderRadius: 8, padding: 14, textAlign: "center" }}>
                     <div style={{ fontSize: 32, fontWeight: 700, color: colors.primary }}>{emailRecipients.length}</div>
-                    <div style={{ fontSize: 12, color: colors.textMuted }}>leads selected</div>
-                    <div style={{ fontSize: 11, color: colors.textDim, marginTop: 4 }}>{emailRecipients.filter((l) => l.email).length} with email address</div>
+                    <div style={{ fontSize: 12, color: colors.textMuted }}>{t("email_leadsSelected")}</div>
+                    <div style={{ fontSize: 11, color: colors.textDim, marginTop: 4 }}>{t("email_withEmail", emailRecipients.filter((l) => l.email).length)}</div>
                   </div>
 
                   {/* Clear filters */}
                   {(emailFilter.statuses.length > 0 || emailFilter.industries.length > 0) && (
                     <button onClick={() => setEmailFilter({ statuses: [], industries: [], hasEmail: emailFilter.hasEmail })}
                       style={{ width: "100%", marginTop: 12, padding: "8px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 11, cursor: "pointer", fontFamily: font }}>
-                      Clear Filters
+                      {t("email_clearFilters")}
                     </button>
                   )}
                 </div>
@@ -1962,21 +2397,21 @@ Kurallar:
               {/* CAMPAIGN HISTORY */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 600 }}>Campaign History</h3>
+                  <h3 style={{ fontSize: 14, fontWeight: 600 }}>{t("email_campaignHistory")}</h3>
                   {emailCampaigns.length > 0 && (
-                    <button onClick={() => { if (window.confirm("Clear all campaign history?")) setEmailCampaigns([]); }}
+                    <button onClick={() => { if (window.confirm(t("email_clearHistoryConfirm"))) setEmailCampaigns([]); }}
                       style={{ padding: "4px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 11, cursor: "pointer" }}>
-                      Clear
+                      {t("email_clearHistory")}
                     </button>
                   )}
                 </div>
                 {emailCampaigns.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "32px 0", color: colors.textDim, fontSize: 13 }}>No campaigns sent yet</div>
+                  <div style={{ textAlign: "center", padding: "32px 0", color: colors.textDim, fontSize: 13 }}>{t("email_noCampaigns")}</div>
                 ) : (
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                     <thead>
                       <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
-                        {["Date", "Subject", "Recipients", "Sent", "Failed", "Rate"].map((h) => (
+                        {[t("email_colDate"), t("email_colSubject"), t("email_colRecipients"), t("email_colSent"), t("email_colFailed"), t("email_colRate")].map((h) => (
                           <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 10, fontWeight: 600, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8 }}>{h}</th>
                         ))}
                       </tr>
@@ -2004,25 +2439,657 @@ Kurallar:
           );
         })()}
 
+        {/* ══ MONDAY.COM VIEW ══ */}
+        {view === "monday" && (() => {
+          const emailCol = mondayColumns.find(c => c.type === "email") || mondayColumns.find(c => /e[\s-]?posta|e-?mail/i.test(c.title));
+          const genderCol = mondayColumns.find(c => /cinsiyet|gender|unvan|hitap|bay|bayan/i.test(c.title));
+          const mailKonulariCol = mondayColumns.find(c => /mail.konular/i.test(c.title));
+          const ortakMailCol = mondayColumns.find(c => /ortak.mail/i.test(c.title));
+          console.log("[Monday cols] mailKonulariCol:", mailKonulariCol, "| ortakMailCol:", ortakMailCol);
+          const otherCols = mondayColumns.filter(c => !["name","checkbox","button"].includes(c.type) && c.id !== emailCol?.id && c.id !== mailKonulariCol?.id).slice(0, 4);
+          const visibleCols = [
+            ...(emailCol ? [emailCol] : []),
+            ...(mailKonulariCol ? [mailKonulariCol] : []),
+            ...otherCols,
+          ];
+          const allIds = mondayItems.map(i => i.id);
+          const allChecked = allIds.length > 0 && allIds.every(id => mondaySelected.has(id));
+          const selectedItems = mondayItems.filter(i => mondaySelected.has(i.id));
+
+          const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+
+          const buildSalutation = (name, colMap) => {
+            const rawName = (name || "").trim();
+            const firstName = rawName.split(/\s+/)[0];
+            const isPlaceholder = !firstName || firstName.toLowerCase() === "item";
+            const genderVal = genderCol ? (colMap[genderCol.id] || "").toLowerCase().trim() : "";
+            if (isPlaceholder) return "Merhaba,";
+            if (/bey|erkek|bay|male|mr/i.test(genderVal)) return `Merhaba ${firstName} Bey,`;
+            if (/han[ıi]m|kad[ıi]n|bayan|female|ms|mrs/i.test(genderVal)) return `Merhaba ${firstName} Hanım,`;
+            return `Merhaba ${firstName},`;
+          };
+
+          const isEmailOk = (email) => email && isValidEmail(email) && mondayEmailVerification[email] !== false && !mondayBounces.has(email.toLowerCase());
+          const hasValidName = (item) => item.name && item.name.trim() && item.name.toLowerCase() !== "item";
+
+          const selectedWithEmail = selectedItems.filter(i => {
+            const colMap = {};
+            i.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
+            const email = emailCol ? (colMap[emailCol.id] || "") : "";
+            return isEmailOk(email);
+          });
+          const selectedInvalidEmail = selectedItems.filter(i => {
+            const colMap = {};
+            i.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
+            const email = emailCol ? (colMap[emailCol.id] || "") : "";
+            return !email || !isValidEmail(email) || mondayEmailVerification[email] === false || mondayBounces.has(email.toLowerCase());
+          });
+          return (
+            <div style={{ animation: "slideIn .3s ease" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                <div>
+                  <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
+                    {t("monday_title", mondayBoardName)}
+                  </h2>
+                  {mondayItems.length > 0 && <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>{t("monday_items", mondayItems.length, mondaySelected.size)}</div>}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {mondaySelected.size > 0 && (
+                    <button
+                      onClick={() => { if (!mondayBulkDraft.subject) setMondayBulkDraft({ subject: "Test E-Postası — Lütfen Yanıtlamayınız", body: "Bu e-posta yalnızca sistem testi amacıyla gönderilmiştir. Herhangi bir işlem yapmanıza gerek yoktur; lütfen bu e-postayı yanıtlamayınız.\n\nİyi çalışmalar dileriz." }); setMondayBulkModal(true); }}
+                      style={{ padding: "8px 18px", background: colors.success || "#2e7d32", border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      {t("monday_sendBulk", mondaySelected.size)}
+                    </button>
+                  )}
+                  <button
+                    onClick={fetchMondayBoard}
+                    disabled={mondayLoading}
+                    style={{ padding: "8px 18px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: mondayLoading ? 0.6 : 1 }}
+                  >
+                    {mondayLoading ? t("monday_loading") : mondayItems.length ? t("monday_refresh") : t("monday_fetchBoard")}
+                  </button>
+                </div>
+              </div>
+
+              {mondayError && (
+                <div style={{ background: "rgba(220,53,69,0.1)", border: "1px solid rgba(220,53,69,0.3)", borderRadius: 8, padding: "12px 16px", color: "#e57373", fontSize: 13, marginBottom: 16 }}>
+                  {mondayError}
+                  {mondayError.includes("Settings") && (
+                    <button onClick={() => setView("settings")} style={{ marginLeft: 10, background: "none", border: "none", color: colors.accent, cursor: "pointer", fontSize: 13, fontWeight: 600, padding: 0 }}>{t("monday_goSettings")}</button>
+                  )}
+                </div>
+              )}
+
+              {!mondayItems.length && !mondayLoading && !mondayError && (
+                <div style={{ textAlign: "center", padding: "60px 20px", color: colors.textMuted }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>{t("monday_noData")}</div>
+                  <div style={{ fontSize: 12 }}>{t("monday_noDataSub")}</div>
+                </div>
+              )}
+
+              {/* ── Compose Panel ── */}
+              {mondayItems.length > 0 && (
+                <div style={{ background: colors.surface, borderRadius: 12, padding: 16, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{t("monday_compose")}</div>
+                  <div style={{ marginBottom: 10 }}>
+                    <input
+                      value={mondayBulkDraft.subject}
+                      placeholder={t("monday_subjectPlaceholder")}
+                      onChange={e => setMondayBulkDraft(p => ({ ...p, subject: e.target.value }))}
+                      style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <textarea
+                      value={mondayBulkDraft.body}
+                      placeholder={t("monday_bodyPlaceholder")}
+                      onChange={e => setMondayBulkDraft(p => ({ ...p, body: e.target.value }))}
+                      style={{ width: "100%", minHeight: 100, padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      {t("monday_attachFile")}
+                      <input type="file" multiple style={{ display: "none" }} onChange={e => {
+                        const files = Array.from(e.target.files);
+                        files.forEach(file => {
+                          const reader = new FileReader();
+                          reader.onload = ev => setMondayAttachments(prev => [...prev, { name: file.name, type: file.type, content: ev.target.result.split(",")[1] }]);
+                          reader.readAsDataURL(file);
+                        });
+                        e.target.value = "";
+                      }} />
+                    </label>
+                    {mondayAttachments.map((a, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 11, color: colors.textMuted }}>
+                        {a.name}
+                        <button onClick={() => setMondayAttachments(prev => prev.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: "#e57373", cursor: "pointer", padding: 0, fontSize: 13, lineHeight: 1 }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ── Tag fields ── */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
+                    {[
+                      { label: "mail Konuları", col: mailKonulariCol, val: mondayMailKonulari, set: setMondayMailKonulari, required: true },
+                      { label: "ortak mail", col: ortakMailCol, val: mondayOrtakMail, set: setMondayOrtakMail, required: false },
+                    ].map(({ label, col, val, set, required }) => (
+                      <div key={label}>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>
+                          {label} {col ? <span style={{ color: colors.success, fontSize: 10 }}>✓</span> : <span style={{ color: required ? "#e57373" : colors.textDim, fontSize: 10 }}>{required ? "sütun bulunamadı" : "isteğe bağlı"}</span>}
+                        </div>
+                        <select
+                          value={val}
+                          onChange={e => set(e.target.value)}
+                          style={{ width: "100%", padding: "7px 10px", background: colors.bg, border: `1px solid ${col ? colors.border : required ? "rgba(220,53,69,0.3)" : colors.border}`, borderRadius: 6, color: val ? colors.text : colors.textDim, fontSize: 12, outline: "none", boxSizing: "border-box" }}
+                        >
+                          <option value="">— Etiket seçin —</option>
+                          {mondayTags.map(tag => (
+                            <option key={tag.id} value={tag.id}>{tag.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Error Panel ── */}
+              {mondayItems.length > 0 && (() => {
+                const classify = (i) => {
+                  const colMap = {};
+                  i.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
+                  const email = emailCol ? (colMap[emailCol.id] || "") : "";
+                  if (!email) return { reason: t("monday_noEmail"), email };
+                  if (!isValidEmail(email)) return { reason: t("monday_badFormat"), email };
+                  if (mondayEmailVerification[email] === false) return { reason: t("monday_noMx"), email };
+                  if (mondayBounces.has(email.toLowerCase())) return { reason: t("monday_bounced"), email };
+                  return null;
+                };
+                const groups = {};
+                mondayItems.forEach(i => {
+                  const c = classify(i);
+                  if (!c) return;
+                  if (!groups[c.reason]) groups[c.reason] = [];
+                  groups[c.reason].push({ item: i, email: c.email });
+                });
+                if (!Object.keys(groups).length) return null;
+
+                const allInvalidIds = Object.values(groups).flatMap(entries => entries.map(g => g.item.id));
+
+                const deleteIds = async (ids, label) => {
+                  if (!window.confirm(`${label} — ${ids.length} kişi silinecek. Emin misin?`)) return;
+                  try {
+                    const token = localStorage.getItem("sns_token");
+                    console.log("[delete-items] sending ids:", ids, "apiKey present:", !!settings.mondayApiKey);
+                    const res = await fetch("/monday/delete-items", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ apiKey: settings.mondayApiKey, itemIds: ids }),
+                    });
+                    const data = await res.json();
+                    console.log("[delete-items] response:", data);
+                    if (!res.ok) { alert(`Sunucu hatası: ${data.error || res.status}`); return; }
+                    const failed = (data.results || []).filter(r => !r.ok);
+                    if (failed.length > 0) {
+                      alert(`${t("monday_deleteError")}\n${failed.map(f => `ID ${f.itemId}: ${f.error || "bilinmeyen hata"}`).join("\n")}`);
+                      return;
+                    }
+                    setMondayItems(prev => prev.filter(i => !ids.includes(i.id)));
+                  } catch (e) { alert(t("monday_deleteNetworkError", e.message)); }
+                };
+
+                return (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                      <span style={{ color: "#e57373", fontWeight: 700, fontSize: 13 }}>⚠ {allInvalidIds.length} geçersiz kişi</span>
+                      <button
+                        onClick={() => deleteIds(allInvalidIds, "Tüm geçersiz kişiler")}
+                        style={{ background: "rgba(220,53,69,0.2)", border: "1px solid rgba(220,53,69,0.5)", borderRadius: 6, color: "#e57373", fontSize: 12, fontWeight: 700, padding: "5px 14px", cursor: "pointer" }}
+                      >
+                        Tümünü Sil ({allInvalidIds.length})
+                      </button>
+                    </div>
+                    {Object.entries(groups).map(([reason, entries]) => (
+                      <div key={reason} style={{ background: "rgba(220,53,69,0.07)", border: "1px solid rgba(220,53,69,0.22)", borderRadius: 8, padding: "10px 14px", marginBottom: 8, fontSize: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                          <span style={{ color: "#e57373", fontWeight: 700 }}>⚠ {reason} — {t("monday_nPersons", entries.length)}</span>
+                          <button
+                            onClick={() => deleteIds(entries.map(g => g.item.id), reason)}
+                            style={{ background: "rgba(220,53,69,0.15)", border: "1px solid rgba(220,53,69,0.35)", borderRadius: 5, color: "#e57373", fontSize: 11, fontWeight: 600, padding: "3px 10px", cursor: "pointer" }}
+                          >
+                            {t("monday_delete", entries.length)}
+                          </button>
+                        </div>
+                        <div style={{ color: colors.textMuted, lineHeight: 1.7 }}>
+                          {entries.map(({ item, email }) => (
+                            <span key={item.id} style={{ marginRight: 10 }}>
+                              {item.name || t("monday_unnamed")}{email ? ` (${email})` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {mondayItems.length > 0 && (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
+                        <th style={{ padding: "8px 12px", width: 36 }}>
+                          <input type="checkbox" checked={allChecked} onChange={() => setMondaySelected(allChecked ? new Set() : new Set(allIds))} />
+                        </th>
+                        <th style={{ textAlign: "left", padding: "8px 12px", color: colors.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>{t("monday_colName")}</th>
+                        {visibleCols.map(c => (
+                          <th key={c.id} style={{ textAlign: "left", padding: "8px 12px", color: colors.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>{c.title}</th>
+                        ))}
+                        <th style={{ padding: "8px 12px" }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mondayItems.map(item => {
+                        const colMap = {};
+                        item.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
+                        const emailVal = emailCol ? colMap[emailCol.id] : "";
+                        const emailBad = emailVal && !isValidEmail(emailVal);
+                        const checked = mondaySelected.has(item.id);
+                        return (
+                          <tr key={item.id} style={{ borderBottom: `1px solid ${colors.border}`, background: emailBad ? "rgba(220,53,69,0.06)" : checked ? `${colors.primary}0d` : "transparent" }}>
+                            <td style={{ padding: "10px 12px" }}>
+                              <input type="checkbox" checked={checked} onChange={() => setMondaySelected(prev => { const s = new Set(prev); s.has(item.id) ? s.delete(item.id) : s.add(item.id); return s; })} />
+                            </td>
+                            <td style={{ padding: "10px 12px", fontWeight: 600, color: colors.text, whiteSpace: "nowrap" }}>{item.name}</td>
+                            {visibleCols.map(c => {
+                              const val = colMap[c.id] || "—";
+                              const isEmailType = emailCol && c.id === emailCol.id;
+                              const isMailKonulari = mailKonulariCol && c.id === mailKonulariCol.id;
+                              const invalid = isEmailType && colMap[c.id] && !isValidEmail(colMap[c.id]);
+                              if (isMailKonulari) {
+                                const tags = colMap[c.id] ? colMap[c.id].split(/[,،]\s*/).map(s => s.trim()).filter(Boolean) : [];
+                                return (
+                                  <td key={c.id} style={{ padding: "10px 12px", maxWidth: 220 }}>
+                                    {tags.length > 0 ? (
+                                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                        {tags.map((tag, ti) => (
+                                          <span key={ti} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 10, background: `${colors.accent}22`, color: colors.accent, fontWeight: 600, whiteSpace: "nowrap" }}>{tag}</span>
+                                        ))}
+                                      </div>
+                                    ) : <span style={{ color: colors.textDim, fontSize: 11 }}>—</span>}
+                                  </td>
+                                );
+                              }
+                              return (
+                                <td key={c.id} style={{ padding: "10px 12px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  <span style={{ color: invalid ? "#e57373" : colors.textMuted }}>{val}</span>
+                                  {invalid && <span style={{ marginLeft: 6, fontSize: 10, color: "#e57373", fontWeight: 600 }}>{t("monday_invalidEmail")}</span>}
+                                </td>
+                              );
+                            })}
+                            <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                              <button
+                                onClick={() => setMondayTestEmail({ name: item.name, email: emailVal })}
+                                style={{ padding: "5px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+                              >
+                                {t("monday_sendEmail")}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Bulk Email Modal */}
+              {mondayBulkModal && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }} onClick={() => !mondayBulkSending && setMondayBulkModal(false)}>
+                  <div style={{ background: colors.surface, borderRadius: 12, padding: 28, width: 500, border: `1px solid ${colors.border}` }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("monday_bulkTitle")}</h3>
+                    <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 4 }}>
+                      {t("monday_willSend", selectedWithEmail.length)}
+                    </p>
+                    {(selectedItems.length - selectedWithEmail.length - selectedInvalidEmail.length) > 0 && (
+                      <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>
+                        {t("monday_willSkipNoEmail", selectedItems.length - selectedWithEmail.length - selectedInvalidEmail.length)}
+                      </p>
+                    )}
+                    {selectedInvalidEmail.length > 0 && (
+                      <p style={{ fontSize: 11, color: "#e57373", marginBottom: 4 }}>
+                        {t("monday_willSkipInvalid", selectedInvalidEmail.length, selectedInvalidEmail.map(i => i.name).join(", "))}
+                      </p>
+                    )}
+                    {genderCol ? (
+                      <p style={{ fontSize: 11, color: "#81c784", marginBottom: 16 }}>{t("monday_genderFound", genderCol.title)}</p>
+                    ) : (
+                      <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("monday_genderNotFound")}</p>
+                    )}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{t("monday_subject")}</div>
+                      <input
+                        value={mondayBulkDraft.subject}
+                        placeholder={t("monday_subjectPlaceholder")}
+                        onChange={e => setMondayBulkDraft(p => ({ ...p, subject: e.target.value }))}
+                        style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{t("monday_body")}</div>
+                      <textarea
+                        value={mondayBulkDraft.body}
+                        placeholder={t("monday_bodyPlaceholder")}
+                        onChange={e => setMondayBulkDraft(p => ({ ...p, body: e.target.value }))}
+                        style={{ width: "100%", minHeight: 140, padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
+                      />
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        disabled={mondayBulkSending || !mondayBulkDraft.subject || selectedWithEmail.length === 0}
+                        onClick={async () => {
+                          if (!settings.sendgridApiKey) { alert("Add your SendGrid API key in Settings first."); return; }
+                          setMondayBulkSending(true);
+                          try {
+                            const token = localStorage.getItem("sns_token");
+                            const recipients = selectedWithEmail.map(item => {
+                              const colMap = {};
+                              item.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
+                              const salutation = buildSalutation(item.name, colMap);
+                              const personalizedBody = `${salutation}<br><br>${mondayBulkDraft.body.replace(/\n/g, "<br>")}`;
+                              return { email: colMap[emailCol.id], name: item.name, htmlBody: personalizedBody };
+                            });
+                            const r = await fetch("/email/send", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                              body: JSON.stringify({
+                                apiKey: settings.sendgridApiKey,
+                                fromEmail: authUser.email,
+                                fromName: authUser.name || settings.sendgridFromName,
+                                subject: mondayBulkDraft.subject,
+                                body: mondayBulkDraft.body,
+                                recipients,
+                                attachments: mondayAttachments,
+                              }),
+                            });
+                            const d = await r.json();
+                            if (!r.ok) { alert("Hata: " + (d.error || `HTTP ${r.status}`)); return; }
+                            await fetch("/email/campaigns", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                              body: JSON.stringify({ subject: mondayBulkDraft.subject, recipients: selectedWithEmail.length, sent: d.sent ?? 0, failed: d.failed ?? 0, source: "monday" }),
+                            });
+                            fetchMondayCampaigns();
+                            // Post activity note to each Monday item with personalized body
+                            const now = new Date().toLocaleString("tr-TR");
+                            const updates = selectedWithEmail.map(item => {
+                              const colMap = {};
+                              item.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
+                              const salutation = buildSalutation(item.name, colMap);
+                              const plainBody = `${salutation}\n\n${mondayBulkDraft.body}`;
+                              return {
+                                itemId: item.id,
+                                body: `📧 E-posta gönderildi — ${now}\nGönderen: ${authUser.email}\nKonu: ${mondayBulkDraft.subject}\n\n${plainBody}`,
+                              };
+                            });
+                            fetch("/monday/add-updates", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                              body: JSON.stringify({ apiKey: settings.mondayApiKey, updates }),
+                            });
+
+                            // Update mail Konuları and ortak mail tag columns
+                            const tagColsToUpdate = [
+                              { col: mailKonulariCol, tagId: mondayMailKonulari ? parseInt(mondayMailKonulari) : null },
+                              { col: ortakMailCol,    tagId: mondayOrtakMail    ? parseInt(mondayOrtakMail)    : null },
+                            ].filter(x => x.col && x.tagId);
+
+                            if (tagColsToUpdate.length > 0) {
+                              const colUpdates = [];
+                              for (const item of selectedWithEmail) {
+                                const colValueMap = {};
+                                item.column_values.forEach(cv => { colValueMap[cv.id] = cv.value; });
+                                for (const { col, tagId } of tagColsToUpdate) {
+                                  let existingIds = [];
+                                  try { existingIds = JSON.parse(colValueMap[col.id] || "{}").tag_ids || []; } catch {}
+                                  const mergedIds = [...new Set([...existingIds, tagId])];
+                                  colUpdates.push({ itemId: item.id, columnId: col.id, colType: "tag", value: mergedIds });
+                                }
+                              }
+                              console.log("[colUpdates]", colUpdates);
+
+                              if (colUpdates.length > 0) {
+                                const colRes = await fetch("/monday/update-columns", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                  body: JSON.stringify({ apiKey: settings.mondayApiKey, boardId: settings.mondayBoardId, updates: colUpdates }),
+                                });
+                                const colData = await colRes.json();
+                                const colFailed = (colData.results || []).filter(r => !r.ok);
+                                if (colFailed.length > 0) {
+                                  alert(`Monday sütun güncellemesi başarısız:\n${colFailed.map(f => `${f.itemId}: ${JSON.stringify(f.errors)}`).join("\n")}`);
+                                } else {
+                                  // Update local state so next send appends correctly
+                                  const updateMap = {};
+                                  colUpdates.forEach(u => {
+                                    if (!updateMap[u.itemId]) updateMap[u.itemId] = {};
+                                    updateMap[u.itemId][u.columnId] = JSON.stringify({ tag_ids: u.value });
+                                  });
+                                  setMondayItems(prev => prev.map(item => {
+                                    if (!updateMap[item.id]) return item;
+                                    return {
+                                      ...item,
+                                      column_values: item.column_values.map(cv =>
+                                        updateMap[item.id][cv.id] !== undefined
+                                          ? { ...cv, value: updateMap[item.id][cv.id] }
+                                          : cv
+                                      ),
+                                    };
+                                  }));
+                                }
+                              }
+                            }
+
+                            alert(`Gönderildi: ${d.sent ?? 0}  Başarısız: ${d.failed ?? 0}${d.errors?.length ? "\n" + d.errors.join("\n") : ""}`);
+                            setMondayBulkModal(false);
+                            setMondaySelected(new Set());
+                            setMondayMailKonulari("");
+                            setMondayOrtakMail("");
+                            setMondayBulkDraft({ subject: "Test E-Postası — Lütfen Yanıtlamayınız", body: "Bu e-posta yalnızca sistem testi amacıyla gönderilmiştir. Herhangi bir işlem yapmanıza gerek yoktur; lütfen bu e-postayı yanıtlamayınız.\n\nİyi çalışmalar dileriz." });
+                          } catch (e) { alert("Error: " + e.message); }
+                          finally { setMondayBulkSending(false); }
+                        }}
+                        style={{ flex: 1, padding: "9px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: mondayBulkSending ? 0.6 : 1 }}
+                      >
+                        {mondayBulkSending ? t("monday_sending") : t("monday_sendToN", selectedWithEmail.length)}
+                      </button>
+                      <button onClick={() => !mondayBulkSending && setMondayBulkModal(false)} style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 13, cursor: "pointer" }}>{t("monday_cancel")}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Campaign History */}
+              {mondayCampaigns.length > 0 && (
+                <div style={{ marginTop: 32 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>{t("monday_campaignHistory")}</h3>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
+                        {[t("monday_colDate"), t("monday_colSubject"), t("monday_colRecipients"), t("monday_colSent"), t("monday_colFailed"), t("monday_colRate")].map(h => (
+                          <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: colors.textMuted, fontWeight: 600 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mondayCampaigns.map(c => {
+                        const rate = c.recipients > 0 ? Math.round((c.sent / c.recipients) * 100) : 0;
+                        return (
+                          <tr key={c.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                            <td style={{ padding: "10px 12px", color: colors.textMuted, whiteSpace: "nowrap" }}>{new Date(c.sent_at).toLocaleString("tr-TR")}</td>
+                            <td style={{ padding: "10px 12px", color: colors.text, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subject}</td>
+                            <td style={{ padding: "10px 12px", color: colors.textMuted }}>{c.recipients}</td>
+                            <td style={{ padding: "10px 12px", color: "#81c784" }}>{c.sent}</td>
+                            <td style={{ padding: "10px 12px", color: c.failed > 0 ? "#e57373" : colors.textMuted }}>{c.failed}</td>
+                            <td style={{ padding: "10px 12px", color: rate === 100 ? "#81c784" : colors.text }}>{rate}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Test Email Modal */}
+              {mondayTestEmail && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }} onClick={() => setMondayTestEmail(null)}>
+                  <div style={{ background: colors.surface, borderRadius: 12, padding: 28, width: 460, border: `1px solid ${colors.border}` }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("monday_testTitle")}</h3>
+                    <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 20 }}>{t("monday_testTo", mondayTestEmail.name)}</p>
+                    {[
+                      { label: t("monday_testRecipientEmail"), key: "email", placeholder: "email@example.com" },
+                      { label: t("monday_testSubject"), key: "subject", placeholder: t("monday_subjectPlaceholder") },
+                    ].map(f => (
+                      <div key={f.key} style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{f.label}</div>
+                        <input
+                          value={mondayTestEmail[f.key] || ""}
+                          placeholder={f.placeholder}
+                          onChange={e => setMondayTestEmail(p => ({ ...p, [f.key]: e.target.value }))}
+                          style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                        />
+                      </div>
+                    ))}
+                    <div style={{ marginBottom: 18 }}>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{t("monday_testBody")}</div>
+                      <textarea
+                        value={mondayTestEmail.body || ""}
+                        placeholder={t("monday_bodyPlaceholder")}
+                        onChange={e => setMondayTestEmail(p => ({ ...p, body: e.target.value }))}
+                        style={{ width: "100%", minHeight: 120, padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
+                      />
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={async () => {
+                          if (!settings.sendgridApiKey) { alert("Add your SendGrid API key in Settings first."); return; }
+                          if (!mondayTestEmail.email) { alert("Recipient email is required."); return; }
+                          try {
+                            const token = localStorage.getItem("sns_token");
+                            const r = await fetch("/email/send", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                              body: JSON.stringify({
+                                apiKey: settings.sendgridApiKey,
+                                fromEmail: authUser.email,
+                                fromName: authUser.name || settings.sendgridFromName,
+                                subject: mondayTestEmail.subject || "(no subject)",
+                                body: mondayTestEmail.body || "",
+                                recipients: [{ email: mondayTestEmail.email, name: mondayTestEmail.name }],
+                              }),
+                            });
+                            const d = await r.json();
+                            if (d.sent > 0) { alert(`Email sent to ${mondayTestEmail.email}`); setMondayTestEmail(null); }
+                            else alert("Send failed: " + (d.errors?.[0] || "unknown error"));
+                          } catch (e) { alert("Error: " + e.message); }
+                        }}
+                        style={{ flex: 1, padding: "9px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                      >
+                        {t("monday_testSend")}
+                      </button>
+                      <button onClick={() => setMondayTestEmail(null)} style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 13, cursor: "pointer" }}>{t("monday_testCancel")}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {view === "settings" && !isAdmin && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 12 }}>
-            <div style={{ fontSize: 36 }}>🔒</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>Admin Access Required</div>
-            <div style={{ fontSize: 13, color: colors.textMuted }}>Settings are restricted to admin accounts.</div>
+          <div style={{ animation: "slideIn .3s ease", maxWidth: 600 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("settings_title")}</h1>
+            <p style={{ color: colors.textMuted, fontSize: 13, marginBottom: 24 }}>{t("settings_subtitle_user")}</p>
+            <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{t("settings_sendgrid")}</h3>
+              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("settings_sendgridSub_user")}</p>
+              {[
+                { label: t("settings_apiKey"), key: "sendgridApiKey", type: "password", placeholder: "SG.xxxxxxxxxxxxxxxxxxxx" },
+                { label: t("settings_fromName"), key: "sendgridFromName", placeholder: "Your Name" },
+              ].map((f) => (
+                <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
+                  <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
+                  <input
+                    value={settings[f.key] || ""}
+                    type={f.type || "text"}
+                    placeholder={f.placeholder || ""}
+                    onChange={(e) => setSettings((p) => ({ ...p, [f.key]: e.target.value }))}
+                    style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", textAlign: "right", width: 280 }}
+                  />
+                </div>
+              ))}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+                <span style={{ fontSize: 12, color: colors.textMuted }}>{t("settings_fromEmail")}</span>
+                <span style={{ fontSize: 12, color: colors.text }}>{authUser?.email}</span>
+              </div>
+            </div>
+            <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{t("settings_monday")}</h3>
+              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("settings_mondaySub_user")}</p>
+              {[
+                { label: t("settings_apiKey"), key: "mondayApiKey", type: "password", placeholder: "eyJhbGci..." },
+                { label: t("settings_boardId"), key: "mondayBoardId", placeholder: "1234567890" },
+              ].map((f) => (
+                <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
+                  <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
+                  <input
+                    value={settings[f.key] || ""}
+                    type={f.type || "text"}
+                    placeholder={f.placeholder || ""}
+                    onChange={(e) => setSettings((p) => ({ ...p, [f.key]: e.target.value }))}
+                    style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", textAlign: "right", width: 280 }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {view === "settings" && isAdmin && (
           <div style={{ animation: "slideIn .3s ease", maxWidth: 600 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Settings</h1>
-            <p style={{ color: colors.textMuted, fontSize: 13, marginBottom: 24 }}>Configure your ERP and agent settings</p>
+            <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("settings_title")}</h1>
+            <p style={{ color: colors.textMuted, fontSize: 13, marginBottom: 24 }}>{t("settings_subtitle_admin")}</p>
             {/* SendGrid Email */}
             <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>SendGrid Email <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 400 }}>(bulk email campaigns)</span></h3>
-              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>Sign up at sendgrid.com → Settings → API Keys → Create API Key (Full Access). Domain must be verified first.</p>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{t("settings_sendgrid")} <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 400 }}>(bulk email campaigns)</span></h3>
+              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("settings_sendgridSub_admin")}</p>
               {[
-                { label: "API Key", key: "sendgridApiKey", type: "password", placeholder: "SG.xxxxxxxxxxxxxxxxxxxx" },
-                { label: "From Email", key: "sendgridFromEmail", placeholder: "info@sunandsun.com.tr" },
-                { label: "From Name", key: "sendgridFromName", placeholder: "Sun & Sun International" },
+                { label: t("settings_apiKey"), key: "sendgridApiKey", type: "password", placeholder: "SG.xxxxxxxxxxxxxxxxxxxx" },
+                { label: t("settings_fromEmail"), key: "sendgridFromEmail", placeholder: "info@sunandsun.com.tr" },
+                { label: t("settings_fromName"), key: "sendgridFromName", placeholder: "Sun & Sun International" },
+              ].map((f) => (
+                <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
+                  <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
+                  <input
+                    value={settings[f.key] || ""}
+                    type={f.type || "text"}
+                    placeholder={f.placeholder || ""}
+                    onChange={(e) => setSettings((p) => ({ ...p, [f.key]: e.target.value }))}
+                    style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", textAlign: "right", width: 280 }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Monday.com */}
+            <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{t("settings_mondayIntegration")}</h3>
+              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("settings_mondaySub_admin")}</p>
+              {[
+                { label: t("settings_apiKey"), key: "mondayApiKey", type: "password", placeholder: "eyJhbGci..." },
+                { label: t("settings_boardId"), key: "mondayBoardId", placeholder: "1234567890" },
               ].map((f) => (
                 <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
                   <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
@@ -2039,12 +3106,12 @@ Kurallar:
 
             {/* Twilio Cold Calling (Test Mode) */}
             <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Twilio Cold Calling <span style={{ fontSize: 11, color: colors.success, fontWeight: 400 }}>✓ Recommended for testing</span></h3>
-              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>Use your Twilio free trial to test calls. Find these in your <strong>Twilio Console → Account Info</strong>.</p>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{t("settings_twilio")} <span style={{ fontSize: 11, color: colors.success, fontWeight: 400 }}>{t("settings_twilioRecommended")}</span></h3>
+              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("settings_twilioSub")}</p>
               {[
-                { label: "Account SID", key: "twilioAccountSid", placeholder: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
-                { label: "Auth Token", key: "twilioAuthToken", type: "password", placeholder: "Your Twilio Auth Token" },
-                { label: "From Number", key: "twilioFromNumber", placeholder: "+1xxxxxxxxxx (your Twilio number)" },
+                { label: t("settings_accountSid"), key: "twilioAccountSid", placeholder: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
+                { label: t("settings_authToken"), key: "twilioAuthToken", type: "password", placeholder: "Your Twilio Auth Token" },
+                { label: t("settings_fromNumber"), key: "twilioFromNumber", placeholder: "+1xxxxxxxxxx (your Twilio number)" },
               ].map((f) => (
                 <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
                   <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
@@ -2057,17 +3124,17 @@ Kurallar:
                   />
                 </div>
               ))}
-              <p style={{ fontSize: 11, color: colors.textMuted, marginTop: 12 }}>⚠️ Free trial only calls <strong>verified numbers</strong>. Verify your test number at <strong>Twilio Console → Verified Caller IDs</strong>.</p>
+              <p style={{ fontSize: 11, color: colors.textMuted, marginTop: 12 }}>{t("settings_twilioNote")}</p>
             </div>
 
             {/* Vapi Cold Calling — custom section with textarea for prompt */}
             <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Vapi Cold Calling <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 400 }}>(human-like voice — upgrade required)</span></h3>
-              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>Sign up free at vapi.ai — upgrade needed to use phone numbers.</p>
+              <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{t("settings_vapi")} <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 400 }}>{t("settings_vapiUpgradeNeeded")}</span></h3>
+              <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("settings_vapiSub")}</p>
               {[
-                { label: "API Key", key: "vapiApiKey", type: "password", placeholder: "vapi_..." },
-                { label: "Phone Number ID", key: "vapiPhoneNumberId", placeholder: "From Vapi dashboard → Phone Numbers" },
-                { label: "First Message (what AI says first)", key: "vapiFirstMessage", placeholder: "Hello, I'm calling from Sun&Sun..." },
+                { label: t("settings_apiKey"), key: "vapiApiKey", type: "password", placeholder: "vapi_..." },
+                { label: t("settings_phoneNumberId"), key: "vapiPhoneNumberId", placeholder: "From Vapi dashboard → Phone Numbers" },
+                { label: t("settings_firstMessage"), key: "vapiFirstMessage", placeholder: "Hello, I'm calling from Sun&Sun..." },
               ].map((f) => (
                 <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
                   <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
@@ -2083,7 +3150,7 @@ Kurallar:
               {/* Voice provider + voice picker */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
                 <div>
-                  <span style={{ fontSize: 12, color: colors.textMuted }}>Voice Provider</span>
+                  <span style={{ fontSize: 12, color: colors.textMuted }}>{t("settings_voiceProvider")}</span>
                   <span style={{ fontSize: 10, color: colors.success, marginLeft: 8 }}>
                     {settings.vapiVoiceProvider === "openai" ? "✓ Free with Vapi credits" : settings.vapiVoiceProvider === "11labs" ? "Requires ElevenLabs account" : ""}
                   </span>
@@ -2101,7 +3168,7 @@ Kurallar:
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
                 <div>
-                  <span style={{ fontSize: 12, color: colors.textMuted }}>Voice</span>
+                  <span style={{ fontSize: 12, color: colors.textMuted }}>{t("settings_voice")}</span>
                   {settings.vapiVoiceProvider === "openai" && (
                     <span style={{ fontSize: 10, color: colors.textDim, marginLeft: 8 }}>alloy · echo · fable · onyx · nova · shimmer</span>
                   )}
@@ -2129,7 +3196,7 @@ Kurallar:
                 )}
               </div>
               <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 6 }}>AI System Prompt (the script / personality)</div>
+                <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 6 }}>{t("settings_vapiPromptLabel")}</div>
                 <textarea
                   value={settings.vapiPrompt || ""}
                   onChange={(e) => setSettings((p) => ({ ...p, vapiPrompt: e.target.value }))}
@@ -2139,28 +3206,28 @@ Kurallar:
             </div>
 
             {[
-              { title: "Lusha Configuration", fields: [
-                { label: "API Provider", value: "Lusha (lusha.com)", disabled: true },
-                { label: "API Key", key: "lushaApiKey", type: "password" },
+              { titleKey: "settings_lusha", fields: [
+                { label: t("settings_apiProvider"), value: "Lusha (lusha.com)", disabled: true },
+                { label: t("settings_apiKey"), key: "lushaApiKey", type: "password" },
               ]},
-              { title: "Snov.io Configuration", fields: [
-                { label: "API Provider", value: "Snov.io (snov.io)", disabled: true },
-                { label: "Client ID (API User ID)", key: "snovClientId" },
-                { label: "Client Secret", key: "snovClientSecret", type: "password" },
+              { titleKey: "settings_snov", fields: [
+                { label: t("settings_apiProvider"), value: "Snov.io (snov.io)", disabled: true },
+                { label: t("settings_clientId"), key: "snovClientId" },
+                { label: t("settings_clientSecret"), key: "snovClientSecret", type: "password" },
               ]},
-              { title: "Lead Scoring Rules", fields: [
-                { label: "Min. Company Size", key: "minCompanySize" },
-                { label: "Priority Industries", key: "priorityIndustries" },
-                { label: "Boost for Decision Makers", key: "decisionMakerBoost" },
+              { titleKey: "settings_scoring", fields: [
+                { label: t("settings_minCompanySize"), key: "minCompanySize" },
+                { label: t("settings_priorityIndustries"), key: "priorityIndustries" },
+                { label: t("settings_decisionMakerBoost"), key: "decisionMakerBoost" },
               ]},
-              { title: "Notification Settings", fields: [
-                { label: "Email Notifications", key: "emailNotifications" },
-                { label: "Notify on New Leads", key: "notifyNewLeads" },
-                { label: "Daily Summary", key: "dailySummary" },
+              { titleKey: "settings_notifications", fields: [
+                { label: t("settings_emailNotifications"), key: "emailNotifications" },
+                { label: t("settings_notifyNewLeads"), key: "notifyNewLeads" },
+                { label: t("settings_dailySummary"), key: "dailySummary" },
               ]},
             ].map((section) => (
-              <div key={section.title} style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>{section.title}</h3>
+              <div key={section.titleKey} style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>{t(section.titleKey)}</h3>
                 {section.fields.map((f) => (
                   <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
                     <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
@@ -2182,12 +3249,12 @@ Kurallar:
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                   <div>
-                    <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>User Management</h3>
-                    <p style={{ fontSize: 11, color: colors.textMuted, margin: 0 }}>Manage users who have access to the ERP</p>
+                    <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{t("settings_userMgmt")}</h3>
+                    <p style={{ fontSize: 11, color: colors.textMuted, margin: 0 }}>{t("settings_userMgmtSub")}</p>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={umFetch} style={{ padding: "6px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 11, cursor: "pointer" }}>↻ Refresh</button>
-                    <button onClick={() => { setShowAddUser(true); setUmError(""); setUmSuccess(""); }} style={{ padding: "6px 14px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>+ Add User</button>
+                    <button onClick={umFetch} style={{ padding: "6px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 11, cursor: "pointer" }}>{t("settings_refresh")}</button>
+                    <button onClick={() => { setShowAddUser(true); setUmError(""); setUmSuccess(""); }} style={{ padding: "6px 14px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{t("settings_addUser")}</button>
                   </div>
                 </div>
 
@@ -2196,12 +3263,12 @@ Kurallar:
 
                 {showAddUser && (
                   <div style={{ background: colors.bg, borderRadius: 8, padding: 16, marginBottom: 16, border: `1px solid ${colors.border}` }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12, color: colors.text }}>New User</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12, color: colors.text }}>{t("settings_newUser")}</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                       {[
-                        { label: "Full Name", key: "name", placeholder: "Ahmet Yılmaz" },
-                        { label: "Email", key: "email", placeholder: "ahmet@sunandsun.com.tr" },
-                        { label: "Password", key: "password", placeholder: "At least 6 characters", type: "password" },
+                        { label: t("settings_fullName"), key: "name", placeholder: "Ahmet Yılmaz" },
+                        { label: t("settings_email"), key: "email", placeholder: "ahmet@sunandsun.com.tr" },
+                        { label: t("settings_password"), key: "password", placeholder: t("modal_passwordPlaceholder"), type: "password" },
                       ].map((f) => (
                         <div key={f.key}>
                           <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>{f.label}</div>
@@ -2215,32 +3282,32 @@ Kurallar:
                         </div>
                       ))}
                       <div>
-                        <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Role</div>
+                        <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>{t("settings_role")}</div>
                         <select
                           value={newUser.role}
                           onChange={(e) => setNewUser((p) => ({ ...p, role: e.target.value }))}
                           style={{ width: "100%", padding: "7px 10px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none" }}
                         >
-                          <option value="user">User</option>
-                          <option value="admin">Admin</option>
+                          <option value="user">{t("settings_user")}</option>
+                          <option value="admin">{t("settings_admin")}</option>
                         </select>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={umAddUser} style={{ padding: "7px 16px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Save</button>
-                      <button onClick={() => { setShowAddUser(false); setNewUser({ name: "", email: "", password: "", role: "user" }); }} style={{ padding: "7px 14px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 12, cursor: "pointer" }}>Cancel</button>
+                      <button onClick={umAddUser} style={{ padding: "7px 16px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{t("settings_save")}</button>
+                      <button onClick={() => { setShowAddUser(false); setNewUser({ name: "", email: "", password: "", role: "user" }); }} style={{ padding: "7px 14px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 12, cursor: "pointer" }}>{t("settings_cancel")}</button>
                     </div>
                   </div>
                 )}
 
                 {umLoading ? (
-                  <div style={{ textAlign: "center", padding: 24, color: colors.textMuted, fontSize: 13 }}>Loading...</div>
+                  <div style={{ textAlign: "center", padding: 24, color: colors.textMuted, fontSize: 13 }}>{t("settings_loading")}</div>
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                       <thead>
                         <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
-                          {["Full Name", "Email", "Role", "Last Login", ""].map((h) => (
+                          {[t("settings_colFullName"), t("settings_colEmail"), t("settings_colRole"), t("settings_colLastLogin"), ""].map((h) => (
                             <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontSize: 10, fontWeight: 600, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</th>
                           ))}
                         </tr>
@@ -2254,13 +3321,13 @@ Kurallar:
                                   {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                                 </div>
                                 <span style={{ fontWeight: 500 }}>{u.name}</span>
-                                {u.id === authUser.id && <span style={{ fontSize: 9, background: "rgba(8,143,196,0.15)", color: colors.primary, borderRadius: 4, padding: "1px 5px", fontWeight: 600 }}>YOU</span>}
+                                {u.id === authUser.id && <span style={{ fontSize: 9, background: "rgba(8,143,196,0.15)", color: colors.primary, borderRadius: 4, padding: "1px 5px", fontWeight: 600 }}>{t("settings_you")}</span>}
                               </div>
                             </td>
                             <td style={{ padding: "10px 10px", color: colors.textMuted }}>{u.email}</td>
                             <td style={{ padding: "10px 10px" }}>
                               <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: u.role === "admin" ? "rgba(8,143,196,0.15)" : "rgba(255,255,255,0.06)", color: u.role === "admin" ? colors.primary : colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                                {u.role === "admin" ? "Admin" : "User"}
+                                {u.role === "admin" ? t("settings_admin") : t("settings_user")}
                               </span>
                             </td>
                             <td style={{ padding: "10px 10px", color: colors.textMuted, fontSize: 11 }}>
@@ -2272,14 +3339,14 @@ Kurallar:
                                   onClick={() => { setPwModal({ id: u.id, name: u.name }); setNewPw(""); setNewPwError(""); }}
                                   style={{ padding: "4px 10px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.textMuted, fontSize: 11, cursor: "pointer" }}
                                 >
-                                  Password
+                                  {t("settings_changePassword")}
                                 </button>
                                 {u.id !== authUser.id && (
                                   <button
                                     onClick={() => umDeleteUser(u.id, u.name)}
                                     style={{ padding: "4px 10px", background: "transparent", border: "1px solid rgba(220,53,69,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}
                                   >
-                                    Delete
+                                    {t("settings_deleteUser")}
                                   </button>
                                 )}
                               </div>
@@ -2287,7 +3354,7 @@ Kurallar:
                           </tr>
                         ))}
                         {umUsers.length === 0 && !umLoading && (
-                          <tr><td colSpan={5} style={{ textAlign: "center", padding: 24, color: colors.textMuted, fontSize: 12 }}>No users found</td></tr>
+                          <tr><td colSpan={5} style={{ textAlign: "center", padding: 24, color: colors.textMuted, fontSize: 12 }}>{t("settings_noUsers")}</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -2303,14 +3370,14 @@ Kurallar:
       {pwModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }} onClick={() => setPwModal(null)}>
           <div style={{ background: colors.surface, borderRadius: 12, padding: 28, width: 360, border: `1px solid ${colors.border}` }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>Change Password</h3>
+            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>{t("modal_changePassword")}</h3>
             <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 20 }}>{pwModal.name}</p>
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>New Password</div>
+              <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>{t("modal_newPassword")}</div>
               <input
                 type="password"
                 value={newPw}
-                placeholder="At least 6 characters"
+                placeholder={t("modal_passwordPlaceholder")}
                 onChange={(e) => setNewPw(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && umChangePw()}
                 autoFocus
@@ -2319,8 +3386,8 @@ Kurallar:
               {newPwError && <div style={{ fontSize: 11, color: "#e57373", marginTop: 6 }}>⚠ {newPwError}</div>}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={umChangePw} style={{ flex: 1, padding: "9px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Save</button>
-              <button onClick={() => setPwModal(null)} style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button onClick={umChangePw} style={{ flex: 1, padding: "9px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{t("modal_save")}</button>
+              <button onClick={() => setPwModal(null)} style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 13, cursor: "pointer" }}>{t("modal_cancel")}</button>
             </div>
           </div>
         </div>
@@ -2331,20 +3398,20 @@ Kurallar:
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }} onClick={() => setShowImportModal(false)}>
           <div style={{ background: colors.surface, borderRadius: 16, padding: 32, width: 560, border: `1px solid ${colors.border}`, animation: "slideIn .2s ease" }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700 }}>Import XLS File</h2>
+              <h2 style={{ fontSize: 18, fontWeight: 700 }}>{t("modal_importTitle")}</h2>
               <button onClick={() => setShowImportModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted }}><XIcon size={20} /></button>
             </div>
 
             {!importStats ? (
               <div>
-                <p style={{ fontSize: 13, color: colors.textMuted, marginBottom: 20 }}>Select a SoGreen Ofisyol .xls file to import leads. Duplicates will be skipped automatically.</p>
+                <p style={{ fontSize: 13, color: colors.textMuted, marginBottom: 20 }}>{t("modal_importDesc")}</p>
                 <label style={{
                   display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                   padding: "40px 20px", border: `2px dashed ${colors.borderLight}`, borderRadius: 12,
                   cursor: "pointer", color: colors.textMuted, fontSize: 13, gap: 8,
                 }}>
                   <span style={{ fontSize: 32 }}>📂</span>
-                  <span>Click to select .xls file</span>
+                  <span>{t("modal_selectFile")}</span>
                   <span style={{ fontSize: 11, color: colors.textDim }}>Afyonkarahisar.xls, Konya.xls, Bursa.xls, etc.</span>
                   <input type="file" accept=".xls,.xlsx" style={{ display: "none" }} onChange={e => handleXlsFile(e.target.files[0])} />
                 </label>
@@ -2355,9 +3422,9 @@ Kurallar:
                   <div style={{ fontWeight: 600, marginBottom: 12, color: colors.text }}>{importFileName}</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                     {[
-                      { label: "Total Leads", value: importStats.total, color: colors.primary },
-                      { label: "Have Contact Info", value: importStats.withContact, color: colors.success },
-                      { label: "Need Snov.io Enrich", value: importStats.withWebsite, color: colors.accent },
+                      { label: t("modal_totalLeads"), value: importStats.total, color: colors.primary },
+                      { label: t("modal_withContact"), value: importStats.withContact, color: colors.success },
+                      { label: t("modal_withWebsite"), value: importStats.withWebsite, color: colors.accent },
                     ].map(s => (
                       <div key={s.label} style={{ background: colors.surface, borderRadius: 8, padding: 12, border: `1px solid ${colors.border}` }}>
                         <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value.toLocaleString()}</div>
@@ -2367,13 +3434,13 @@ Kurallar:
                   </div>
                 </div>
 
-                <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 16 }}>Preview (first 5 rows):</div>
+                <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 16 }}>{t("modal_preview")}</div>
                 <div style={{ background: colors.bg, borderRadius: 8, overflow: "hidden", marginBottom: 20 }}>
                   {importPreview.slice(0, 5).map((l, i) => (
                     <div key={i} style={{ padding: "8px 12px", borderBottom: `1px solid ${colors.border}`, fontSize: 12, display: "flex", gap: 12, alignItems: "center" }}>
                       <span style={{ fontWeight: 600, flex: 1 }}>{l.company}</span>
                       <span style={{ color: colors.textMuted, width: 80 }}>{l.city}</span>
-                      <span style={{ color: colors.primaryLight, width: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.email || l.phone || "no contact"}</span>
+                      <span style={{ color: colors.primaryLight, width: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.email || l.phone || t("modal_noContact")}</span>
                     </div>
                   ))}
                 </div>
@@ -2381,11 +3448,11 @@ Kurallar:
                 <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                   <button onClick={() => { setImportStats(null); setImportPreview([]); setImportFileName(""); }}
                     style={{ padding: "8px 20px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, cursor: "pointer", fontSize: 13, fontFamily: font }}>
-                    Change File
+                    {t("modal_changeFile")}
                   </button>
                   <button onClick={confirmImport}
                     style={{ padding: "8px 20px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: font }}>
-                    Import {importStats.total.toLocaleString()} Leads
+                    {t("modal_importN", importStats.total)}
                   </button>
                 </div>
               </div>
@@ -2399,18 +3466,18 @@ Kurallar:
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }} onClick={() => setShowAddModal(false)}>
           <div style={{ background: colors.surface, borderRadius: 16, padding: 32, width: 560, maxHeight: "90vh", overflowY: "auto", border: `1px solid ${colors.border}`, animation: "slideIn .2s ease" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700 }}>Add New Lead</h2>
+              <h2 style={{ fontSize: 18, fontWeight: 700 }}>{t("modal_addLeadTitle")}</h2>
               <button onClick={() => setShowAddModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted }}><XIcon size={20} /></button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               {[
-                { label: "First Name", key: "firstName", placeholder: "Ahmet" },
-                { label: "Last Name",  key: "lastName",  placeholder: "Yılmaz" },
-                { label: "Email",      key: "email",     placeholder: "ahmet@company.com" },
-                { label: "Phone",      key: "phone",     placeholder: "+90 5XX XXX XXXX" },
-                { label: "Company",    key: "company",   placeholder: "Tekno Makina A.Ş." },
-                { label: "LinkedIn URL", key: "linkedinUrl", placeholder: "linkedin.com/in/..." },
+                { label: t("modal_firstName"), key: "firstName", placeholder: "Ahmet" },
+                { label: t("modal_lastName"),  key: "lastName",  placeholder: "Yılmaz" },
+                { label: t("modal_email"),     key: "email",     placeholder: "ahmet@company.com" },
+                { label: t("modal_phone"),     key: "phone",     placeholder: "+90 5XX XXX XXXX" },
+                { label: t("modal_company"),   key: "company",   placeholder: "Tekno Makina A.Ş." },
+                { label: t("modal_linkedin"),  key: "linkedinUrl", placeholder: "linkedin.com/in/..." },
               ].map((f) => (
                 <div key={f.key}>
                   <label style={{ display: "block", fontSize: 11, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</label>
@@ -2420,17 +3487,17 @@ Kurallar:
               ))}
 
               {[
-                { label: "Job Title", key: "title", options: JOB_TITLES },
-                { label: "Industry",  key: "industry", options: INDUSTRIES },
-                { label: "City",      key: "city", options: CITIES },
-                { label: "Company Size", key: "companySize", options: COMPANY_SIZES },
-                { label: "Source",    key: "source", options: ["LinkedIn Search", "LinkedIn Post Engagement", "LinkedIn Group", "Manual Entry"] },
+                { label: t("modal_jobTitle"),    key: "title",       options: JOB_TITLES },
+                { label: t("modal_industry"),    key: "industry",    options: INDUSTRIES },
+                { label: t("modal_city"),        key: "city",        options: CITIES },
+                { label: t("modal_companySize"), key: "companySize", options: COMPANY_SIZES },
+                { label: t("modal_source"),      key: "source",      options: ["LinkedIn Search", "LinkedIn Post Engagement", "LinkedIn Group", "Manual Entry"] },
               ].map((f) => (
                 <div key={f.key}>
                   <label style={{ display: "block", fontSize: 11, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</label>
                   <select value={newLead[f.key]} onChange={(e) => setNewLead((p) => ({ ...p, [f.key]: e.target.value }))}
                     style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: newLead[f.key] ? colors.text : colors.textDim, fontSize: 13, outline: "none", fontFamily: font }}>
-                    <option value="">— Select —</option>
+                    <option value="">{t("leads_select")}</option>
                     {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
@@ -2438,16 +3505,16 @@ Kurallar:
             </div>
 
             <div style={{ marginTop: 14 }}>
-              <label style={{ display: "block", fontSize: 11, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>Notes</label>
-              <textarea value={newLead.notes} onChange={(e) => setNewLead((p) => ({ ...p, notes: e.target.value }))} placeholder="Any initial notes about this lead..."
+              <label style={{ display: "block", fontSize: 11, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>{t("modal_notes")}</label>
+              <textarea value={newLead.notes} onChange={(e) => setNewLead((p) => ({ ...p, notes: e.target.value }))} placeholder={t("modal_notesPlaceholder")}
                 style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", minHeight: 70, fontFamily: font }} />
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <button onClick={() => setShowAddModal(false)} style={{ padding: "8px 20px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, cursor: "pointer", fontSize: 13, fontFamily: font }}>Cancel</button>
+              <button onClick={() => setShowAddModal(false)} style={{ padding: "8px 20px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, cursor: "pointer", fontSize: 13, fontFamily: font }}>{t("modal_cancel")}</button>
               <button onClick={submitNewLead} disabled={!newLead.firstName || !newLead.lastName || !newLead.company}
                 style={{ padding: "8px 20px", background: !newLead.firstName || !newLead.lastName || !newLead.company ? colors.surfaceHover : colors.primary, border: "none", borderRadius: 8, color: !newLead.firstName || !newLead.lastName || !newLead.company ? colors.textDim : "#fff", cursor: !newLead.firstName || !newLead.lastName || !newLead.company ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: font }}>
-                Add Lead
+                {t("modal_addLead")}
               </button>
             </div>
           </div>
@@ -2493,12 +3560,12 @@ Kurallar:
             {/* Live info */}
             <div style={{ background: colors.bg, borderRadius: 10, padding: 14, marginBottom: 20, fontSize: 12, color: colors.textMuted }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Number</span>
+                <span>{t("call_number")}</span>
                 <span style={{ fontFamily: mono, color: colors.text }}>{activeCall.lead.phone}</span>
               </div>
               {activeCall.duration != null && (
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-                  <span>Duration</span>
+                  <span>{t("call_duration")}</span>
                   <span style={{ color: colors.text }}>{activeCall.duration}s</span>
                 </div>
               )}
@@ -2507,7 +3574,7 @@ Kurallar:
             {/* Transcript */}
             {activeCall.transcript && (
               <div style={{ background: colors.bg, borderRadius: 10, padding: 14, marginBottom: 20, maxHeight: 160, overflowY: "auto" }}>
-                <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Transcript</div>
+                <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>{t("call_transcript")}</div>
                 <p style={{ fontSize: 12, color: colors.text, lineHeight: 1.6, whiteSpace: "pre-wrap", margin: 0 }}>{activeCall.transcript}</p>
               </div>
             )}
@@ -2515,13 +3582,13 @@ Kurallar:
             {/* Actions */}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               {activeCall.status !== "ended" && activeCall.status !== "error" && (
-                <div style={{ fontSize: 12, color: colors.textDim, alignSelf: "center", marginRight: "auto" }}>Checking status every 5s...</div>
+                <div style={{ fontSize: 12, color: colors.textDim, alignSelf: "center", marginRight: "auto" }}>{t("call_checking")}</div>
               )}
               <button
                 onClick={endActiveCall}
                 style={{ padding: "8px 20px", background: activeCall.status === "ended" || activeCall.status === "error" ? colors.primary : colors.danger, border: "none", borderRadius: 8, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: font }}
               >
-                {activeCall.status === "ended" || activeCall.status === "error" ? "Close" : "Dismiss"}
+                {activeCall.status === "ended" || activeCall.status === "error" ? t("call_close") : t("call_dismiss")}
               </button>
             </div>
           </div>

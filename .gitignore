@@ -36,6 +36,11 @@ Thumbs.db
 # Claude Code internal
 .claude/
 
+# Database files (contain sensitive user/auth data)
+*.db
+*.sqlite
+*.sqlite3
+
 # Data files that may contain sensitive lead data
 *.xlsx
 *.xls

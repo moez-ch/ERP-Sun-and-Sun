@@ -33,6 +33,14 @@ export default defineConfig({
         target: "http://localhost:3001",
         changeOrigin: false,
       },
+      "/ml": {
+        target: "http://localhost:3001",
+        changeOrigin: false,
+      },
+      "/monday": {
+        target: "http://localhost:3001",
+        changeOrigin: false,
+      },
     },
   },
 });
