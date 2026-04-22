@@ -80,46 +80,8 @@ db.exec(`
 db.exec(`CREATE INDEX IF NOT EXISTS idx_email_sends_sent_at ON email_sends(sent_at DESC)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_email_sends_email   ON email_sends(recipient_email)`);
 
-const templateCount = db.prepare("SELECT COUNT(*) AS n FROM email_templates").get().n;
-if (templateCount === 0) {
-  const insertTpl = db.prepare("INSERT INTO email_templates (label, color, subject, body) VALUES (?, ?, ?, ?)");
-  insertTpl.run("İlgileniyoruz ✓", "#2e7d32", "Finansman Desteği Hakkında",
-    "Merhaba,\n\nPaylaştığınız finansman desteği ile ilgileniyoruz. Detayları görüşmek üzere sizinle iletişime geçmek isteriz.\n\nİyi çalışmalar,\n\nSaygılarımla,");
-  insertTpl.run("Sektör Dışı ✗", "#c62828", "Finansman Desteği – Sektör Kapsamı Dışı",
-    "Merhaba,\n\nPaylaştığınız finansman desteği için teşekkür ederiz. Ancak firmamızın faaliyet gösterdiği sektör bu program kapsamında yer almadığı için değerlendiremiyoruz.\n\nSaygılarımla");
-  insertTpl.run("İlgilenmiyoruz ✗", "#e65100", "Finansman Desteği – Şu An İçin Uygun Değil",
-    "Merhaba,\n\nPaylaştığınız finansman desteği için teşekkür ederiz, ancak şu an için ilgilenmiyoruz.\n\nİyi çalışmalar dileriz.\n\nSaygılarımla");
-  insertTpl.run("Hibe Duyurusu 📢", "#6a1b9a", "Faizsiz 7.500.000 TL Finansman Desteği – Sınırlı Başvuru",
-    `Merhaba [İsim],
-
-Sanayi firmalarına yönelik faizsiz 7.500.000 TL'ye kadar kredi fırsatı sunan bir finansman desteği sınırlı başvuru ile çağrıya çıktı. Önümüzdeki dönemde artan enerji maliyetleri, karbon regülasyonları ve rekabet baskısı nedeniyle firmaların üretim süreçlerini daha verimli, sürdürülebilir ve maliyet avantajı sağlayacak şekilde dönüştürmesi kaçınılmaz bir hale gelmişken bu destek söz konusu dönüşümü düşük maliyetle gerçekleştirmek isteyen firmalar için önemli bir fırsat sunmaktadır.
-
-Bu programın en önemli farkı:
-🚫Faiz yok, kar payı yok
-⏳İlk 6 ay geri ödeme yok
-✅Toplam 30 ay vade ile sadece anapara ödemesi
-Yani mevcut finansman koşullarına kıyasla ciddi bir maliyet avantajı sağlıyor.
-
-Program kapsamında firmalar;
-- Yeni makine, ekipman ve yazılım yatırımları,
-- Yenilenebilir enerji yatırımları (GES vb.),
-- Kalite, marka ve patent gibi belge alımları
-- Makine kurulumuna yönelik tadilat, montaj ve altyapı işleri,
-- Sınırlı deneme üretimi için hammadde giderleri,
-- Sarf malzemesi giderleri,
-- Eğitim, danışmanlık, denetim, görünürlük hizmetleri,
-gibi birçok kalemi bu finansman kapsamında karşılayabilmektedir.
-
-❗ KDV giderleri de destek kapsamına dahildir.
-
-Başvurular 8 Mayıs tarihinde sona eriyor. Dilerseniz programın ayrıntılarını ve firmanızın uygunluğunu hızlıca analiz edip, bu destekten en verimli şekilde nasıl yararlanabileceğinizi birlikte değerlendirebiliriz. Bu maili yanıtlayarak ya da aşağıda yer alan telefon numaramdan bana ulaşabilirsiniz.
-
-Saygılarımla
-
-Merve ÇÖLOĞLU
-Müşteri İletişim Sorumlusu
-0541 634 95 76`);
-}
+// Remove default seeded templates
+db.prepare(`DELETE FROM email_templates WHERE label IN ('İlgileniyoruz ✓','Sektör Dışı ✗','İlgilenmiyoruz ✗','Hibe Duyurusu 📢')`).run();
 
 // Seed default admin on first run
 const count = db.prepare("SELECT COUNT(*) AS n FROM users").get().n;
