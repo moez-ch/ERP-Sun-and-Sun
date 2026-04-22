@@ -317,7 +317,8 @@ export default function App() {
   return <Dashboard authUser={authUser} onLogout={handleLogout} />;
 }
 
-function EmailHistory({ colors, token }) {
+function EmailHistory({ colors, token, lang }) {
+  const t = (key, ...args) => { const v = TRANSLATIONS[lang]?.[key] ?? TRANSLATIONS.tr[key]; return typeof v === "function" ? v(...args) : (v ?? key); };
   const [filters, setFilters] = useState({ search: "", date_from: "", date_to: "", status: "", subject: "" });
   const [rows, setRows]       = useState([]);
   const [total, setTotal]     = useState(0);
@@ -348,15 +349,15 @@ function EmailHistory({ colors, token }) {
   const exportExcel = () => {
     if (!rows.length) return;
     const ws = XLSX.utils.json_to_sheet(rows.map(r => ({
-      "Tarih":     r.sent_at,
-      "Alıcı E-posta": r.recipient_email,
-      "Alıcı Adı":     r.recipient_name || "",
-      "Konu":          r.subject || "",
-      "Durum":         r.status,
-      "İmza":          r.signature_key || "",
+      [t("history_xlsDate")]:      r.sent_at,
+      [t("history_xlsEmail")]:     r.recipient_email,
+      [t("history_xlsName")]:      r.recipient_name || "",
+      [t("history_xlsSubject")]:   r.subject || "",
+      [t("history_xlsStatus")]:    r.status,
+      [t("history_xlsSignature")]: r.signature_key || "",
     })));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "E-posta Geçmişi");
+    XLSX.utils.book_append_sheet(wb, ws, t("history_xlsSheet"));
     XLSX.writeFile(wb, `email_gecmisi_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
@@ -365,41 +366,41 @@ function EmailHistory({ colors, token }) {
   return (
     <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>E-posta Gönderim Geçmişi</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{t("history_title")}</h3>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => fetchHistory(0)} style={{ ...inputStyle, cursor: "pointer", fontWeight: 600 }}>↻ Yenile</button>
-          <button onClick={exportExcel} disabled={!rows.length} style={{ ...inputStyle, cursor: rows.length ? "pointer" : "not-allowed", fontWeight: 600, color: colors.primary, opacity: rows.length ? 1 : 0.4 }}>⬇ Excel İndir</button>
+          <button onClick={() => fetchHistory(0)} style={{ ...inputStyle, cursor: "pointer", fontWeight: 600 }}>{t("history_refresh")}</button>
+          <button onClick={exportExcel} disabled={!rows.length} style={{ ...inputStyle, cursor: rows.length ? "pointer" : "not-allowed", fontWeight: 600, color: colors.primary, opacity: rows.length ? 1 : 0.4 }}>{t("history_download")}</button>
         </div>
       </div>
 
       {/* Filters */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-        <input placeholder="E-posta veya isim ara…" value={filters.search} onChange={e => setFilters(p => ({ ...p, search: e.target.value }))} style={{ ...inputStyle, minWidth: 180 }} />
-        <input placeholder="Konu ara…" value={filters.subject} onChange={e => setFilters(p => ({ ...p, subject: e.target.value }))} style={{ ...inputStyle, minWidth: 160 }} />
+        <input placeholder={t("history_searchPlaceholder")} value={filters.search} onChange={e => setFilters(p => ({ ...p, search: e.target.value }))} style={{ ...inputStyle, minWidth: 180 }} />
+        <input placeholder={t("history_subjectPlaceholder")} value={filters.subject} onChange={e => setFilters(p => ({ ...p, subject: e.target.value }))} style={{ ...inputStyle, minWidth: 160 }} />
         <input type="date" value={filters.date_from} onChange={e => setFilters(p => ({ ...p, date_from: e.target.value }))} style={inputStyle} />
         <input type="date" value={filters.date_to}   onChange={e => setFilters(p => ({ ...p, date_to:   e.target.value }))} style={inputStyle} />
         <select value={filters.status} onChange={e => setFilters(p => ({ ...p, status: e.target.value }))} style={{ ...inputStyle, cursor: "pointer" }}>
-          <option value="">Tüm durumlar</option>
-          <option value="sent">Gönderildi</option>
-          <option value="failed">Başarısız</option>
+          <option value="">{t("history_allStatuses")}</option>
+          <option value="sent">{t("history_sent")}</option>
+          <option value="failed">{t("history_failed")}</option>
         </select>
-        <button onClick={() => fetchHistory(0)} style={{ ...inputStyle, cursor: "pointer", background: colors.primary, color: "#fff", fontWeight: 600, border: "none" }}>Filtrele</button>
+        <button onClick={() => fetchHistory(0)} style={{ ...inputStyle, cursor: "pointer", background: colors.primary, color: "#fff", fontWeight: 600, border: "none" }}>{t("history_filter")}</button>
         <button onClick={() => { setFilters({ search: "", date_from: "", date_to: "", status: "", subject: "" }); setTimeout(() => fetchHistory(0), 0); }}
-          style={{ ...inputStyle, cursor: "pointer" }}>Temizle</button>
+          style={{ ...inputStyle, cursor: "pointer" }}>{t("history_clearBtn")}</button>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: 32, color: colors.textMuted }}>Yükleniyor…</div>
+        <div style={{ textAlign: "center", padding: 32, color: colors.textMuted }}>{t("history_loading")}</div>
       ) : rows.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 32, color: colors.textMuted, fontSize: 13 }}>Kayıt bulunamadı.</div>
+        <div style={{ textAlign: "center", padding: 32, color: colors.textMuted, fontSize: 13 }}>{t("history_noRecords")}</div>
       ) : (
         <>
-          <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 8 }}>{total} sonuç, {rows.length} gösteriliyor</div>
+          <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 8 }}>{t("history_showing", total, rows.length)}</div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
                 <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
-                  {["Tarih", "Alıcı", "E-posta", "Konu", "Durum", "İmza"].map(h => (
+                  {[t("history_colDate"), t("history_colRecipient"), t("history_colEmail"), t("history_colSubject"), t("history_colStatus"), t("history_colSignature")].map(h => (
                     <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 10, fontWeight: 600, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -413,7 +414,7 @@ function EmailHistory({ colors, token }) {
                     <td style={{ padding: "8px 10px", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.subject}</td>
                     <td style={{ padding: "8px 10px" }}>
                       <span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: r.status === "sent" ? "rgba(67,160,71,0.15)" : "rgba(220,53,69,0.15)", color: r.status === "sent" ? "#81c784" : "#e57373" }}>
-                        {r.status === "sent" ? "Gönderildi" : "Başarısız"}
+                        {r.status === "sent" ? t("history_sent") : t("history_failed")}
                       </span>
                     </td>
                     <td style={{ padding: "8px 10px", color: colors.textMuted, fontSize: 11 }}>{r.signature_key || "—"}</td>
@@ -424,9 +425,9 @@ function EmailHistory({ colors, token }) {
           </div>
           {total > LIMIT && (
             <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
-              <button disabled={offset === 0} onClick={() => fetchHistory(offset - LIMIT)} style={{ ...inputStyle, cursor: "pointer" }}>← Önceki</button>
+              <button disabled={offset === 0} onClick={() => fetchHistory(offset - LIMIT)} style={{ ...inputStyle, cursor: "pointer" }}>{t("history_prev")}</button>
               <span style={{ padding: "7px 10px", fontSize: 12, color: colors.textMuted }}>{Math.floor(offset / LIMIT) + 1} / {Math.ceil(total / LIMIT)}</span>
-              <button disabled={offset + LIMIT >= total} onClick={() => fetchHistory(offset + LIMIT)} style={{ ...inputStyle, cursor: "pointer" }}>Sonraki →</button>
+              <button disabled={offset + LIMIT >= total} onClick={() => fetchHistory(offset + LIMIT)} style={{ ...inputStyle, cursor: "pointer" }}>{t("history_next")}</button>
             </div>
           )}
         </>
@@ -513,10 +514,7 @@ Kurallar:
   const [newTemplateModal, setNewTemplateModal] = useState(false);
   const [newTemplateDraft, setNewTemplateDraft] = useState({ label: "", subject: "", body: "" });
   const [showOnlyWithEmail, setShowOnlyWithEmail] = useState(true);
-  const [mondayBulkDraft, setMondayBulkDraft] = useState({
-    subject: "Test E-Postası — Lütfen Yanıtlamayınız",
-    body: "Bu e-posta yalnızca sistem testi amacıyla gönderilmiştir. Herhangi bir işlem yapmanıza gerek yoktur; lütfen bu e-postayı yanıtlamayınız.\n\nİyi çalışmalar dileriz.",
-  });
+  const [mondayBulkDraft, setMondayBulkDraft] = useState({ subject: "", body: "" });
   const [mondayBulkSending, setMondayBulkSending] = useState(false);
   const [mondayCampaigns, setMondayCampaigns] = useState([]);
   const [mondayAttachments, setMondayAttachments] = useState([]);
@@ -2115,7 +2113,7 @@ Kurallar:
                   <textarea
                     value={inboxText}
                     onChange={(e) => { setInboxText(e.target.value); setInboxResult(null); }}
-                    placeholder={"Merhaba,\n\nPaylaştığınız finansman desteği ile ilgileniyoruz..."}
+                    placeholder={t("inbox_emailPlaceholder")}
                     rows={14}
                     style={{ width: "100%", padding: "10px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
                   />
@@ -2450,7 +2448,7 @@ Kurallar:
                     <textarea
                       value={emailDraft.body}
                       onChange={(e) => setEmailDraft((p) => ({ ...p, body: e.target.value }))}
-                      placeholder={"Sayın [İsim],\n\nSun & Sun Danışmanlık olarak size ulaşıyoruz..."}
+                      placeholder={t("email_bodyPlaceholderLead")}
                       rows={14}
                       style={{ width: "100%", padding: "10px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
                     />
@@ -2554,7 +2552,7 @@ Kurallar:
               </div>
 
               {/* SEND HISTORY */}
-              <EmailHistory colors={colors} token={localStorage.getItem("sns_token")} />
+              <EmailHistory colors={colors} token={localStorage.getItem("sns_token")} lang={settings.lang || "tr"} />
             </div>
           );
         })()}
@@ -2647,7 +2645,7 @@ Kurallar:
                 <div style={{ display: "flex", gap: 8 }}>
                   {mondaySelected.size > 0 && (
                     <button
-                      onClick={() => { if (!mondayBulkDraft.subject) setMondayBulkDraft({ subject: "Test E-Postası — Lütfen Yanıtlamayınız", body: "Bu e-posta yalnızca sistem testi amacıyla gönderilmiştir. Herhangi bir işlem yapmanıza gerek yoktur; lütfen bu e-postayı yanıtlamayınız.\n\nİyi çalışmalar dileriz." }); setMondayBulkModal(true); }}
+                      onClick={() => { if (!mondayBulkDraft.subject) setMondayBulkDraft({ subject: t("monday_defaultSubject"), body: t("monday_defaultBody") }); setMondayBulkModal(true); }}
                       style={{ padding: "8px 18px", background: colors.success || "#2e7d32", border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
                     >
                       {t("monday_sendBulk", mondaySelected.size)}
@@ -2696,7 +2694,7 @@ Kurallar:
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 5 }}>Şablon Adı</div>
                       <input value={newTemplateDraft.label} onChange={e => setNewTemplateDraft(p => ({ ...p, label: e.target.value }))}
-                        placeholder="ör. Hibe Duyurusu, Takip Maili…"
+                        placeholder={t("monday_composePlaceholder")}
                         style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                     </div>
                     <div style={{ marginBottom: 14 }}>
@@ -2822,14 +2820,14 @@ Kurallar:
                     ].map(({ label, col, val, set, required }) => (
                       <div key={label}>
                         <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>
-                          {label} {col ? <span style={{ color: colors.success, fontSize: 10 }}>✓</span> : <span style={{ color: required ? "#e57373" : colors.textDim, fontSize: 10 }}>{required ? "sütun bulunamadı" : "isteğe bağlı"}</span>}
+                          {label} {col ? <span style={{ color: colors.success, fontSize: 10 }}>✓</span> : <span style={{ color: required ? "#e57373" : colors.textDim, fontSize: 10 }}>{required ? t("monday_colNotFound") : t("monday_optionalCol")}</span>}
                         </div>
                         <select
                           value={val}
                           onChange={e => set(e.target.value)}
                           style={{ width: "100%", padding: "7px 10px", background: colors.bg, border: `1px solid ${col ? colors.border : required ? "rgba(220,53,69,0.3)" : colors.border}`, borderRadius: 6, color: val ? colors.text : colors.textDim, fontSize: 12, outline: "none", boxSizing: "border-box" }}
                         >
-                          <option value="">— Etiket seçin —</option>
+                          <option value="">{t("monday_selectTag")}</option>
                           {mondayTags.map(tag => (
                             <option key={tag.id} value={tag.id}>{tag.name}</option>
                           ))}
@@ -2874,8 +2872,8 @@ Kurallar:
                 if (!toDelete.length && !toClear.length) return null;
 
                 const clearEmails = async (entries) => {
-                  if (!emailCol) { alert("E-posta sütunu bulunamadı."); return; }
-                  if (!window.confirm(`${entries.length} kişinin e-posta alanı temizlenecek. Diğer bilgiler korunacak. Emin misin?`)) return;
+                  if (!emailCol) { alert(t("monday_noEmailColAlert")); return; }
+                  if (!window.confirm(t("monday_clearEmailConfirm", entries.length))) return;
                   try {
                     const token = localStorage.getItem("sns_token");
                     const updates = entries.map(({ item }) => ({ itemId: item.id, columnId: emailCol.id, colType: emailCol.type, value: "" }));
@@ -2885,11 +2883,11 @@ Kurallar:
                       body: JSON.stringify({ apiKey: settings.mondayApiKey, boardId: settings.mondayBoardId, updates }),
                     });
                     const data = await res.json();
-                    if (!res.ok) { alert(`Sunucu hatası: ${data.error || res.status}`); return; }
+                    if (!res.ok) { alert(t("monday_serverError", data.error || res.status)); return; }
                     const failed = (data.results || []).filter(r => !r.ok);
                     const succeededIds = new Set((data.results || []).filter(r => r.ok).map(r => r.itemId));
                     if (failed.length > 0) {
-                      alert(`${failed.length} e-posta temizlenemedi:\n${failed.map(f => `ID ${f.itemId}: ${JSON.stringify(f.errors?.[0]?.message || f.error)}`).join("\n")}`);
+                      alert(`${t("monday_clearEmailFailed", failed.length)}\n${failed.map(f => `ID ${f.itemId}: ${JSON.stringify(f.errors?.[0]?.message || f.error)}`).join("\n")}`);
                     }
                     if (succeededIds.size > 0) {
                       setMondayItems(prev => prev.map(i => {
@@ -2897,11 +2895,11 @@ Kurallar:
                         return { ...i, column_values: i.column_values.map(cv => cv.id === emailCol.id ? { ...cv, text: "" } : cv) };
                       }));
                     }
-                  } catch (e) { alert("Hata: " + e.message); }
+                  } catch (e) { alert(t("monday_error", e.message)); }
                 };
 
                 const deleteItems = async (entries) => {
-                  if (!window.confirm(`${entries.length} boş kişi Monday'den silinecek. Emin misin?`)) return;
+                  if (!window.confirm(t("monday_deleteEmptyConfirm", entries.length))) return;
                   try {
                     const token = localStorage.getItem("sns_token");
                     const res = await fetch("/monday/delete-items", {
@@ -2910,10 +2908,10 @@ Kurallar:
                       body: JSON.stringify({ apiKey: settings.mondayApiKey, itemIds: entries.map(({ item }) => item.id) }),
                     });
                     const data = await res.json();
-                    if (!res.ok) { alert(`Sunucu hatası: ${data.error || res.status}`); return; }
+                    if (!res.ok) { alert(t("monday_serverError", data.error || res.status)); return; }
                     const deletedIds = new Set(entries.map(({ item }) => item.id));
                     setMondayItems(prev => prev.filter(i => !deletedIds.has(i.id)));
-                  } catch (e) { alert("Hata: " + e.message); }
+                  } catch (e) { alert(t("monday_error", e.message)); }
                 };
 
                 return (
@@ -2922,12 +2920,12 @@ Kurallar:
                     {toClear.length > 0 && (
                       <div style={{ background: "rgba(220,53,69,0.07)", border: "1px solid rgba(220,53,69,0.22)", borderRadius: 8, padding: "10px 14px", marginBottom: 8, fontSize: 12 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                          <span style={{ color: "#e57373", fontWeight: 700 }}>⚠ Geçersiz e-posta (diğer bilgiler mevcut) — {toClear.length} kişi</span>
+                          <span style={{ color: "#e57373", fontWeight: 700 }}>{t("monday_invalidEmailPanel", toClear.length)}</span>
                           <button
                             onClick={() => clearEmails(toClear)}
                             style={{ background: "rgba(220,53,69,0.15)", border: "1px solid rgba(220,53,69,0.35)", borderRadius: 5, color: "#e57373", fontSize: 11, fontWeight: 600, padding: "3px 10px", cursor: "pointer" }}
                           >
-                            E-postayı Temizle ({toClear.length})
+                            {t("monday_clearEmailBtn", toClear.length)}
                           </button>
                         </div>
                         <div style={{ color: colors.textMuted, lineHeight: 1.7 }}>
@@ -2941,12 +2939,12 @@ Kurallar:
                     {toDelete.length > 0 && (
                       <div style={{ background: "rgba(220,53,69,0.07)", border: "1px solid rgba(220,53,69,0.22)", borderRadius: 8, padding: "10px 14px", marginBottom: 8, fontSize: 12 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                          <span style={{ color: "#e57373", fontWeight: 700 }}>⚠ Boş kayıt (isim dışında bilgi yok) — {toDelete.length} kişi</span>
+                          <span style={{ color: "#e57373", fontWeight: 700 }}>{t("monday_emptyRecordPanel", toDelete.length)}</span>
                           <button
                             onClick={() => deleteItems(toDelete)}
                             style={{ background: "rgba(220,53,69,0.15)", border: "1px solid rgba(220,53,69,0.35)", borderRadius: 5, color: "#e57373", fontSize: 11, fontWeight: 600, padding: "3px 10px", cursor: "pointer" }}
                           >
-                            Tümünü Sil ({toDelete.length})
+                            {t("monday_deleteAllBtn", toDelete.length)}
                           </button>
                         </div>
                         <div style={{ color: colors.textMuted, lineHeight: 1.7 }}>
@@ -2965,7 +2963,7 @@ Kurallar:
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: showFilterPanel ? 0 : 8, flexWrap: "wrap" }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.textMuted, cursor: "pointer", userSelect: "none" }}>
                       <input type="checkbox" checked={showOnlyWithEmail} onChange={e => setShowOnlyWithEmail(e.target.checked)} />
-                      Sadece geçerli e-postası olanları göster
+                      {t("monday_showEmailOnly")}
                     </label>
                     <span style={{ fontSize: 11, color: colors.textMuted }}>({visibleItems.length} / {mondayItems.length})</span>
                     <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
@@ -2974,7 +2972,7 @@ Kurallar:
                           onClick={() => setMondayFilters({})}
                           style={{ padding: "4px 10px", background: "rgba(229,115,115,0.15)", border: "1px solid rgba(229,115,115,0.4)", borderRadius: 6, color: "#e57373", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
                         >
-                          ✕ Filtreleri Temizle
+                          {t("monday_clearFiltersBtn")}
                         </button>
                       )}
                       {Object.keys(filterOptions).length > 0 && (
@@ -2982,7 +2980,7 @@ Kurallar:
                           onClick={() => setShowFilterPanel(p => !p)}
                           style={{ padding: "4px 12px", background: showFilterPanel ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: showFilterPanel ? "#fff" : colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}
                         >
-                          {showFilterPanel ? "▲ Filtreler" : "▼ Filtreler"}{hasActiveFilters ? " ●" : ""}
+                          {showFilterPanel ? "▲" : "▼"} {t("monday_filterBtn")}{hasActiveFilters ? " ●" : ""}
                         </button>
                       )}
                     </div>
@@ -3244,7 +3242,7 @@ Kurallar:
                             setMondaySelected(new Set());
                             setMondayMailKonulari("");
                             setMondayOrtakMail("");
-                            setMondayBulkDraft({ subject: "Test E-Postası — Lütfen Yanıtlamayınız", body: "Bu e-posta yalnızca sistem testi amacıyla gönderilmiştir. Herhangi bir işlem yapmanıza gerek yoktur; lütfen bu e-postayı yanıtlamayınız.\n\nİyi çalışmalar dileriz." });
+                            setMondayBulkDraft({ subject: t("monday_defaultSubject"), body: t("monday_defaultBody") });
                           } catch (e) { alert("Error: " + e.message); }
                           finally { setMondayBulkSending(false); }
                         }}
