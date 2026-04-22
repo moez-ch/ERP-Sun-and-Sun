@@ -317,6 +317,124 @@ export default function App() {
   return <Dashboard authUser={authUser} onLogout={handleLogout} />;
 }
 
+function EmailHistory({ colors, token }) {
+  const [filters, setFilters] = useState({ search: "", date_from: "", date_to: "", status: "", subject: "" });
+  const [rows, setRows]       = useState([]);
+  const [total, setTotal]     = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [offset, setOffset]   = useState(0);
+  const LIMIT = 100;
+
+  const fetchHistory = useCallback(async (off = 0) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: LIMIT, offset: off });
+      if (filters.search)    params.set("search",    filters.search);
+      if (filters.date_from) params.set("date_from", filters.date_from);
+      if (filters.date_to)   params.set("date_to",   filters.date_to);
+      if (filters.status)    params.set("status",    filters.status);
+      if (filters.subject)   params.set("subject",   filters.subject);
+      const res = await fetch(`/email/sends?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setRows(data.rows || []);
+      setTotal(data.total || 0);
+      setOffset(off);
+    } catch {}
+    finally { setLoading(false); }
+  }, [filters, token]);
+
+  useEffect(() => { fetchHistory(0); }, []);
+
+  const exportExcel = () => {
+    if (!rows.length) return;
+    const ws = XLSX.utils.json_to_sheet(rows.map(r => ({
+      "Tarih":     r.sent_at,
+      "Alıcı E-posta": r.recipient_email,
+      "Alıcı Adı":     r.recipient_name || "",
+      "Konu":          r.subject || "",
+      "Durum":         r.status,
+      "İmza":          r.signature_key || "",
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "E-posta Geçmişi");
+    XLSX.writeFile(wb, `email_gecmisi_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
+  const inputStyle = { padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none" };
+
+  return (
+    <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>E-posta Gönderim Geçmişi</h3>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => fetchHistory(0)} style={{ ...inputStyle, cursor: "pointer", fontWeight: 600 }}>↻ Yenile</button>
+          <button onClick={exportExcel} disabled={!rows.length} style={{ ...inputStyle, cursor: rows.length ? "pointer" : "not-allowed", fontWeight: 600, color: colors.primary, opacity: rows.length ? 1 : 0.4 }}>⬇ Excel İndir</button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        <input placeholder="E-posta veya isim ara…" value={filters.search} onChange={e => setFilters(p => ({ ...p, search: e.target.value }))} style={{ ...inputStyle, minWidth: 180 }} />
+        <input placeholder="Konu ara…" value={filters.subject} onChange={e => setFilters(p => ({ ...p, subject: e.target.value }))} style={{ ...inputStyle, minWidth: 160 }} />
+        <input type="date" value={filters.date_from} onChange={e => setFilters(p => ({ ...p, date_from: e.target.value }))} style={inputStyle} />
+        <input type="date" value={filters.date_to}   onChange={e => setFilters(p => ({ ...p, date_to:   e.target.value }))} style={inputStyle} />
+        <select value={filters.status} onChange={e => setFilters(p => ({ ...p, status: e.target.value }))} style={{ ...inputStyle, cursor: "pointer" }}>
+          <option value="">Tüm durumlar</option>
+          <option value="sent">Gönderildi</option>
+          <option value="failed">Başarısız</option>
+        </select>
+        <button onClick={() => fetchHistory(0)} style={{ ...inputStyle, cursor: "pointer", background: colors.primary, color: "#fff", fontWeight: 600, border: "none" }}>Filtrele</button>
+        <button onClick={() => { setFilters({ search: "", date_from: "", date_to: "", status: "", subject: "" }); setTimeout(() => fetchHistory(0), 0); }}
+          style={{ ...inputStyle, cursor: "pointer" }}>Temizle</button>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 32, color: colors.textMuted }}>Yükleniyor…</div>
+      ) : rows.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 32, color: colors.textMuted, fontSize: 13 }}>Kayıt bulunamadı.</div>
+      ) : (
+        <>
+          <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 8 }}>{total} sonuç, {rows.length} gösteriliyor</div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
+                  {["Tarih", "Alıcı", "E-posta", "Konu", "Durum", "İmza"].map(h => (
+                    <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 10, fontWeight: 600, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8, whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={r.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                    <td style={{ padding: "8px 10px", color: colors.textMuted, whiteSpace: "nowrap" }}>{r.sent_at?.slice(0, 16).replace("T", " ")}</td>
+                    <td style={{ padding: "8px 10px", fontWeight: 500, whiteSpace: "nowrap" }}>{r.recipient_name || "—"}</td>
+                    <td style={{ padding: "8px 10px", color: colors.textMuted }}>{r.recipient_email}</td>
+                    <td style={{ padding: "8px 10px", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.subject}</td>
+                    <td style={{ padding: "8px 10px" }}>
+                      <span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: r.status === "sent" ? "rgba(67,160,71,0.15)" : "rgba(220,53,69,0.15)", color: r.status === "sent" ? "#81c784" : "#e57373" }}>
+                        {r.status === "sent" ? "Gönderildi" : "Başarısız"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "8px 10px", color: colors.textMuted, fontSize: 11 }}>{r.signature_key || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {total > LIMIT && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
+              <button disabled={offset === 0} onClick={() => fetchHistory(offset - LIMIT)} style={{ ...inputStyle, cursor: "pointer" }}>← Önceki</button>
+              <span style={{ padding: "7px 10px", fontSize: 12, color: colors.textMuted }}>{Math.floor(offset / LIMIT) + 1} / {Math.ceil(total / LIMIT)}</span>
+              <button disabled={offset + LIMIT >= total} onClick={() => fetchHistory(offset + LIMIT)} style={{ ...inputStyle, cursor: "pointer" }}>Sonraki →</button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function Dashboard({ authUser, onLogout: handleLogout }) {
   // ── LEADS STATE ─────────────────────────────────────────────────
   const [leads, setLeads] = useState(() => {
@@ -2430,47 +2548,8 @@ Kurallar:
                 </div>
               </div>
 
-              {/* CAMPAIGN HISTORY */}
-              <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 600 }}>{t("email_campaignHistory")}</h3>
-                  {emailCampaigns.length > 0 && (
-                    <button onClick={() => { if (window.confirm(t("email_clearHistoryConfirm"))) setEmailCampaigns([]); }}
-                      style={{ padding: "4px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 11, cursor: "pointer" }}>
-                      {t("email_clearHistory")}
-                    </button>
-                  )}
-                </div>
-                {emailCampaigns.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "32px 0", color: colors.textDim, fontSize: 13 }}>{t("email_noCampaigns")}</div>
-                ) : (
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
-                        {[t("email_colDate"), t("email_colSubject"), t("email_colRecipients"), t("email_colSent"), t("email_colFailed"), t("email_colRate")].map((h) => (
-                          <th key={h} style={{ textAlign: "left", padding: "6px 10px", fontSize: 10, fontWeight: 600, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8 }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {emailCampaigns.map((c) => (
-                        <tr key={c.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                          <td style={{ padding: "10px 10px", color: colors.textMuted }}>{new Date(c.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</td>
-                          <td style={{ padding: "10px 10px", fontWeight: 500, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.subject}</td>
-                          <td style={{ padding: "10px 10px", color: colors.textMuted }}>{c.recipients}</td>
-                          <td style={{ padding: "10px 10px", color: colors.success }}>{c.sent}</td>
-                          <td style={{ padding: "10px 10px", color: c.failed > 0 ? "#e57373" : colors.textDim }}>{c.failed}</td>
-                          <td style={{ padding: "10px 10px" }}>
-                            <span style={{ padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: c.sent / c.recipients >= 0.9 ? "rgba(67,160,71,0.15)" : "rgba(255,167,38,0.15)", color: c.sent / c.recipients >= 0.9 ? colors.success : colors.accent }}>
-                              {Math.round((c.sent / c.recipients) * 100)}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+              {/* SEND HISTORY */}
+              <EmailHistory colors={colors} token={localStorage.getItem("sns_token")} />
             </div>
           );
         })()}

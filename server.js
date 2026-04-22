@@ -64,6 +64,22 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS email_sends (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id     INTEGER,
+    sent_at         TEXT DEFAULT (datetime('now')),
+    recipient_email TEXT NOT NULL,
+    recipient_name  TEXT,
+    subject         TEXT,
+    status          TEXT NOT NULL DEFAULT 'sent',
+    signature_key   TEXT,
+    FOREIGN KEY (campaign_id) REFERENCES email_campaigns(id)
+  )
+`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_email_sends_sent_at ON email_sends(sent_at DESC)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_email_sends_email   ON email_sends(recipient_email)`);
+
 const templateCount = db.prepare("SELECT COUNT(*) AS n FROM email_templates").get().n;
 if (templateCount === 0) {
   const insertTpl = db.prepare("INSERT INTO email_templates (label, color, subject, body) VALUES (?, ?, ?, ?)");
@@ -352,6 +368,16 @@ app.post("/email/send", authenticate, async (req, res) => {
     groups.get(key).push(r);
   }
 
+  // Create campaign record first to get campaign_id
+  const campaignRow = db.prepare(
+    "INSERT INTO email_campaigns (user_id, subject, recipients, sent, failed, source) VALUES (?, ?, ?, 0, 0, ?)"
+  ).run(req.user.id, subject, recipients.length, req.body.source || "erp");
+  const campaignId = campaignRow.lastInsertRowid;
+
+  const insertSend = db.prepare(
+    "INSERT INTO email_sends (campaign_id, recipient_email, recipient_name, subject, status, signature_key) VALUES (?, ?, ?, ?, ?, ?)"
+  );
+
   for (const [groupBody, groupRecipients] of groups) {
     for (let i = 0; i < groupRecipients.length; i += CHUNK) {
       const chunk = groupRecipients.slice(i, i + CHUNK);
@@ -371,7 +397,8 @@ app.post("/email/send", authenticate, async (req, res) => {
           body: JSON.stringify(payload),
         });
         console.log(`  SendGrid status: ${sgRes.status} for ${chunk.length} recipients`);
-        if (sgRes.ok || sgRes.status === 202) {
+        const chunkOk = sgRes.ok || sgRes.status === 202;
+        if (chunkOk) {
           totalSent += chunk.length;
         } else {
           const errBody = await sgRes.json().catch(() => ({}));
@@ -379,14 +406,42 @@ app.post("/email/send", authenticate, async (req, res) => {
           totalFailed += chunk.length;
           errors.push(errBody?.errors?.[0]?.message || `HTTP ${sgRes.status}`);
         }
+        const status = chunkOk ? "sent" : "failed";
+        const logInserts = db.transaction(() => {
+          for (const r of chunk) insertSend.run(campaignId, r.email, r.name || "", subject, status, signatureKey || "merve");
+        });
+        logInserts();
       } catch (e) {
         totalFailed += chunk.length;
         errors.push(e.message);
+        const logFailed = db.transaction(() => {
+          for (const r of chunk) insertSend.run(campaignId, r.email, r.name || "", subject, "failed", signatureKey || "merve");
+        });
+        logFailed();
       }
     }
   }
 
-  res.json({ sent: totalSent, failed: totalFailed, errors });
+  // Update campaign totals
+  db.prepare("UPDATE email_campaigns SET sent=?, failed=? WHERE id=?").run(totalSent, totalFailed, campaignId);
+
+  res.json({ sent: totalSent, failed: totalFailed, errors, campaignId });
+});
+
+// GET /email/sends — filterable individual send log
+app.get("/email/sends", authenticate, (req, res) => {
+  const { search, date_from, date_to, status, subject, limit = 200, offset = 0 } = req.query;
+  let where = [];
+  const params = [];
+  if (search)    { where.push("(recipient_email LIKE ? OR recipient_name LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
+  if (date_from) { where.push("sent_at >= ?"); params.push(date_from); }
+  if (date_to)   { where.push("sent_at <= ?"); params.push(date_to + " 23:59:59"); }
+  if (status)    { where.push("status = ?"); params.push(status); }
+  if (subject)   { where.push("subject LIKE ?"); params.push(`%${subject}%`); }
+  const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const rows = db.prepare(`SELECT * FROM email_sends ${whereClause} ORDER BY sent_at DESC LIMIT ? OFFSET ?`).all(...params, parseInt(limit), parseInt(offset));
+  const total = db.prepare(`SELECT COUNT(*) AS n FROM email_sends ${whereClause}`).get(...params).n;
+  res.json({ rows, total });
 });
 
 // ── ML SERVICE PROXY ─────────────────────────────────────────────
