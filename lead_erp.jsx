@@ -528,6 +528,8 @@ Kurallar:
   const [mondayMailKonulari, setMondayMailKonulari] = useState("");
   const [mondayOrtakMail, setMondayOrtakMail] = useState("");
   const [mondayTags, setMondayTags] = useState([]);
+  const [mondayFilters, setMondayFilters] = useState({});
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   const fetchMondayCampaigns = async () => {
     try {
@@ -2574,9 +2576,38 @@ Kurallar:
           const isEmailOk = (email) => email && isValidEmail(email) && mondayEmailVerification[email] !== false && !mondayBounces.has(email.toLowerCase());
           const hasValidName = (item) => item.name && item.name.trim() && item.name.toLowerCase() !== "item";
 
-          const visibleItems = showOnlyWithEmail
-            ? mondayItems.filter(i => { const colMap = {}; i.column_values.forEach(cv => { colMap[cv.id] = cv.text; }); const email = emailCol ? (colMap[emailCol.id] || "") : ""; return isEmailOk(email); })
-            : mondayItems;
+          // Filterable columns: not email, not name/checkbox/button, max 50 unique values
+          const filterableCols = mondayColumns.filter(c =>
+            !["checkbox","button","name"].includes(c.type) &&
+            c.id !== emailCol?.id &&
+            c.id !== ortakMailCol?.id
+          );
+          const filterOptions = {};
+          filterableCols.forEach(col => {
+            const vals = new Set();
+            mondayItems.forEach(i => {
+              const cv = i.column_values.find(v => v.id === col.id);
+              const val = (cv?.text || "").trim();
+              if (val) vals.add(val);
+            });
+            if (vals.size > 0 && vals.size <= 50) filterOptions[col.id] = [...vals].sort();
+          });
+          const hasActiveFilters = Object.values(mondayFilters).some(s => s && s.size > 0);
+
+          const visibleItems = mondayItems.filter(i => {
+            const colMap = {};
+            i.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
+            if (showOnlyWithEmail) {
+              const email = emailCol ? (colMap[emailCol.id] || "") : "";
+              if (!isEmailOk(email)) return false;
+            }
+            for (const [colId, sel] of Object.entries(mondayFilters)) {
+              if (!sel || sel.size === 0) continue;
+              const val = (colMap[colId] || "").trim();
+              if (!sel.has(val)) return false;
+            }
+            return true;
+          });
           const allIds = visibleItems.map(i => i.id);
           const allChecked = allIds.length > 0 && allIds.every(id => mondaySelected.has(id));
           const selectedItems = mondayItems.filter(i => mondaySelected.has(i.id));
@@ -2931,13 +2962,67 @@ Kurallar:
 
               {mondayItems.length > 0 && (
                 <div style={{ overflowX: "auto" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: showFilterPanel ? 0 : 8, flexWrap: "wrap" }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.textMuted, cursor: "pointer", userSelect: "none" }}>
                       <input type="checkbox" checked={showOnlyWithEmail} onChange={e => setShowOnlyWithEmail(e.target.checked)} />
                       Sadece geçerli e-postası olanları göster
                     </label>
                     <span style={{ fontSize: 11, color: colors.textMuted }}>({visibleItems.length} / {mondayItems.length})</span>
+                    <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+                      {hasActiveFilters && (
+                        <button
+                          onClick={() => setMondayFilters({})}
+                          style={{ padding: "4px 10px", background: "rgba(229,115,115,0.15)", border: "1px solid rgba(229,115,115,0.4)", borderRadius: 6, color: "#e57373", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+                        >
+                          ✕ Filtreleri Temizle
+                        </button>
+                      )}
+                      {Object.keys(filterOptions).length > 0 && (
+                        <button
+                          onClick={() => setShowFilterPanel(p => !p)}
+                          style={{ padding: "4px 12px", background: showFilterPanel ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: showFilterPanel ? "#fff" : colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+                        >
+                          {showFilterPanel ? "▲ Filtreler" : "▼ Filtreler"}{hasActiveFilters ? " ●" : ""}
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {showFilterPanel && Object.keys(filterOptions).length > 0 && (
+                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 14, marginBottom: 10, display: "flex", gap: 20, flexWrap: "wrap" }}>
+                      {Object.entries(filterOptions).map(([colId, vals]) => {
+                        const col = mondayColumns.find(c => c.id === colId);
+                        const sel = mondayFilters[colId] || new Set();
+                        return (
+                          <div key={colId} style={{ minWidth: 140 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>{col?.title}</div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              {vals.map(val => {
+                                const checked = sel.has(val);
+                                return (
+                                  <label key={val} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.text, cursor: "pointer", userSelect: "none" }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() => {
+                                        setMondayFilters(prev => {
+                                          const current = new Set(prev[colId] || []);
+                                          checked ? current.delete(val) : current.add(val);
+                                          return { ...prev, [colId]: current };
+                                        });
+                                      }}
+                                    />
+                                    <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={val}>{val}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                     <thead>
                       <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
