@@ -572,19 +572,22 @@ app.post("/email/bounces/sync", authenticate, async (req, res) => {
 
 // ── MONDAY.COM ───────────────────────────────────────────────────────────────
 
-// POST /monday/board — fetch items from a Monday.com board
+// POST /monday/board — fetch ALL items from a Monday.com board (paginated)
 app.post("/monday/board", authenticate, async (req, res) => {
   const { apiKey, boardId } = req.body || {};
   if (!apiKey || !boardId) return res.status(400).json({ error: "apiKey and boardId are required" });
 
-  const query = `query {
-    boards(ids: [${parseInt(boardId)}]) {
+  const headers = { "Content-Type": "application/json", "Authorization": apiKey, "API-Version": "2024-01" };
+  const boardInt = parseInt(boardId);
+
+  const firstQuery = `query {
+    boards(ids: [${boardInt}]) {
       name
       columns { id title type }
       items_page(limit: 500) {
+        cursor
         items {
-          id
-          name
+          id name
           column_values { id text value column { title type } }
         }
       }
@@ -592,17 +595,26 @@ app.post("/monday/board", authenticate, async (req, res) => {
   }`;
 
   try {
-    const r = await fetch("https://api.monday.com/v2", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": apiKey,
-        "API-Version": "2024-01",
-      },
-      body: JSON.stringify({ query }),
-    });
-    const data = await r.json();
-    res.json(data);
+    const firstRes = await fetch("https://api.monday.com/v2", { method: "POST", headers, body: JSON.stringify({ query: firstQuery }) });
+    const firstData = await firstRes.json();
+    const board = firstData?.data?.boards?.[0];
+    if (!board) return res.json(firstData);
+
+    const allItems = [...board.items_page.items];
+    let cursor = board.items_page.cursor;
+
+    while (cursor) {
+      const nextQuery = `query { next_items_page(limit: 500, cursor: "${cursor}") { cursor items { id name column_values { id text value column { title type } } } } }`;
+      const nextRes = await fetch("https://api.monday.com/v2", { method: "POST", headers, body: JSON.stringify({ query: nextQuery }) });
+      const nextData = await nextRes.json();
+      const page = nextData?.data?.next_items_page;
+      if (!page) break;
+      allItems.push(...page.items);
+      cursor = page.cursor;
+    }
+
+    console.log(`[monday/board] fetched ${allItems.length} items total for board ${boardId}`);
+    res.json({ data: { boards: [{ ...board, items_page: { items: allItems } }] } });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
