@@ -391,6 +391,7 @@ Kurallar:
   const [mondayTestEmail, setMondayTestEmail] = useState(null);
   const [mondaySelected, setMondaySelected] = useState(new Set());
   const [mondayBulkModal, setMondayBulkModal] = useState(false);
+  const [selectedSignature, setSelectedSignature] = useState("merve");
   const [mondayBulkDraft, setMondayBulkDraft] = useState({
     subject: "Test E-Postası — Lütfen Yanıtlamayınız",
     body: "Bu e-posta yalnızca sistem testi amacıyla gönderilmiştir. Herhangi bir işlem yapmanıza gerek yoktur; lütfen bu e-postayı yanıtlamayınız.\n\nİyi çalışmalar dileriz.",
@@ -2170,6 +2171,7 @@ Kurallar:
                   subject: emailDraft.subject,
                   htmlBody: emailDraft.body.replace(/\n/g, "<br>"),
                   recipients: emailRecipients.map((l) => ({ email: l.email, name: `${l.firstName} ${l.lastName}`.trim() })),
+                  signatureKey: selectedSignature,
                 }),
               });
               const data = await res.json();
@@ -2330,6 +2332,17 @@ Kurallar:
                       style={{ width: "100%", padding: "10px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
                     />
                     <div style={{ fontSize: 11, color: colors.textDim, marginTop: 4 }}>{t("email_signatureNote")}</div>
+                  </div>
+                  <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: "nowrap" }}>İmza:</span>
+                    <select value={selectedSignature} onChange={e => setSelectedSignature(e.target.value)}
+                      style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer" }}>
+                      <option value="merve">Merve Çöloğlu — Müşteri İletişim Sorumlusu</option>
+                      <option value="sura">Şura Kurtoğlu — Müşteri İletişim Sorumlusu</option>
+                      <option value="ahmet">Ahmet Sungur — Genel Müdür</option>
+                      <option value="esra">Esra Serin — İdari İşler Koordinatörü</option>
+                      <option value="melek">Melek Çıtak — Proje Geliştirme ve Yürütme Koordinatörü</option>
+                    </select>
                   </div>
 
                   {/* Result banner */}
@@ -2579,6 +2592,17 @@ Kurallar:
                       onChange={e => setMondayBulkDraft(p => ({ ...p, body: e.target.value }))}
                       style={{ width: "100%", minHeight: 100, padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
                     />
+                  </div>
+                  <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: "nowrap" }}>İmza:</span>
+                    <select value={selectedSignature} onChange={e => setSelectedSignature(e.target.value)}
+                      style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer" }}>
+                      <option value="merve">Merve Çöloğlu — Müşteri İletişim Sorumlusu</option>
+                      <option value="sura">Şura Kurtoğlu — Müşteri İletişim Sorumlusu</option>
+                      <option value="ahmet">Ahmet Sungur — Genel Müdür</option>
+                      <option value="esra">Esra Serin — İdari İşler Koordinatörü</option>
+                      <option value="melek">Melek Çıtak — Proje Geliştirme ve Yürütme Koordinatörü</option>
+                    </select>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -2883,6 +2907,7 @@ Kurallar:
                                 subject: mondayBulkDraft.subject,
                                 body: mondayBulkDraft.body,
                                 recipients,
+                                signatureKey: selectedSignature,
                                 attachments: mondayAttachments,
                               }),
                             });

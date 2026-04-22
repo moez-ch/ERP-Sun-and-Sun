@@ -245,7 +245,18 @@ const _logoSrc = "https://www.sunandsun.com.tr/wp-content/uploads/2024/06/SunSun
 const _igSrc   = "https://www.sunandsun.com.tr/wp-content/uploads/2026/04/instagram.png";
 const _liSrc   = "https://www.sunandsun.com.tr/wp-content/uploads/2026/04/linkedin.png";
 const _gifSrc  = "https://www.sunandsun.com.tr/wp-content/uploads/2026/04/unnamed.gif";
-const SIGNATURE_HTML = `
+
+const SIGNATORIES = {
+  merve:  { name: "Merve Çöloğlu",  title: "Müşteri İletişim Sorumlusu",                    phone: "541 634 9576",   tel: "+905416349576" },
+  sura:   { name: "Şura Kurtoğlu",   title: "Müşteri İletişim Sorumlusu",                    phone: "0 543 459 71 57", tel: "+905434597157" },
+  ahmet:  { name: "Ahmet Sungur",    title: "Genel Müdür",                                   phone: "0 533 506 32 32", tel: "+905335063232" },
+  esra:   { name: "Esra Serin",      title: "İdari İşler Koordinatörü",                      phone: "0 505 039 47 67", tel: "+905050394767" },
+  melek:  { name: "Melek Çıtak",     title: "Proje Geliştirme ve Yürütme Koordinatörü",      phone: "0532 778 50 31",  tel: "+905327785031" },
+};
+
+function buildSignature(key) {
+  const s = SIGNATORIES[key] || SIGNATORIES.merve;
+  return `
 <br><br>
 <div style="font-family:Arial,sans-serif;color:#333;max-width:600px;font-size:12px;">
 
@@ -258,9 +269,9 @@ const SIGNATURE_HTML = `
         </a>
       </td>
       <td style="vertical-align:top;border-left:2px solid #ddd;padding-left:18px;">
-        <div style="font-weight:bold;font-size:14px;color:#c0392b;margin-bottom:2px;">Merve Çöloğlu</div>
-        <div style="color:#555;font-size:12px;padding-bottom:7px;border-bottom:1px solid #ddd;margin-bottom:7px;">Müşteri İletişim Sorumlusu</div>
-        <div style="margin-bottom:4px;">&#128222;&nbsp;<a href="tel:+905416349576" style="color:#333;text-decoration:none;">541 634 9576</a></div>
+        <div style="font-weight:bold;font-size:14px;color:#c0392b;margin-bottom:2px;">${s.name}</div>
+        <div style="color:#555;font-size:12px;padding-bottom:7px;border-bottom:1px solid #ddd;margin-bottom:7px;">${s.title}</div>
+        <div style="margin-bottom:4px;">&#128222;&nbsp;<a href="tel:${s.tel}" style="color:#333;text-decoration:none;">${s.phone}</a></div>
         <div style="margin-bottom:10px;">&#127760;&nbsp;<a href="https://www.sunandsun.com.tr/" style="color:#0A3E62;text-decoration:none;">www.sunandsun.com.tr</a></div>
         <div>
           <a href="https://www.instagram.com/sunandsuninternational/" target="_blank" style="display:inline-block;margin-right:6px;text-decoration:none;">
@@ -314,11 +325,12 @@ const SIGNATURE_HTML = `
     This e-mail and related files are the private property of the sender, the personal and the legal entities to whom they were intended to be sent. If you are not an authorized recipient of this e-mail, it is forbidden to open, copy, forward or use it and it is required that you should delete this e-mail immediately. As data controllers, Sun Proje Tercüme Danışmanlık Eğitim İthalat İhracat ve Sanayi Ticaret Limited Şirketi and Sun ve Sun Danışmanlık Bilişim Sanayi ve Ticaret Anonim Şirketi (Hereinafter collectively referred to as "SUN DANIŞMANLIK" or "Data Controller".) do not guarantee absolutely the correctness and completeness of the information within this e-mail. Therefore, it cannot be held responsible for losses related to the use of this information. The sole responsibility will belong to the person who sends it, and the contents herein might not be reflecting the opinions of Data Controller. This e-mail has been scanned for all known computer viruses. As Data Controller in accordance with Law No. 6698 (Personal Data Protection Law), We process and store your personal data collected in the e-mail environment in accordance with the purposes specified in the privacy notice regarding the processing of personal data on our website. You can read the personal data privacy notice via <a href="https://www.sundanismanlik.net" style="color:#0A3E62;">www.sundanismanlik.net</a>.
   </div>
 </div>`;
+}
 
 // POST /email/send — send bulk email via SendGrid (admin)
 // recipients may include per-recipient htmlBody for personalization
 app.post("/email/send", authenticate, async (req, res) => {
-  const { apiKey, fromEmail, fromName, subject, htmlBody, body, recipients, attachments } = req.body || {};
+  const { apiKey, fromEmail, fromName, subject, htmlBody, body, recipients, attachments, signatureKey } = req.body || {};
   if (!apiKey) return res.status(400).json({ error: "SendGrid API key is required" });
   const defaultBody = htmlBody || body || "";
   if (!fromEmail || !subject || !defaultBody) return res.status(400).json({ error: "fromEmail, subject and body are required" });
@@ -347,7 +359,7 @@ app.post("/email/send", authenticate, async (req, res) => {
         personalizations: chunk.map((r) => ({ to: [{ email: r.email, name: r.name || "" }] })),
         from: { email: fromEmail, name: fromName || "Sun & Sun" },
         subject,
-        content: [{ type: "text/html", value: `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#222;max-width:600px;">${groupBody}</div>${SIGNATURE_HTML}` }],
+        content: [{ type: "text/html", value: `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#222;max-width:600px;">${groupBody}</div>${buildSignature(signatureKey)}` }],
         ...(Array.isArray(attachments) && attachments.length > 0 ? {
           attachments: attachments.map(a => ({ content: a.content, filename: a.name, type: a.type || "application/octet-stream", disposition: "attachment" }))
         } : {}),
