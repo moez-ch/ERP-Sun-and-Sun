@@ -2459,7 +2459,7 @@ Kurallar:
                       <option value="sura">Şura Kurtoğlu — sura.kurtoglu@sundanismanlik.net</option>
                       <option value="ahmet">Ahmet Sungur — ahmet.sungur@sundanismanlik.net</option>
                       <option value="esra">Esra Serin — esra.serin@sundanismanlik.net</option>
-                      <option value="melek">Melek Çıtak — (e-posta henüz eklenmedi)</option>
+                      <option value="melek">Melek Çıtak — melek.citak@sundanismanlik.net</option>
                     </select>
                   </div>
 
@@ -2680,7 +2680,7 @@ Kurallar:
                       <option value="sura">Şura Kurtoğlu — sura.kurtoglu@sundanismanlik.net</option>
                       <option value="ahmet">Ahmet Sungur — ahmet.sungur@sundanismanlik.net</option>
                       <option value="esra">Esra Serin — esra.serin@sundanismanlik.net</option>
-                      <option value="melek">Melek Çıtak — (e-posta henüz eklenmedi)</option>
+                      <option value="melek">Melek Çıtak — melek.citak@sundanismanlik.net</option>
                     </select>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
