@@ -652,7 +652,9 @@ app.post("/monday/update-columns", authenticate, async (req, res) => {
   for (const { itemId, columnId, colType, value } of updates) {
     try {
       let inlineValue;
-      if (colType === "tag") {
+      if (value === "" || value === null) {
+        inlineValue = '""';
+      } else if (colType === "tag") {
         inlineValue = JSON.stringify(JSON.stringify({ tag_ids: value }));
       } else {
         inlineValue = JSON.stringify(JSON.stringify({ text: String(value) }));

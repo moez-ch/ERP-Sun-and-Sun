@@ -2650,26 +2650,35 @@ Kurallar:
 
                 const allInvalidIds = Object.values(groups).flatMap(entries => entries.map(g => g.item.id));
 
-                const deleteIds = async (ids, label) => {
-                  if (!window.confirm(`${label} — ${ids.length} kişi silinecek. Emin misin?`)) return;
+                const clearEmails = async (entries, label) => {
+                  if (!emailCol) { alert("E-posta sütunu bulunamadı."); return; }
+                  if (!window.confirm(`${label} — ${entries.length} kişinin e-posta alanı temizlenecek. Diğer bilgiler korunacak. Emin misin?`)) return;
                   try {
                     const token = localStorage.getItem("sns_token");
-                    console.log("[delete-items] sending ids:", ids, "apiKey present:", !!settings.mondayApiKey);
-                    const res = await fetch("/monday/delete-items", {
+                    const updates = entries.map(({ item }) => ({
+                      itemId: item.id,
+                      columnId: emailCol.id,
+                      colType: emailCol.type,
+                      value: "",
+                    }));
+                    const res = await fetch("/monday/update-columns", {
                       method: "POST",
                       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                      body: JSON.stringify({ apiKey: settings.mondayApiKey, itemIds: ids }),
+                      body: JSON.stringify({ apiKey: settings.mondayApiKey, boardId: settings.mondayBoardId, updates }),
                     });
                     const data = await res.json();
-                    console.log("[delete-items] response:", data);
                     if (!res.ok) { alert(`Sunucu hatası: ${data.error || res.status}`); return; }
                     const failed = (data.results || []).filter(r => !r.ok);
                     if (failed.length > 0) {
-                      alert(`${t("monday_deleteError")}\n${failed.map(f => `ID ${f.itemId}: ${f.error || "bilinmeyen hata"}`).join("\n")}`);
+                      alert(`Bazı e-postalar temizlenemedi:\n${failed.map(f => `ID ${f.itemId}: ${f.error || "bilinmeyen hata"}`).join("\n")}`);
                       return;
                     }
-                    setMondayItems(prev => prev.filter(i => !ids.includes(i.id)));
-                  } catch (e) { alert(t("monday_deleteNetworkError", e.message)); }
+                    const clearedIds = new Set(entries.map(({ item }) => item.id));
+                    setMondayItems(prev => prev.map(i => {
+                      if (!clearedIds.has(i.id)) return i;
+                      return { ...i, column_values: i.column_values.map(cv => cv.id === emailCol.id ? { ...cv, text: "" } : cv) };
+                    }));
+                  } catch (e) { alert("Hata: " + e.message); }
                 };
 
                 return (
@@ -2677,10 +2686,10 @@ Kurallar:
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                       <span style={{ color: "#e57373", fontWeight: 700, fontSize: 13 }}>⚠ {allInvalidIds.length} geçersiz kişi</span>
                       <button
-                        onClick={() => deleteIds(allInvalidIds, "Tüm geçersiz kişiler")}
+                        onClick={() => clearEmails(Object.values(groups).flat(), "Tüm geçersiz kişiler")}
                         style={{ background: "rgba(220,53,69,0.2)", border: "1px solid rgba(220,53,69,0.5)", borderRadius: 6, color: "#e57373", fontSize: 12, fontWeight: 700, padding: "5px 14px", cursor: "pointer" }}
                       >
-                        Tümünü Sil ({allInvalidIds.length})
+                        Tümünün E-postasını Temizle ({allInvalidIds.length})
                       </button>
                     </div>
                     {Object.entries(groups).map(([reason, entries]) => (
@@ -2688,10 +2697,10 @@ Kurallar:
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                           <span style={{ color: "#e57373", fontWeight: 700 }}>⚠ {reason} — {t("monday_nPersons", entries.length)}</span>
                           <button
-                            onClick={() => deleteIds(entries.map(g => g.item.id), reason)}
+                            onClick={() => clearEmails(entries, reason)}
                             style={{ background: "rgba(220,53,69,0.15)", border: "1px solid rgba(220,53,69,0.35)", borderRadius: 5, color: "#e57373", fontSize: 11, fontWeight: 600, padding: "3px 10px", cursor: "pointer" }}
                           >
-                            {t("monday_delete", entries.length)}
+                            E-postayı Temizle ({entries.length})
                           </button>
                         </div>
                         <div style={{ color: colors.textMuted, lineHeight: 1.7 }}>
