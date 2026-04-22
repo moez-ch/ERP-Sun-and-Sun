@@ -2711,13 +2711,28 @@ Kurallar:
                     </button>
                   </div>
                   {emailTemplates.length > 0 && (
-                    <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: "nowrap" }}>Şablon:</span>
-                      <select defaultValue="" onChange={e => { const tpl = emailTemplates.find(t => String(t.id) === e.target.value); if (tpl) setMondayBulkDraft(p => ({ ...p, subject: tpl.subject, body: tpl.body })); e.target.value = ""; }}
-                        style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer", flex: 1 }}>
-                        <option value="">— Şablon seç —</option>
-                        {emailTemplates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.label}</option>)}
-                      </select>
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: "nowrap" }}>Şablon:</span>
+                        <select defaultValue="" onChange={e => { const tpl = emailTemplates.find(t => String(t.id) === e.target.value); if (tpl) setMondayBulkDraft(p => ({ ...p, subject: tpl.subject, body: tpl.body })); e.target.value = ""; }}
+                          style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer", flex: 1 }}>
+                          <option value="">— Şablon seç —</option>
+                          {emailTemplates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.label}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 52 }}>
+                        {emailTemplates.map(tpl => (
+                          <span key={tpl.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 10, fontSize: 11, color: colors.textMuted }}>
+                            {tpl.label}
+                            <button onClick={async () => {
+                              if (!window.confirm(`"${tpl.label}" şablonu silinsin mi?`)) return;
+                              const token = localStorage.getItem("sns_token");
+                              await fetch(`/email/templates/${tpl.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                              fetchEmailTemplates();
+                            }} style={{ background: "none", border: "none", color: "#e57373", cursor: "pointer", fontSize: 12, padding: "0 0 0 2px", lineHeight: 1 }}>✕</button>
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
                   <div style={{ marginBottom: 10 }}>
