@@ -2629,6 +2629,11 @@ Kurallar:
 
               {/* ── Error Panel ── */}
               {mondayItems.length > 0 && (() => {
+                // true if item has any filled column other than the email column
+                const hasOtherInfo = (item) => item.column_values.some(cv =>
+                  cv.text && cv.text.trim() && (!emailCol || cv.id !== emailCol.id)
+                );
+
                 const classify = (i) => {
                   const colMap = {};
                   i.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
@@ -2639,28 +2644,28 @@ Kurallar:
                   if (mondayBounces.has(email.toLowerCase())) return { reason: t("monday_bounced"), email };
                   return null;
                 };
-                const groups = {};
+
+                // split into: clear-email-only (has other info) vs delete-whole-item (empty shell)
+                const toDelete = [];
+                const toClear = [];
                 mondayItems.forEach(i => {
                   const c = classify(i);
                   if (!c) return;
-                  if (!groups[c.reason]) groups[c.reason] = [];
-                  groups[c.reason].push({ item: i, email: c.email });
+                  if (hasOtherInfo(i)) {
+                    toClear.push({ item: i, email: c.email, reason: c.reason });
+                  } else {
+                    toDelete.push({ item: i, email: c.email, reason: c.reason });
+                  }
                 });
-                if (!Object.keys(groups).length) return null;
 
-                const allInvalidIds = Object.values(groups).flatMap(entries => entries.map(g => g.item.id));
+                if (!toDelete.length && !toClear.length) return null;
 
-                const clearEmails = async (entries, label) => {
+                const clearEmails = async (entries) => {
                   if (!emailCol) { alert("E-posta sütunu bulunamadı."); return; }
-                  if (!window.confirm(`${label} — ${entries.length} kişinin e-posta alanı temizlenecek. Diğer bilgiler korunacak. Emin misin?`)) return;
+                  if (!window.confirm(`${entries.length} kişinin e-posta alanı temizlenecek. Diğer bilgiler korunacak. Emin misin?`)) return;
                   try {
                     const token = localStorage.getItem("sns_token");
-                    const updates = entries.map(({ item }) => ({
-                      itemId: item.id,
-                      columnId: emailCol.id,
-                      colType: emailCol.type,
-                      value: "",
-                    }));
+                    const updates = entries.map(({ item }) => ({ itemId: item.id, columnId: emailCol.id, colType: emailCol.type, value: "" }));
                     const res = await fetch("/monday/update-columns", {
                       method: "POST",
                       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -2668,11 +2673,6 @@ Kurallar:
                     });
                     const data = await res.json();
                     if (!res.ok) { alert(`Sunucu hatası: ${data.error || res.status}`); return; }
-                    const failed = (data.results || []).filter(r => !r.ok);
-                    if (failed.length > 0) {
-                      alert(`Bazı e-postalar temizlenemedi:\n${failed.map(f => `ID ${f.itemId}: ${f.error || "bilinmeyen hata"}`).join("\n")}`);
-                      return;
-                    }
                     const clearedIds = new Set(entries.map(({ item }) => item.id));
                     setMondayItems(prev => prev.map(i => {
                       if (!clearedIds.has(i.id)) return i;
@@ -2681,37 +2681,62 @@ Kurallar:
                   } catch (e) { alert("Hata: " + e.message); }
                 };
 
+                const deleteItems = async (entries) => {
+                  if (!window.confirm(`${entries.length} boş kişi Monday'den silinecek. Emin misin?`)) return;
+                  try {
+                    const token = localStorage.getItem("sns_token");
+                    const res = await fetch("/monday/delete-items", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ apiKey: settings.mondayApiKey, itemIds: entries.map(({ item }) => item.id) }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) { alert(`Sunucu hatası: ${data.error || res.status}`); return; }
+                    const deletedIds = new Set(entries.map(({ item }) => item.id));
+                    setMondayItems(prev => prev.filter(i => !deletedIds.has(i.id)));
+                  } catch (e) { alert("Hata: " + e.message); }
+                };
+
                 return (
                   <div style={{ marginBottom: 14 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                      <span style={{ color: "#e57373", fontWeight: 700, fontSize: 13 }}>⚠ {allInvalidIds.length} geçersiz kişi</span>
-                      <button
-                        onClick={() => clearEmails(Object.values(groups).flat(), "Tüm geçersiz kişiler")}
-                        style={{ background: "rgba(220,53,69,0.2)", border: "1px solid rgba(220,53,69,0.5)", borderRadius: 6, color: "#e57373", fontSize: 12, fontWeight: 700, padding: "5px 14px", cursor: "pointer" }}
-                      >
-                        Tümünün E-postasını Temizle ({allInvalidIds.length})
-                      </button>
-                    </div>
-                    {Object.entries(groups).map(([reason, entries]) => (
-                      <div key={reason} style={{ background: "rgba(220,53,69,0.07)", border: "1px solid rgba(220,53,69,0.22)", borderRadius: 8, padding: "10px 14px", marginBottom: 8, fontSize: 12 }}>
+                    {/* Items with other info — clear email only */}
+                    {toClear.length > 0 && (
+                      <div style={{ background: "rgba(220,53,69,0.07)", border: "1px solid rgba(220,53,69,0.22)", borderRadius: 8, padding: "10px 14px", marginBottom: 8, fontSize: 12 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                          <span style={{ color: "#e57373", fontWeight: 700 }}>⚠ {reason} — {t("monday_nPersons", entries.length)}</span>
+                          <span style={{ color: "#e57373", fontWeight: 700 }}>⚠ Geçersiz e-posta (diğer bilgiler mevcut) — {toClear.length} kişi</span>
                           <button
-                            onClick={() => clearEmails(entries, reason)}
+                            onClick={() => clearEmails(toClear)}
                             style={{ background: "rgba(220,53,69,0.15)", border: "1px solid rgba(220,53,69,0.35)", borderRadius: 5, color: "#e57373", fontSize: 11, fontWeight: 600, padding: "3px 10px", cursor: "pointer" }}
                           >
-                            E-postayı Temizle ({entries.length})
+                            E-postayı Temizle ({toClear.length})
                           </button>
                         </div>
                         <div style={{ color: colors.textMuted, lineHeight: 1.7 }}>
-                          {entries.map(({ item, email }) => (
-                            <span key={item.id} style={{ marginRight: 10 }}>
-                              {item.name || t("monday_unnamed")}{email ? ` (${email})` : ""}
-                            </span>
+                          {toClear.map(({ item, email }) => (
+                            <span key={item.id} style={{ marginRight: 10 }}>{item.name}{email ? ` (${email})` : ""}</span>
                           ))}
                         </div>
                       </div>
-                    ))}
+                    )}
+                    {/* Items with no useful info — delete */}
+                    {toDelete.length > 0 && (
+                      <div style={{ background: "rgba(220,53,69,0.07)", border: "1px solid rgba(220,53,69,0.22)", borderRadius: 8, padding: "10px 14px", marginBottom: 8, fontSize: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                          <span style={{ color: "#e57373", fontWeight: 700 }}>⚠ Boş kayıt (isim dışında bilgi yok) — {toDelete.length} kişi</span>
+                          <button
+                            onClick={() => deleteItems(toDelete)}
+                            style={{ background: "rgba(220,53,69,0.15)", border: "1px solid rgba(220,53,69,0.35)", borderRadius: 5, color: "#e57373", fontSize: 11, fontWeight: 600, padding: "3px 10px", cursor: "pointer" }}
+                          >
+                            Tümünü Sil ({toDelete.length})
+                          </button>
+                        </div>
+                        <div style={{ color: colors.textMuted, lineHeight: 1.7 }}>
+                          {toDelete.map(({ item }) => (
+                            <span key={item.id} style={{ marginRight: 10 }}>{item.name || t("monday_unnamed")}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
