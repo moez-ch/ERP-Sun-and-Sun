@@ -263,11 +263,11 @@ const _liSrc   = "https://www.sunandsun.com.tr/wp-content/uploads/2026/04/linked
 const _gifSrc  = "https://www.sunandsun.com.tr/wp-content/uploads/2026/04/unnamed.gif";
 
 const SIGNATORIES = {
-  merve:  { name: "Merve Çöloğlu",  title: "Müşteri İletişim Sorumlusu",                    phone: "541 634 9576",   tel: "+905416349576" },
-  sura:   { name: "Şura Kurtoğlu",   title: "Müşteri İletişim Sorumlusu",                    phone: "0 543 459 71 57", tel: "+905434597157" },
-  ahmet:  { name: "Ahmet Sungur",    title: "Genel Müdür",                                   phone: "0 533 506 32 32", tel: "+905335063232" },
-  esra:   { name: "Esra Serin",      title: "İdari İşler Koordinatörü",                      phone: "0 505 039 47 67", tel: "+905050394767" },
-  melek:  { name: "Melek Çıtak",     title: "Proje Geliştirme ve Yürütme Koordinatörü",      phone: "0532 778 50 31",  tel: "+905327785031" },
+  merve:  { name: "Merve Çöloğlu",  title: "Müşteri İletişim Sorumlusu",               phone: "541 634 9576",    tel: "+905416349576", email: "merve.cologlu@sundanismanlik.net" },
+  sura:   { name: "Şura Kurtoğlu",  title: "Müşteri İletişim Sorumlusu",               phone: "0 543 459 71 57", tel: "+905434597157", email: "sura.kurtoglu@sundanismanlik.net" },
+  ahmet:  { name: "Ahmet Sungur",   title: "Genel Müdür",                              phone: "0 533 506 32 32", tel: "+905335063232", email: "ahmet.sungur@sundanismanlik.net" },
+  esra:   { name: "Esra Serin",     title: "İdari İşler Koordinatörü",                 phone: "0 505 039 47 67", tel: "+905050394767", email: null },
+  melek:  { name: "Melek Çıtak",    title: "Proje Geliştirme ve Yürütme Koordinatörü", phone: "0532 778 50 31",  tel: "+905327785031", email: null },
 };
 
 function buildSignature(key) {
@@ -352,7 +352,12 @@ app.post("/email/send", authenticate, async (req, res) => {
   if (!fromEmail || !subject || !defaultBody) return res.status(400).json({ error: "fromEmail, subject and body are required" });
   if (!Array.isArray(recipients) || recipients.length === 0) return res.status(400).json({ error: "No recipients provided" });
 
-  console.log(`📧 /email/send — ${recipients.length} recipients, subject: "${subject}"`);
+  // Admin can send on behalf of a signatory — override from address if signatory has an email
+  const signatory = SIGNATORIES[signatureKey];
+  const effectiveFromEmail = (req.user.role === "admin" && signatory?.email) ? signatory.email : fromEmail;
+  const effectiveFromName  = (req.user.role === "admin" && signatory?.email) ? signatory.name  : (fromName || "Sun & Sun");
+
+  console.log(`📧 /email/send — ${recipients.length} recipients, from: ${effectiveFromEmail}, subject: "${subject}"`);
   recipients.forEach((r, i) => console.log(`  [${i}] email=${r.email} name=${r.name} hasBody=${!!r.htmlBody}`));
 
   const CHUNK = 1000;
@@ -383,7 +388,7 @@ app.post("/email/send", authenticate, async (req, res) => {
       const chunk = groupRecipients.slice(i, i + CHUNK);
       const payload = {
         personalizations: chunk.map((r) => ({ to: [{ email: r.email, name: r.name || "" }] })),
-        from: { email: fromEmail, name: fromName || "Sun & Sun" },
+        from: { email: effectiveFromEmail, name: effectiveFromName },
         subject,
         content: [{ type: "text/html", value: `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#222;max-width:600px;">${groupBody}</div>${buildSignature(signatureKey)}` }],
         ...(Array.isArray(attachments) && attachments.length > 0 ? {

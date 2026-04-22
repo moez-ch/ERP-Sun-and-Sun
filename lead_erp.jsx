@@ -2455,11 +2455,11 @@ Kurallar:
                     <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: "nowrap" }}>İmza:</span>
                     <select value={selectedSignature} onChange={e => setSelectedSignature(e.target.value)}
                       style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer" }}>
-                      <option value="merve">Merve Çöloğlu — Müşteri İletişim Sorumlusu</option>
-                      <option value="sura">Şura Kurtoğlu — Müşteri İletişim Sorumlusu</option>
-                      <option value="ahmet">Ahmet Sungur — Genel Müdür</option>
-                      <option value="esra">Esra Serin — İdari İşler Koordinatörü</option>
-                      <option value="melek">Melek Çıtak — Proje Geliştirme ve Yürütme Koordinatörü</option>
+                      <option value="merve">Merve Çöloğlu — merve.cologlu@sundanismanlik.net</option>
+                      <option value="sura">Şura Kurtoğlu — sura.kurtoglu@sundanismanlik.net</option>
+                      <option value="ahmet">Ahmet Sungur — ahmet.sungur@sundanismanlik.net</option>
+                      <option value="esra">Esra Serin — (e-posta henüz eklenmedi)</option>
+                      <option value="melek">Melek Çıtak — (e-posta henüz eklenmedi)</option>
                     </select>
                   </div>
 
@@ -2676,11 +2676,11 @@ Kurallar:
                     <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: "nowrap" }}>İmza:</span>
                     <select value={selectedSignature} onChange={e => setSelectedSignature(e.target.value)}
                       style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer" }}>
-                      <option value="merve">Merve Çöloğlu — Müşteri İletişim Sorumlusu</option>
-                      <option value="sura">Şura Kurtoğlu — Müşteri İletişim Sorumlusu</option>
-                      <option value="ahmet">Ahmet Sungur — Genel Müdür</option>
-                      <option value="esra">Esra Serin — İdari İşler Koordinatörü</option>
-                      <option value="melek">Melek Çıtak — Proje Geliştirme ve Yürütme Koordinatörü</option>
+                      <option value="merve">Merve Çöloğlu — merve.cologlu@sundanismanlik.net</option>
+                      <option value="sura">Şura Kurtoğlu — sura.kurtoglu@sundanismanlik.net</option>
+                      <option value="ahmet">Ahmet Sungur — ahmet.sungur@sundanismanlik.net</option>
+                      <option value="esra">Esra Serin — (e-posta henüz eklenmedi)</option>
+                      <option value="melek">Melek Çıtak — (e-posta henüz eklenmedi)</option>
                     </select>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
