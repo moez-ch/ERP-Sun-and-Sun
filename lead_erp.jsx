@@ -510,6 +510,8 @@ Kurallar:
   const [mondaySelected, setMondaySelected] = useState(new Set());
   const [mondayBulkModal, setMondayBulkModal] = useState(false);
   const [selectedSignature, setSelectedSignature] = useState("merve");
+  const [newTemplateModal, setNewTemplateModal] = useState(false);
+  const [newTemplateDraft, setNewTemplateDraft] = useState({ label: "", subject: "", body: "" });
   const [mondayBulkDraft, setMondayBulkDraft] = useState({
     subject: "Test E-Postası — Lütfen Yanıtlamayınız",
     body: "Bu e-posta yalnızca sistem testi amacıyla gönderilmiştir. Herhangi bir işlem yapmanıza gerek yoktur; lütfen bu e-postayı yanıtlamayınız.\n\nİyi çalışmalar dileriz.",
@@ -2652,10 +2654,69 @@ Kurallar:
                 </div>
               )}
 
+              {/* ── New Template Modal ── */}
+              {newTemplateModal && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ background: colors.surface, borderRadius: 12, padding: 28, width: 500, maxWidth: "92vw", border: `1px solid ${colors.border}` }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>Yeni Şablon Oluştur</div>
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 5 }}>Şablon Adı</div>
+                      <input value={newTemplateDraft.label} onChange={e => setNewTemplateDraft(p => ({ ...p, label: e.target.value }))}
+                        placeholder="ör. Hibe Duyurusu, Takip Maili…"
+                        style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                    </div>
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 5 }}>Konu</div>
+                      <input value={newTemplateDraft.subject} onChange={e => setNewTemplateDraft(p => ({ ...p, subject: e.target.value }))}
+                        placeholder="E-posta konusu"
+                        style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                    </div>
+                    <div style={{ marginBottom: 22 }}>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 5 }}>İçerik</div>
+                      <textarea value={newTemplateDraft.body} onChange={e => setNewTemplateDraft(p => ({ ...p, body: e.target.value }))} rows={8}
+                        style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                      <button onClick={() => { setNewTemplateModal(false); setNewTemplateDraft({ label: "", subject: "", body: "" }); }}
+                        style={{ padding: "8px 18px", background: "none", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 13, cursor: "pointer" }}>
+                        İptal
+                      </button>
+                      <button onClick={async () => {
+                        if (!newTemplateDraft.label.trim() || !newTemplateDraft.subject.trim()) { alert("Ad ve konu zorunludur."); return; }
+                        const token = localStorage.getItem("sns_token");
+                        await fetch("/email/templates", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ label: newTemplateDraft.label, color: "#088FC4", subject: newTemplateDraft.subject, body: newTemplateDraft.body }) });
+                        await fetchEmailTemplates();
+                        setNewTemplateModal(false);
+                        setNewTemplateDraft({ label: "", subject: "", body: "" });
+                      }}
+                        style={{ padding: "8px 18px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        Kaydet
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ── Compose Panel ── */}
               {mondayItems.length > 0 && (
                 <div style={{ background: colors.surface, borderRadius: 12, padding: 16, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{t("monday_compose")}</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{t("monday_compose")}</div>
+                    <button onClick={() => { setNewTemplateDraft({ label: "", subject: "", body: "" }); setNewTemplateModal(true); }}
+                      style={{ padding: "5px 12px", background: `${colors.primary}20`, border: `1px dashed ${colors.primary}`, borderRadius: 6, color: colors.primary, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      + Şablon Oluştur
+                    </button>
+                  </div>
+                  {emailTemplates.length > 0 && (
+                    <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: "nowrap" }}>Şablon:</span>
+                      <select defaultValue="" onChange={e => { const tpl = emailTemplates.find(t => String(t.id) === e.target.value); if (tpl) setMondayBulkDraft(p => ({ ...p, subject: tpl.subject, body: tpl.body })); e.target.value = ""; }}
+                        style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer", flex: 1 }}>
+                        <option value="">— Şablon seç —</option>
+                        {emailTemplates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.label}</option>)}
+                      </select>
+                    </div>
+                  )}
                   <div style={{ marginBottom: 10 }}>
                     <input
                       value={mondayBulkDraft.subject}
