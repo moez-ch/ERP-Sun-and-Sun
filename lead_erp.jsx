@@ -2604,6 +2604,8 @@ Kurallar:
           const phoneCol    = mondayColumns.find(c => c.type === "phone" || /\btelefon\b|phone|tel\b|gsm\b|cep\b/i.test(c.title));
           const empCol      = mondayColumns.find(c => /çalışan sayısı|çalışan|calisan|employee|personel|kadro|eleman|staff/iu.test(c.title));
           const industryCol = mondayColumns.find(c => /sektör|sektor|industry|endüstri|endustri/i.test(c.title));
+          const nameCol     = mondayColumns.find(c => /^\s*(i̇sim|isim|ad)\s*$/iu.test(c.title) || c.type === "name");
+          const surnameCol  = mondayColumns.find(c => /soyisim|soyad|surname|last.?name/iu.test(c.title));
 
           const EMP_RANGES = [
             { label: "1–10",    min: 1,   max: 10  },
@@ -2614,7 +2616,7 @@ Kurallar:
           ];
 
           // Build ordered filter definitions
-          const specialIds = new Set([emailCol?.id, phoneCol?.id, empCol?.id, industryCol?.id, ortakMailCol?.id, genderCol?.id].filter(Boolean));
+          const specialIds = new Set([emailCol?.id, phoneCol?.id, empCol?.id, industryCol?.id, ortakMailCol?.id, genderCol?.id, nameCol?.id, surnameCol?.id].filter(Boolean));
           const filterDefs = [];
           if (emailCol)    filterDefs.push({ id: emailCol.id,    title: emailCol.title,    type: "presence" });
           if (phoneCol)    filterDefs.push({ id: phoneCol.id,    title: phoneCol.title,    type: "presence" });
