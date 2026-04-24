@@ -3063,55 +3063,62 @@ Kurallar:
                   </div>
 
                   {showFilterPanel && filterDefs.length > 0 && (
-                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 14, marginBottom: 10, display: "flex", gap: 20, flexWrap: "wrap" }}>
+                    <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 12, padding: "14px 16px", marginBottom: 12, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
                       {filterDefs.map(def => {
                         const f = mondayFilters[def.id] || {};
                         const setF = (patch) => setMondayFilters(prev => ({ ...prev, [def.id]: { ...f, ...patch, type: def.type } }));
+                        const isActive = (def.type === "presence" && f.presence && f.presence !== "any") ||
+                          (def.type === "numeric_range" && ((f.presence && f.presence !== "any") || (f.ranges && f.ranges.size > 0))) ||
+                          (def.type === "value_select" && f.values && f.values.size > 0);
+
+                        const cardStyle = {
+                          background: isActive ? `${colors.primary}18` : colors.surface,
+                          border: `1px solid ${isActive ? colors.primary + "55" : colors.border}`,
+                          borderRadius: 10, padding: "10px 12px", minWidth: 0,
+                          transition: "border-color .15s, background .15s",
+                        };
+                        const titleStyle = { fontSize: 10, fontWeight: 700, color: isActive ? colors.primary : colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.07em" };
+
+                        // Segmented pill control for presence
+                        const PresencePills = ({ value, onChange }) => (
+                          <div style={{ display: "flex", borderRadius: 7, overflow: "hidden", border: `1px solid ${colors.border}` }}>
+                            {[["any","Any"],["has","Has"],["empty","Empty"]].map(([opt, label]) => (
+                              <button key={opt} onClick={() => onChange(opt)}
+                                style={{ flex: 1, padding: "5px 0", fontSize: 11, fontWeight: 600, cursor: "pointer", border: "none", borderRight: opt !== "empty" ? `1px solid ${colors.border}` : "none",
+                                  background: value === opt ? colors.primary : "transparent",
+                                  color: value === opt ? "#fff" : colors.textMuted,
+                                  transition: "background .15s, color .15s" }}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        );
 
                         if (def.type === "presence") {
-                          const pres = f.presence || "any";
                           return (
-                            <div key={def.id} style={{ minWidth: 130 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>{def.title}</div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                {["any", "has", "empty"].map(opt => (
-                                  <label key={opt} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.text, cursor: "pointer", userSelect: "none" }}>
-                                    <input type="radio" name={`pres_${def.id}`} checked={pres === opt} onChange={() => setF({ presence: opt })} />
-                                    {opt === "any" ? "Any" : opt === "has" ? "Has value" : "Empty"}
-                                  </label>
-                                ))}
-                              </div>
+                            <div key={def.id} style={{ ...cardStyle, minWidth: 150 }}>
+                              <div style={titleStyle}>{def.title}</div>
+                              <PresencePills value={f.presence || "any"} onChange={v => setF({ presence: v })} />
                             </div>
                           );
                         }
 
                         if (def.type === "numeric_range") {
-                          const pres   = f.presence || "any";
                           const ranges = f.ranges || new Set();
                           return (
-                            <div key={def.id} style={{ minWidth: 150 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>{def.title}</div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
-                                {["any", "has", "empty"].map(opt => (
-                                  <label key={opt} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.text, cursor: "pointer", userSelect: "none" }}>
-                                    <input type="radio" name={`pres_${def.id}`} checked={pres === opt} onChange={() => setF({ presence: opt })} />
-                                    {opt === "any" ? "Any" : opt === "has" ? "Has value" : "Empty"}
-                                  </label>
-                                ))}
-                              </div>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>Range</div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <div key={def.id} style={{ ...cardStyle, minWidth: 160 }}>
+                              <div style={titleStyle}>{def.title}</div>
+                              <PresencePills value={f.presence || "any"} onChange={v => setF({ presence: v })} />
+                              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, margin: "10px 0 6px", textTransform: "uppercase", letterSpacing: "0.07em" }}>Range</div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                                 {EMP_RANGES.map(r => {
                                   const on = ranges.has(r.label);
                                   return (
-                                    <label key={r.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.text, cursor: "pointer", userSelect: "none" }}>
-                                      <input type="checkbox" checked={on} onChange={() => {
-                                        const next = new Set(ranges);
-                                        on ? next.delete(r.label) : next.add(r.label);
-                                        setF({ ranges: next });
-                                      }} />
+                                    <button key={r.label} onClick={() => { const next = new Set(ranges); on ? next.delete(r.label) : next.add(r.label); setF({ ranges: next }); }}
+                                      style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer", border: `1px solid ${on ? colors.primary : colors.border}`,
+                                        background: on ? colors.primary : "transparent", color: on ? "#fff" : colors.textMuted, transition: "all .15s" }}>
                                       {r.label}
-                                    </label>
+                                    </button>
                                   );
                                 })}
                               </div>
@@ -3119,24 +3126,23 @@ Kurallar:
                           );
                         }
 
-                        // value_select
+                        // value_select — pill checkboxes
                         const vals = def.options || [];
                         const sel  = f.values || new Set();
                         return (
-                          <div key={def.id} style={{ minWidth: 140 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>{def.title}</div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <div key={def.id} style={{ ...cardStyle, minWidth: 140 }}>
+                            <div style={titleStyle}>{def.title}</div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                               {vals.map(val => {
-                                const checked = sel.has(val);
+                                const on = sel.has(val);
                                 return (
-                                  <label key={val} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.text, cursor: "pointer", userSelect: "none" }}>
-                                    <input type="checkbox" checked={checked} onChange={() => {
-                                      const next = new Set(sel);
-                                      checked ? next.delete(val) : next.add(val);
-                                      setF({ values: next });
-                                    }} />
-                                    <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={val}>{val}</span>
-                                  </label>
+                                  <button key={val} onClick={() => { const next = new Set(sel); on ? next.delete(val) : next.add(val); setF({ values: next }); }}
+                                    style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer", border: `1px solid ${on ? colors.primary : colors.border}`,
+                                      background: on ? colors.primary : "transparent", color: on ? "#fff" : colors.textMuted,
+                                      maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", transition: "all .15s" }}
+                                    title={val}>
+                                    {val}
+                                  </button>
                                 );
                               })}
                             </div>
