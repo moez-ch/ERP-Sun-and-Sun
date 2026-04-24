@@ -2632,7 +2632,7 @@ Kurallar:
             if (vals.size > 0) filterDefs.push({ id: industryCol.id, title: industryCol.title, type: "value_select", options: [...vals].sort() });
           }
           mondayColumns.filter(c =>
-            !["checkbox","button","name","email","phone"].includes(c.type) && !specialIds.has(c.id)
+            !["checkbox","button","name","email","phone","text"].includes(c.type) && !specialIds.has(c.id)
           ).forEach(col => {
             const vals = new Set();
             mondayItems.forEach(i => { const cv = i.column_values.find(v => v.id === col.id); const val = (cv?.text||"").trim(); if (val) vals.add(val); });
