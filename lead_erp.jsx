@@ -2604,8 +2604,9 @@ Kurallar:
           const phoneCol    = mondayColumns.find(c => c.type === "phone" || /\btelefon\b|phone|tel\b|gsm\b|cep\b/i.test(c.title));
           const empCol      = mondayColumns.find(c => /çalışan sayısı|çalışan|calisan|employee|personel|kadro|eleman|staff/iu.test(c.title));
           const industryCol = mondayColumns.find(c => /sektör|sektor|industry|endüstri|endustri/i.test(c.title));
-          const nameCol     = mondayColumns.find(c => /^\s*(i̇sim|isim|ad)\s*$/iu.test(c.title) || c.type === "name");
-          const surnameCol  = mondayColumns.find(c => /soyisim|soyad|surname|last.?name/iu.test(c.title));
+          const isTitle = (col, ...words) => words.some(w => col.title.trim().toUpperCase() === w.toUpperCase());
+          const nameCol    = mondayColumns.find(c => isTitle(c, "İSİM", "ISIM", "AD", "NAME", "İSM") || c.type === "name");
+          const surnameCol = mondayColumns.find(c => isTitle(c, "SOYİSİM", "SOYISIM", "SOYAD", "SURNAME") || /soyad|soyisim|surname/i.test(c.title));
 
           const EMP_RANGES = [
             { label: "1–10",    min: 1,   max: 10  },
@@ -2618,6 +2619,7 @@ Kurallar:
           // Build ordered filter definitions
           const specialIds = new Set([emailCol?.id, phoneCol?.id, empCol?.id, industryCol?.id, ortakMailCol?.id, genderCol?.id, nameCol?.id, surnameCol?.id].filter(Boolean));
           const filterDefs = [];
+          filterDefs.push({ id: "_name", title: "Name", type: "presence" });
           if (emailCol)    filterDefs.push({ id: emailCol.id,    title: emailCol.title,    type: "presence" });
           if (phoneCol)    filterDefs.push({ id: phoneCol.id,    title: phoneCol.title,    type: "presence" });
           if (genderCol)   filterDefs.push({ id: genderCol.id,   title: genderCol.title,   type: "presence" });
@@ -2656,7 +2658,7 @@ Kurallar:
               if (!f) continue;
               if (f.type === "presence") {
                 if (!f.presence || f.presence === "any") continue;
-                const val = (colMap[fid] || "").trim();
+                const val = fid === "_name" ? (i.name || "").trim() : (colMap[fid] || "").trim();
                 if (f.presence === "has"   && !val) return false;
                 if (f.presence === "empty" &&  val) return false;
               } else if (f.type === "numeric_range") {
