@@ -5,6 +5,10 @@ import jwt from "jsonwebtoken";
 import cors from "cors";
 import { fileURLToPath } from "url";
 import path from "path";
+import fs from "fs";
+import { execSync } from "child_process";
+import multer from "multer";
+import PizZip from "pizzip";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || "sns-erp-2025-secret-key";
@@ -79,6 +83,54 @@ db.exec(`
 `);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_email_sends_sent_at ON email_sends(sent_at DESC)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_email_sends_email   ON email_sends(recipient_email)`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS contract_templates (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    filename    TEXT NOT NULL,
+    file        BLOB NOT NULL,
+    variables   TEXT NOT NULL DEFAULT '[]',
+    created_at  TEXT DEFAULT (datetime('now'))
+  )
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS contracts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id INTEGER,
+    template_name TEXT,
+    data        TEXT NOT NULL,
+    created_by  INTEGER,
+    created_at  TEXT DEFAULT (datetime('now'))
+  )
+`);
+
+// ── SUN GROUP COMPANIES (DB-backed, editable from Settings) ──────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS contract_companies (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    short       TEXT NOT NULL DEFAULT '',
+    tax_office  TEXT NOT NULL DEFAULT '',
+    tax_no      TEXT NOT NULL DEFAULT '',
+    address     TEXT NOT NULL DEFAULT '',
+    iban        TEXT NOT NULL DEFAULT '',
+    sort_order  INTEGER NOT NULL DEFAULT 0
+  )
+`);
+// Seed known companies if table is empty
+const companyCount = db.prepare("SELECT COUNT(*) as c FROM contract_companies").get().c;
+if (companyCount === 0) {
+  const ins = db.prepare("INSERT INTO contract_companies (name,short,tax_office,tax_no,address,iban,sort_order) VALUES (?,?,?,?,?,?,?)");
+  ins.run("Sun Proje Tercüme Danışmanlık Eğt. İth. İhr. ve San. Tic. Ltd. Şti.","Sun Proje","Doğanbey Vergi Dairesi","782 053 6086","Ümit Mah. 2545. Sok. No:11 Çankaya ANKARA","TR10 0010 0068 1460 8882 1500 1",1);
+  ins.run("Analiz Kariyer Danışmanlık Eğt. Özel İstih. ve İns. Kay. Turz. Bil. Yaz. Tic. Ltd. Şti.","Analiz Kariyer","Doğanbey Vergi Dairesi","068 083 9717","Aşağı Öveçler Mah. 1324. Cad. 37/4 Çankaya ANKARA","TR18 0010 0068 1690 9836 9500 1",2);
+  ins.run("Sun ve Sun Danışmanlık Bilişim San. ve Tic. A.Ş.","Sun ve Sun A.Ş.","","","","",3);
+}
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const LIBREOFFICE = "C:\\Program Files\\LibreOffice\\program\\soffice.exe";
+const TMP_DIR = path.join(__dirname, "tmp_contracts");
+if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR);
 
 // Remove default seeded templates
 db.prepare(`DELETE FROM email_templates WHERE label IN ('İlgileniyoruz ✓','Sektör Dışı ✗','İlgilenmiyoruz ✗','Hibe Duyurusu 📢')`).run();
@@ -326,6 +378,7 @@ app.post("/email/send", authenticate, async (req, res) => {
   let totalSent = 0;
   let totalFailed = 0;
   const errors = [];
+  const sentEmails = [];
 
   // Group recipients by their individual body (for personalization); fall back to defaultBody
   const groups = new Map();
@@ -367,6 +420,7 @@ app.post("/email/send", authenticate, async (req, res) => {
         const chunkOk = sgRes.ok || sgRes.status === 202;
         if (chunkOk) {
           totalSent += chunk.length;
+          for (const r of chunk) sentEmails.push(r.email);
         } else {
           const errBody = await sgRes.json().catch(() => ({}));
           console.log(`  SendGrid error:`, JSON.stringify(errBody));
@@ -392,7 +446,7 @@ app.post("/email/send", authenticate, async (req, res) => {
   // Update campaign totals
   db.prepare("UPDATE email_campaigns SET sent=?, failed=? WHERE id=?").run(totalSent, totalFailed, campaignId);
 
-  res.json({ sent: totalSent, failed: totalFailed, errors, campaignId });
+  res.json({ sent: totalSent, failed: totalFailed, errors, campaignId, sentEmails });
 });
 
 // GET /email/sends — filterable individual send log
@@ -720,6 +774,198 @@ app.post("/monday/update-columns", authenticate, async (req, res) => {
   }
   res.json({ results });
 });
+
+// ══════════════════════════════════════════════════════════════════
+// CONTRACT ROUTES
+// ══════════════════════════════════════════════════════════════════
+
+// GET /contracts/companies
+app.get("/contracts/companies", authenticate, (req, res) => {
+  res.json(db.prepare("SELECT * FROM contract_companies ORDER BY sort_order, id").all());
+});
+
+// POST /contracts/companies
+app.post("/contracts/companies", authenticate, (req, res) => {
+  const { name, short, tax_office, tax_no, address, iban } = req.body || {};
+  if (!name?.trim()) return res.status(400).json({ error: "Name required" });
+  const maxOrder = db.prepare("SELECT MAX(sort_order) as m FROM contract_companies").get().m || 0;
+  const r = db.prepare("INSERT INTO contract_companies (name,short,tax_office,tax_no,address,iban,sort_order) VALUES (?,?,?,?,?,?,?)").run(name.trim(), short||"", tax_office||"", tax_no||"", address||"", iban||"", maxOrder+1);
+  res.json(db.prepare("SELECT * FROM contract_companies WHERE id=?").get(r.lastInsertRowid));
+});
+
+// PUT /contracts/companies/:id
+app.put("/contracts/companies/:id", authenticate, (req, res) => {
+  const { name, short, tax_office, tax_no, address, iban } = req.body || {};
+  if (!name?.trim()) return res.status(400).json({ error: "Name required" });
+  db.prepare("UPDATE contract_companies SET name=?,short=?,tax_office=?,tax_no=?,address=?,iban=? WHERE id=?").run(name.trim(), short||"", tax_office||"", tax_no||"", address||"", iban||"", req.params.id);
+  res.json(db.prepare("SELECT * FROM contract_companies WHERE id=?").get(req.params.id));
+});
+
+// DELETE /contracts/companies/:id
+app.delete("/contracts/companies/:id", authenticate, (req, res) => {
+  db.prepare("DELETE FROM contract_companies WHERE id=?").run(req.params.id);
+  res.json({ ok: true });
+});
+
+// GET /contracts/templates
+app.get("/contracts/templates", authenticate, (req, res) => {
+  const rows = db.prepare("SELECT id, name, filename, variables, created_at FROM contract_templates ORDER BY created_at DESC").all();
+  res.json(rows.map(r => ({ ...r, variables: JSON.parse(r.variables) })));
+});
+
+// POST /contracts/templates — upload .docx, detect @@var@@ tags
+app.post("/contracts/templates", authenticate, upload.single("file"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  if (!req.file.originalname.endsWith(".docx")) return res.status(400).json({ error: "Only .docx files are supported" });
+  const name = (req.body.name || req.file.originalname.replace(/\.docx$/i, "")).trim();
+  const buf = req.file.buffer;
+
+  // Extract @@variable@@ tags from docx XML
+  let variables = [];
+  try {
+    const zip = new PizZip(buf);
+    const xmlFiles = ["word/document.xml", "word/header1.xml", "word/footer1.xml"];
+    const fullXml = xmlFiles.map(f => {
+      try { return zip.file(f)?.asText() || ""; } catch { return ""; }
+    }).join("");
+    const stripped = fullXml.replace(/<[^>]+>/g, " ");
+    const matches = [...stripped.matchAll(/@@([a-zA-Z0-9_]+)@@/g)];
+    variables = [...new Set(matches.map(m => m[1]))];
+  } catch (e) {
+    return res.status(400).json({ error: "Could not parse .docx: " + e.message });
+  }
+
+  db.prepare("INSERT INTO contract_templates (name, filename, file, variables) VALUES (?, ?, ?, ?)")
+    .run(name, req.file.originalname, buf, JSON.stringify(variables));
+  res.json({ ok: true, variables });
+});
+
+// DELETE /contracts/templates/:id
+app.delete("/contracts/templates/:id", authenticate, (req, res) => {
+  db.prepare("DELETE FROM contract_templates WHERE id=?").run(req.params.id);
+  res.json({ ok: true });
+});
+
+// POST /contracts/generate — fill template and return PDF
+app.post("/contracts/generate", authenticate, async (req, res) => {
+  const { templateId, data } = req.body || {};
+  const row = db.prepare("SELECT * FROM contract_templates WHERE id=?").get(templateId);
+  if (!row) return res.status(404).json({ error: "Template not found" });
+
+  try {
+    const zip = new PizZip(row.file);
+    const xmlFiles = Object.keys(zip.files).filter(f => f.startsWith("word/") && f.endsWith(".xml") && !f.includes("theme") && !f.includes("settings"));
+
+    // Build payment schedule table XML if needed
+    const scheduleRows = (data.payment_schedule || []);
+    const scheduleTableXml = scheduleRows.length > 0 ? buildScheduleTable(scheduleRows) : "";
+
+    for (const fname of xmlFiles) {
+      const xmlFile = zip.file(fname);
+      if (!xmlFile) continue;
+      let xml = xmlFile.asText();
+
+      // Merge split text runs so @@var@@ isn't fragmented across <w:t> elements
+      xml = mergeRuns(xml);
+
+      // Replace each @@var@@ with its value
+      for (const [key, val] of Object.entries(data)) {
+        if (key === "payment_schedule") continue;
+        const escaped = String(val ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+        xml = xml.split(`@@${key}@@`).join(escaped);
+      }
+
+      // Replace @@payment_schedule@@ with table XML
+      if (scheduleTableXml) {
+        xml = xml.split("@@payment_schedule@@").join(scheduleTableXml);
+      } else {
+        xml = xml.split("@@payment_schedule@@").join("");
+      }
+
+      zip.file(fname, xml);
+    }
+
+    const docxBuf = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+
+    // Write temp docx
+    const tmpId = Date.now() + "_" + Math.random().toString(36).slice(2);
+    const docxPath = path.join(TMP_DIR, tmpId + ".docx");
+    const pdfPath  = path.join(TMP_DIR, tmpId + ".pdf");
+    fs.writeFileSync(docxPath, docxBuf);
+
+    // Convert to PDF with LibreOffice headless
+    execSync(`"${LIBREOFFICE}" --headless --convert-to pdf --outdir "${TMP_DIR}" "${docxPath}"`, { timeout: 30000 });
+
+    if (!fs.existsSync(pdfPath)) throw new Error("PDF conversion failed");
+
+    const pdfBuf = fs.readFileSync(pdfPath);
+    fs.unlinkSync(docxPath);
+    fs.unlinkSync(pdfPath);
+
+    // Save contract record
+    db.prepare("INSERT INTO contracts (template_id, template_name, data, created_by) VALUES (?,?,?,?)")
+      .run(templateId, row.name, JSON.stringify(data), req.user.id);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.pdf"`);
+    res.send(pdfBuf);
+  } catch (e) {
+    console.error("[contracts/generate]", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /contracts/ocr — extract text from tax certificate image via local EasyOCR
+app.post("/contracts/ocr", authenticate, upload.single("image"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No image provided" });
+  try {
+    const form = new FormData();
+    const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+    form.append("file", blob, req.file.originalname || "image.jpg");
+    const mlRes = await fetch("http://localhost:8000/ocr", { method: "POST", body: form });
+    if (!mlRes.ok) {
+      const err = await mlRes.json().catch(() => ({}));
+      return res.status(500).json({ error: err.detail || "OCR service error" });
+    }
+    res.json(await mlRes.json());
+  } catch (e) {
+    res.status(500).json({ error: "OCR service unavailable. Make sure the ML service is running." });
+  }
+});
+
+// GET /contracts/history
+app.get("/contracts/history", authenticate, (req, res) => {
+  const rows = db.prepare("SELECT id, template_name, data, created_at FROM contracts ORDER BY created_at DESC LIMIT 50").all();
+  res.json(rows.map(r => ({ ...r, data: JSON.parse(r.data) })));
+});
+
+// ── Helpers ───────────────────────────────────────────────────────
+
+function mergeRuns(xml) {
+  // Merge adjacent <w:r> runs within the same <w:p> so @@var@@ isn't split
+  return xml.replace(/(<\/w:t>)(<\/w:r>)(<w:r(?:\s[^>]*)?>(?:<w:rPr>[^]*?<\/w:rPr>)?<w:t(?:\s[^>]*)?>)/g, (_, close_t, close_r, open_next) => {
+    return close_t.replace("</w:t>", "") + close_r + open_next;
+  }).replace(/<\/w:t><w:t[^>]*>/g, "");
+}
+
+function buildScheduleTable(rows) {
+  const headerRow = `
+    <w:tr>
+      <w:tc><w:tcPr><w:tcW w:w="4320" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>ÖDEME TARİHİ</w:t></w:r></w:p></w:tc>
+      <w:tc><w:tcPr><w:tcW w:w="4320" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>ÖDENECEK MEBLAĞ</w:t></w:r></w:p></w:tc>
+    </w:tr>`;
+  const dataRows = rows.map(r => `
+    <w:tr>
+      <w:tc><w:tcPr><w:tcW w:w="4320" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${escapeXml(r.date)}</w:t></w:r></w:p></w:tc>
+      <w:tc><w:tcPr><w:tcW w:w="4320" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${escapeXml(r.amount)}</w:t></w:r></w:p></w:tc>
+    </w:tr>`).join("");
+  return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="8640" w:type="dxa"/></w:tblPr><w:tblGrid><w:gridCol w:w="4320"/><w:gridCol w:w="4320"/></w:tblGrid>${headerRow}${dataRows}</w:tbl>`;
+}
+
+function escapeXml(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
 
 app.listen(PORT, () => {
   console.log(`🔐 Sun & Sun ERP Auth Server → http://localhost:${PORT}`);

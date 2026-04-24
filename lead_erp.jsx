@@ -272,6 +272,7 @@ const ChevronDown = (p) => <Icon d="M6 9l6 6 6-6" {...p} />;
 const BotIcon = (p) => <Icon d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 110 2h-1v1a7 7 0 01-7 7H10a7 7 0 01-7-7v-1H2a1 1 0 110-2h1a7 7 0 017-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 012-2zM9.5 14a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm5 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" {...p} />;
 const InboxIcon = (p) => <Icon d="M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" {...p} />;
 const GridIcon = (p) => <Icon d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" {...p} />;
+const FileTextIcon = (p) => <Icon d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" {...p} />;
 const BarChartIcon = (p) => <Icon d="M12 20V10M18 20V4M6 20v-4" {...p} />;
 const SettingsIcon = (p) => <Icon d="M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.2.65.77 1.1 1.51 1H21a2 2 0 010 4h-.09c-.74.1-1.31.55-1.51 1.01z" {...p} />;
 const RefreshIcon = (p) => <Icon d="M23 4v6h-6M1 20v-6h6M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" {...p} />;
@@ -529,6 +530,23 @@ Kurallar:
   const [mondayFilters, setMondayFilters] = useState({});
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
+  // ── Contracts state ───────────────────────────────────────────
+  const [contractTemplates, setContractTemplates] = useState([]);
+  const [contractCompanies, setContractCompanies] = useState([]);
+  const [contractView, setContractView] = useState("form"); // "form" | "templates"
+  const [contractTemplate, setContractTemplate] = useState(null);
+  const [contractData, setContractData] = useState({
+    party1_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
+    party2_address: "", party3_name: "", program_name: "", down_payment: "",
+    success_bonus: "", contract_date: new Date().toLocaleDateString("tr-TR"),
+    payment_schedule: [],
+  });
+  const [contractGenerating, setContractGenerating] = useState(false);
+  const [contractOcrLoading, setContractOcrLoading] = useState(false);
+  const [contractUploadName, setContractUploadName] = useState("");
+  const [contractUploadFile, setContractUploadFile] = useState(null);
+  const [contractUploading, setContractUploading] = useState(false);
+
   const fetchMondayCampaigns = async () => {
     try {
       const token = localStorage.getItem("sns_token");
@@ -675,6 +693,13 @@ Kurallar:
   useEffect(() => {
     if (view === "settings" && authUser?.role === "admin") umFetch();
     if (view === "monday") fetchMondayCampaigns();
+    if (view === "contracts") {
+      const token = localStorage.getItem("sns_token");
+      fetch("/contracts/templates", { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(setContractTemplates).catch(() => {});
+      fetch("/contracts/companies", { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(setContractCompanies).catch(() => {});
+    }
   }, [view, authUser, umFetch]);
 
   const umAddUser = async () => {
@@ -1322,6 +1347,7 @@ Kurallar:
     { id: "calls", label: t("nav_coldCalls"), icon: <PhoneCallIcon size={18} />, badge: stats.totalCalls || null },
     { id: "email", label: t("nav_email"), icon: <MailIcon size={18} /> },
     { id: "monday", label: t("nav_monday"), icon: <GridIcon size={18} /> },
+    { id: "contracts", label: t("nav_contracts"), icon: <FileTextIcon size={18} /> },
     ...(isAdmin ? [
       { id: "inbox", label: t("nav_inbox"), icon: <InboxIcon size={18} /> },
       { id: "agent", label: t("nav_agent"), icon: <BotIcon size={18} /> },
@@ -2574,23 +2600,48 @@ Kurallar:
           const isEmailOk = (email) => email && isValidEmail(email) && mondayEmailVerification[email] !== false && !mondayBounces.has(email.toLowerCase());
           const hasValidName = (item) => item.name && item.name.trim() && item.name.toLowerCase() !== "item";
 
-          // Filterable columns: not email, not name/checkbox/button, max 50 unique values
-          const filterableCols = mondayColumns.filter(c =>
-            !["checkbox","button","name"].includes(c.type) &&
-            c.id !== emailCol?.id &&
-            c.id !== ortakMailCol?.id
-          );
-          const filterOptions = {};
-          filterableCols.forEach(col => {
+          // Special column detection
+          const phoneCol    = mondayColumns.find(c => c.type === "phone" || /\btelefon\b|phone|tel\b|gsm\b|cep\b/i.test(c.title));
+          const empCol      = mondayColumns.find(c => /çalışan sayısı|çalışan|calisan|employee|personel|kadro|eleman|staff/iu.test(c.title));
+          const industryCol = mondayColumns.find(c => /sektör|sektor|industry|endüstri|endustri/i.test(c.title));
+
+          const EMP_RANGES = [
+            { label: "1–10",    min: 1,   max: 10  },
+            { label: "11–50",   min: 11,  max: 50  },
+            { label: "51–200",  min: 51,  max: 200 },
+            { label: "201–500", min: 201, max: 500 },
+            { label: "500+",    min: 501, max: Infinity },
+          ];
+
+          // Build ordered filter definitions
+          const specialIds = new Set([emailCol?.id, phoneCol?.id, empCol?.id, industryCol?.id, ortakMailCol?.id, genderCol?.id].filter(Boolean));
+          const filterDefs = [];
+          if (emailCol)    filterDefs.push({ id: emailCol.id,    title: emailCol.title,    type: "presence" });
+          if (phoneCol)    filterDefs.push({ id: phoneCol.id,    title: phoneCol.title,    type: "presence" });
+          if (genderCol)   filterDefs.push({ id: genderCol.id,   title: genderCol.title,   type: "presence" });
+          if (empCol) {
+            filterDefs.push({ id: empCol.id, title: empCol.title, type: "numeric_range" });
+          }
+          if (industryCol) {
             const vals = new Set();
-            mondayItems.forEach(i => {
-              const cv = i.column_values.find(v => v.id === col.id);
-              const val = (cv?.text || "").trim();
-              if (val) vals.add(val);
-            });
-            if (vals.size > 0 && vals.size <= 50) filterOptions[col.id] = [...vals].sort();
+            mondayItems.forEach(i => { const cv = i.column_values.find(v => v.id === industryCol.id); const val = (cv?.text||"").trim(); if (val) vals.add(val); });
+            if (vals.size > 0) filterDefs.push({ id: industryCol.id, title: industryCol.title, type: "value_select", options: [...vals].sort() });
+          }
+          mondayColumns.filter(c =>
+            !["checkbox","button","name","email","phone"].includes(c.type) && !specialIds.has(c.id)
+          ).forEach(col => {
+            const vals = new Set();
+            mondayItems.forEach(i => { const cv = i.column_values.find(v => v.id === col.id); const val = (cv?.text||"").trim(); if (val) vals.add(val); });
+            if (vals.size > 0 && vals.size <= 50) filterDefs.push({ id: col.id, title: col.title, type: "value_select", options: [...vals].sort() });
           });
-          const hasActiveFilters = Object.values(mondayFilters).some(s => s && s.size > 0);
+
+          const hasActiveFilters = Object.entries(mondayFilters).some(([, f]) => {
+            if (!f) return false;
+            if (f.type === "presence")      return f.presence && f.presence !== "any";
+            if (f.type === "numeric_range") return (f.presence && f.presence !== "any") || (f.ranges && f.ranges.size > 0);
+            if (f.type === "value_select")  return f.values && f.values.size > 0;
+            return false;
+          });
 
           const visibleItems = mondayItems.filter(i => {
             const colMap = {};
@@ -2599,10 +2650,31 @@ Kurallar:
               const email = emailCol ? (colMap[emailCol.id] || "") : "";
               if (!isEmailOk(email)) return false;
             }
-            for (const [colId, sel] of Object.entries(mondayFilters)) {
-              if (!sel || sel.size === 0) continue;
-              const val = (colMap[colId] || "").trim();
-              if (!sel.has(val)) return false;
+            for (const [fid, f] of Object.entries(mondayFilters)) {
+              if (!f) continue;
+              if (f.type === "presence") {
+                if (!f.presence || f.presence === "any") continue;
+                const val = (colMap[fid] || "").trim();
+                if (f.presence === "has"   && !val) return false;
+                if (f.presence === "empty" &&  val) return false;
+              } else if (f.type === "numeric_range") {
+                const val = (colMap[fid] || "").trim();
+                if (f.presence && f.presence !== "any") {
+                  if (f.presence === "has"   && !val) return false;
+                  if (f.presence === "empty" &&  val) return false;
+                }
+                if (f.ranges && f.ranges.size > 0 && val) {
+                  const num = parseFloat(val.replace(/[^\d.]/g, ""));
+                  if (!isNaN(num)) {
+                    const inRange = [...f.ranges].some(label => { const r = EMP_RANGES.find(x => x.label === label); return r && num >= r.min && num <= r.max; });
+                    if (!inRange) return false;
+                  }
+                }
+              } else if (f.type === "value_select") {
+                if (!f.values || f.values.size === 0) continue;
+                const val = (colMap[fid] || "").trim();
+                if (!f.values.has(val)) return false;
+              }
             }
             return true;
           });
@@ -2975,7 +3047,7 @@ Kurallar:
                           {t("monday_clearFiltersBtn")}
                         </button>
                       )}
-                      {Object.keys(filterOptions).length > 0 && (
+                      {filterDefs.length > 0 && (
                         <button
                           onClick={() => setShowFilterPanel(p => !p)}
                           style={{ padding: "4px 12px", background: showFilterPanel ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: showFilterPanel ? "#fff" : colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}
@@ -2986,30 +3058,79 @@ Kurallar:
                     </div>
                   </div>
 
-                  {showFilterPanel && Object.keys(filterOptions).length > 0 && (
+                  {showFilterPanel && filterDefs.length > 0 && (
                     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 14, marginBottom: 10, display: "flex", gap: 20, flexWrap: "wrap" }}>
-                      {Object.entries(filterOptions).map(([colId, vals]) => {
-                        const col = mondayColumns.find(c => c.id === colId);
-                        const sel = mondayFilters[colId] || new Set();
+                      {filterDefs.map(def => {
+                        const f = mondayFilters[def.id] || {};
+                        const setF = (patch) => setMondayFilters(prev => ({ ...prev, [def.id]: { ...f, ...patch, type: def.type } }));
+
+                        if (def.type === "presence") {
+                          const pres = f.presence || "any";
+                          return (
+                            <div key={def.id} style={{ minWidth: 130 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>{def.title}</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                {["any", "has", "empty"].map(opt => (
+                                  <label key={opt} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.text, cursor: "pointer", userSelect: "none" }}>
+                                    <input type="radio" name={`pres_${def.id}`} checked={pres === opt} onChange={() => setF({ presence: opt })} />
+                                    {opt === "any" ? "Any" : opt === "has" ? "Has value" : "Empty"}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        if (def.type === "numeric_range") {
+                          const pres   = f.presence || "any";
+                          const ranges = f.ranges || new Set();
+                          return (
+                            <div key={def.id} style={{ minWidth: 150 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>{def.title}</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+                                {["any", "has", "empty"].map(opt => (
+                                  <label key={opt} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.text, cursor: "pointer", userSelect: "none" }}>
+                                    <input type="radio" name={`pres_${def.id}`} checked={pres === opt} onChange={() => setF({ presence: opt })} />
+                                    {opt === "any" ? "Any" : opt === "has" ? "Has value" : "Empty"}
+                                  </label>
+                                ))}
+                              </div>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>Range</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                {EMP_RANGES.map(r => {
+                                  const on = ranges.has(r.label);
+                                  return (
+                                    <label key={r.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.text, cursor: "pointer", userSelect: "none" }}>
+                                      <input type="checkbox" checked={on} onChange={() => {
+                                        const next = new Set(ranges);
+                                        on ? next.delete(r.label) : next.add(r.label);
+                                        setF({ ranges: next });
+                                      }} />
+                                      {r.label}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // value_select
+                        const vals = def.options || [];
+                        const sel  = f.values || new Set();
                         return (
-                          <div key={colId} style={{ minWidth: 140 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>{col?.title}</div>
+                          <div key={def.id} style={{ minWidth: 140 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>{def.title}</div>
                             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                               {vals.map(val => {
                                 const checked = sel.has(val);
                                 return (
                                   <label key={val} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.text, cursor: "pointer", userSelect: "none" }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={() => {
-                                        setMondayFilters(prev => {
-                                          const current = new Set(prev[colId] || []);
-                                          checked ? current.delete(val) : current.add(val);
-                                          return { ...prev, [colId]: current };
-                                        });
-                                      }}
-                                    />
+                                    <input type="checkbox" checked={checked} onChange={() => {
+                                      const next = new Set(sel);
+                                      checked ? next.delete(val) : next.add(val);
+                                      setF({ values: next });
+                                    }} />
                                     <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={val}>{val}</span>
                                   </label>
                                 );
@@ -3167,9 +3288,17 @@ Kurallar:
                               body: JSON.stringify({ subject: mondayBulkDraft.subject, recipients: selectedWithEmail.length, sent: d.sent ?? 0, failed: d.failed ?? 0, source: "monday" }),
                             });
                             fetchMondayCampaigns();
-                            // Post activity note to each Monday item with personalized body
+                            // Only update Monday for items whose email was actually sent
+                            const sentEmailSet = new Set((d.sentEmails || []).map(e => e.toLowerCase()));
+                            const actuallySent = selectedWithEmail.filter(item => {
+                              const colMap = {};
+                              item.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
+                              const email = (emailCol ? colMap[emailCol.id] : "") || "";
+                              return sentEmailSet.has(email.toLowerCase());
+                            });
+                            // Post activity note to each Monday item that received the email
                             const now = new Date().toLocaleString("tr-TR");
-                            const updates = selectedWithEmail.map(item => {
+                            const updates = actuallySent.map(item => {
                               const colMap = {};
                               item.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
                               const salutation = buildSalutation(item.name, colMap);
@@ -3179,13 +3308,15 @@ Kurallar:
                                 body: `📧 E-posta gönderildi — ${now}\nGönderen: ${authUser.email}\nKonu: ${mondayBulkDraft.subject}\n\n${plainBody}`,
                               };
                             });
-                            fetch("/monday/add-updates", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                              body: JSON.stringify({ apiKey: settings.mondayApiKey, updates }),
-                            });
+                            if (updates.length > 0) {
+                              fetch("/monday/add-updates", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ apiKey: settings.mondayApiKey, updates }),
+                              });
+                            }
 
-                            // Update mail Konuları and ortak mail tag columns
+                            // Update mail Konuları and ortak mail tag columns — only for sent items
                             const tagColsToUpdate = [
                               { col: mailKonulariCol, tagId: mondayMailKonulari ? parseInt(mondayMailKonulari) : null },
                               { col: ortakMailCol,    tagId: mondayOrtakMail    ? parseInt(mondayOrtakMail)    : null },
@@ -3193,7 +3324,7 @@ Kurallar:
 
                             if (tagColsToUpdate.length > 0) {
                               const colUpdates = [];
-                              for (const item of selectedWithEmail) {
+                              for (const item of actuallySent) {
                                 const colValueMap = {};
                                 item.column_values.forEach(cv => { colValueMap[cv.id] = cv.value; });
                                 for (const { col, tagId } of tagColsToUpdate) {
@@ -3353,6 +3484,287 @@ Kurallar:
           );
         })()}
 
+        {/* ══ CONTRACTS VIEW ══ */}
+        {view === "contracts" && (() => {
+          const selectedCompany = contractCompanies.find(c => String(c.id) === String(contractData.party1_id));
+          const dataWithCompany = selectedCompany ? {
+            ...contractData,
+            party1_name: selectedCompany.name,
+            party1_tax_office: selectedCompany.tax_office,
+            party1_tax_no: selectedCompany.tax_no,
+            party1_address: selectedCompany.address,
+            iban: selectedCompany.iban,
+          } : contractData;
+
+          const handleOcr = async (file) => {
+            setContractOcrLoading(true);
+            try {
+              const token = localStorage.getItem("sns_token");
+              const fd = new FormData();
+              fd.append("image", file);
+              const r = await fetch("/contracts/ocr", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+              const d = await r.json();
+              if (d.ok && d.fields) {
+                setContractData(prev => ({ ...prev, ...d.fields }));
+                alert(t("contract_ocrDone"));
+              } else { alert(t("contract_ocrError")(d.error || "Unknown")); }
+            } catch (e) { alert(t("contract_ocrError")(e.message)); }
+            finally { setContractOcrLoading(false); }
+          };
+
+          const handleGenerate = async () => {
+            if (!contractTemplate) { alert("Lütfen bir sözleşme şablonu seçin."); return; }
+            if (!contractData.party1_id) { alert("Lütfen 1. Taraf şirketini seçin."); return; }
+            setContractGenerating(true);
+            try {
+              const token = localStorage.getItem("sns_token");
+              const r = await fetch("/contracts/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ templateId: contractTemplate.id, data: dataWithCompany }),
+              });
+              if (!r.ok) { const e = await r.json(); alert("Hata: " + e.error); return; }
+              const blob = await r.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url; a.download = `sozlesme_${contractTemplate.name}_${new Date().toLocaleDateString("tr-TR").replace(/\./g,"-")}.pdf`;
+              a.click(); URL.revokeObjectURL(url);
+            } catch (e) { alert("Hata: " + e.message); }
+            finally { setContractGenerating(false); }
+          };
+
+          const handleUpload = async () => {
+            if (!contractUploadFile) { alert("Dosya seçin."); return; }
+            setContractUploading(true);
+            try {
+              const token = localStorage.getItem("sns_token");
+              const fd = new FormData();
+              fd.append("file", contractUploadFile);
+              fd.append("name", contractUploadName || contractUploadFile.name.replace(/\.docx$/i,""));
+              const r = await fetch("/contracts/templates", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+              const d = await r.json();
+              if (!r.ok) { alert("Hata: " + d.error); return; }
+              alert(t("contract_uploadedMsg")(d.variables.join(", ")));
+              setContractUploadFile(null); setContractUploadName("");
+              const r2 = await fetch("/contracts/templates", { headers: { Authorization: `Bearer ${token}` } });
+              setContractTemplates(await r2.json());
+            } catch(e) { alert("Hata: " + e.message); }
+            finally { setContractUploading(false); }
+          };
+
+          const deleteTemplate = async (id) => {
+            if (!confirm(t("contract_deleteConfirm"))) return;
+            const token = localStorage.getItem("sns_token");
+            await fetch(`/contracts/templates/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+            setContractTemplates(prev => prev.filter(t => t.id !== id));
+            if (contractTemplate?.id === id) setContractTemplate(null);
+          };
+
+          const field = (label, key, opts = {}) => (
+            <div key={key} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{label}</div>
+              {opts.textarea ? (
+                <textarea value={contractData[key] || ""} onChange={e => setContractData(p => ({ ...p, [key]: e.target.value }))}
+                  rows={2} placeholder={opts.placeholder || ""}
+                  style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+              ) : (
+                <input value={contractData[key] || ""} onChange={e => setContractData(p => ({ ...p, [key]: e.target.value }))}
+                  placeholder={opts.placeholder || ""}
+                  style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              )}
+            </div>
+          );
+
+          return (
+            <div style={{ animation: "slideIn .3s ease", maxWidth: 780 }}>
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t("contract_title")}</h2>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setContractView(contractView === "form" ? "templates" : "form")}
+                    style={{ padding: "7px 14px", background: contractView === "templates" ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 7, color: contractView === "templates" ? "#fff" : colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    {contractView === "form" ? t("contract_manageTemplates") : t("contract_backToForm")}
+                  </button>
+                </div>
+              </div>
+
+              {contractView === "templates" ? (
+                <div>
+                  {/* Upload new template */}
+                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 18, marginBottom: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{t("contract_uploadTitle")}</div>
+                    <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 12 }}>
+                      {t("contract_uploadHint")(<code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>@@variable_name@@</code>)}<br/>
+                      e.g. <code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>@@party2_name@@</code>, <code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>@@program_name@@</code>, <code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>@@iban@@</code>
+                    </div>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+                      <div style={{ flex: 1, minWidth: 180 }}>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{t("contract_templateName")}</div>
+                        <input value={contractUploadName} onChange={e => setContractUploadName(e.target.value)}
+                          placeholder="Örn: Yıllık Danışmanlık"
+                          style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 180 }}>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{t("contract_fileDocx")}</div>
+                        <input type="file" accept=".docx" onChange={e => setContractUploadFile(e.target.files[0])}
+                          style={{ width: "100%", padding: "6px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                      </div>
+                      <button onClick={handleUpload} disabled={contractUploading || !contractUploadFile}
+                        style={{ padding: "8px 18px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: contractUploading ? 0.6 : 1, whiteSpace: "nowrap" }}>
+                        {contractUploading ? t("contract_uploading") : t("contract_upload")}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Template list */}
+                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
+                    <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>{t("contract_loadedTemplates")(contractTemplates.length)}</div>
+                    {contractTemplates.length === 0 ? (
+                      <div style={{ padding: 30, textAlign: "center", color: colors.textMuted, fontSize: 13 }}>{t("contract_noTemplates")}</div>
+                    ) : contractTemplates.map(t => (
+                      <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: `1px solid ${colors.border}` }}>
+                        <FileTextIcon size={16} color={colors.primary} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                          <div style={{ fontSize: 11, color: colors.textMuted }}>
+                            {t("contract_variables")}: {t.variables.length > 0 ? t.variables.map(v => `@@${v}@@`).join(", ") : "—"} · {new Date(t.created_at).toLocaleDateString("tr-TR")}
+                          </div>
+                        </div>
+                        <button onClick={() => { setContractTemplate(t); setContractView("form"); }}
+                          style={{ padding: "5px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          {t("contract_select")}
+                        </button>
+                        <button onClick={() => deleteTemplate(t.id)}
+                          style={{ padding: "5px 10px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 6, color: "#e57373", fontSize: 12, cursor: "pointer" }}>
+                          {t("contract_delete")}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                  {/* Left column */}
+                  <div>
+                    {/* Template selector */}
+                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionTemplate")}</div>
+                      <select value={contractTemplate?.id || ""} onChange={e => setContractTemplate(contractTemplates.find(t => String(t.id) === e.target.value) || null)}
+                        style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" }}>
+                        <option value="">{ t("contract_selectTemplate")}</option>
+                        {contractTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                      {contractTemplate && (
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 6 }}>
+                          Değişkenler: {contractTemplate.variables.map(v => `@@${v}@@`).join(", ") || "yok"}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Party 1 */}
+                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionParty1")}</div>
+                      <select value={contractData.party1_id} onChange={e => setContractData(p => ({ ...p, party1_id: e.target.value }))}
+                        style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" }}>
+                        <option value="">{t("contract_selectCompany")}</option>
+                        {contractCompanies.map(c => <option key={c.id} value={c.id}>{c.short}</option>)}
+                      </select>
+                      {selectedCompany && (
+                        <div style={{ marginTop: 10, padding: 10, background: colors.bg, borderRadius: 6, fontSize: 12, color: colors.textMuted, lineHeight: 1.8 }}>
+                          <div>{selectedCompany.name}</div>
+                          <div>{selectedCompany.tax_office} / {selectedCompany.tax_no}</div>
+                          <div>{selectedCompany.address}</div>
+                          <div style={{ color: colors.primary, fontWeight: 600 }}>IBAN: {selectedCompany.iban}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Contract details */}
+                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionDetails")}</div>
+                      {field(t("contract_programName"), "program_name", { placeholder: "e.g. SoGreen" })}
+                      {field(t("contract_downPayment"), "down_payment", { placeholder: "e.g. 50.000" })}
+                      {field(t("contract_successBonus"), "success_bonus", { placeholder: "e.g. 5" })}
+                      {field(t("contract_contractDate"), "contract_date", { placeholder: t("contract_datePlaceholder") })}
+                    </div>
+                  </div>
+
+                  {/* Right column */}
+                  <div>
+                    {/* Party 2 */}
+                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionParty2")}</div>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6 }}>
+                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleOcr(e.target.files[0]); }} />
+                          <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{contractOcrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
+                        </label>
+                      </div>
+                      {field(t("contract_party2Name"), "party2_name", { placeholder: t("contract_party2NamePh") })}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        <div>
+                          <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_taxOffice")}</div>
+                          <input value={contractData.party2_tax_office || ""} onChange={e => setContractData(p => ({ ...p, party2_tax_office: e.target.value }))}
+                            placeholder="Örn: Çankaya"
+                            style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_taxNo")}</div>
+                          <input value={contractData.party2_tax_no || ""} onChange={e => setContractData(p => ({ ...p, party2_tax_no: e.target.value }))}
+                            placeholder="10 digits"
+                            style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 10 }}>
+                        {field(t("contract_address"), "party2_address", { placeholder: "...", textarea: true })}
+                      </div>
+                    </div>
+
+                    {/* Party 3 (optional) */}
+                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionParty3")}</div>
+                      {field(t("contract_party3Name"), "party3_name", { placeholder: "..." })}
+                    </div>
+
+                    {/* Payment schedule */}
+                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionSchedule")}</div>
+                        <button onClick={() => setContractData(p => ({ ...p, payment_schedule: [...p.payment_schedule, { date: "", amount: "" }] }))}
+                          style={{ padding: "4px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          {t("contract_addRow")}
+                        </button>
+                      </div>
+                      {contractData.payment_schedule.length === 0 ? (
+                        <div style={{ fontSize: 12, color: colors.textMuted, textAlign: "center", padding: "10px 0" }}>{t("contract_scheduleEmpty")}</div>
+                      ) : contractData.payment_schedule.map((row, i) => (
+                        <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                          <input value={row.date} onChange={e => setContractData(p => { const s = [...p.payment_schedule]; s[i] = { ...s[i], date: e.target.value }; return { ...p, payment_schedule: s }; })}
+                            placeholder={t("contract_datePh")}
+                            style={{ flex: 1, padding: "7px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none" }} />
+                          <input value={row.amount} onChange={e => setContractData(p => { const s = [...p.payment_schedule]; s[i] = { ...s[i], amount: e.target.value }; return { ...p, payment_schedule: s }; })}
+                            placeholder={t("contract_amountPh")}
+                            style={{ flex: 1, padding: "7px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none" }} />
+                          <button onClick={() => setContractData(p => ({ ...p, payment_schedule: p.payment_schedule.filter((_, j) => j !== i) }))}
+                            style={{ padding: "5px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 12, cursor: "pointer" }}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Generate button — full width */}
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <button onClick={handleGenerate} disabled={contractGenerating || !contractTemplate || !contractData.party1_id}
+                      style={{ width: "100%", padding: "13px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: (contractGenerating || !contractTemplate || !contractData.party1_id) ? 0.6 : 1 }}>
+                      {contractGenerating ? t("contract_generating") : t("contract_generate")()}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {view === "settings" && !isAdmin && (
           <div style={{ animation: "slideIn .3s ease", maxWidth: 600 }}>
             <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("settings_title")}</h1>
@@ -3447,6 +3859,139 @@ Kurallar:
                 </div>
               ))}
             </div>
+
+            {/* Sun Group Companies */}
+            {(() => {
+              const [companies, setCompanies] = React.useState([]);
+              const [editingId, setEditingId] = React.useState(null);
+              const [editDraft, setEditDraft] = React.useState({});
+              const [addDraft, setAddDraft] = React.useState({ name:"", short:"", tax_office:"", tax_no:"", address:"", iban:"" });
+              const [showAdd, setShowAdd] = React.useState(false);
+              const [ocrLoading, setOcrLoading] = React.useState(false);
+              React.useEffect(() => {
+                const token = localStorage.getItem("sns_token");
+                fetch("/contracts/companies", { headers: { Authorization: `Bearer ${token}` } })
+                  .then(r => r.json()).then(setCompanies).catch(() => {});
+              }, []);
+              const token = localStorage.getItem("sns_token");
+
+              const runOcr = async (file, setDraft) => {
+                setOcrLoading(true);
+                try {
+                  const fd = new FormData();
+                  fd.append("image", file);
+                  const r = await fetch("/contracts/ocr", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+                  const d = await r.json();
+                  if (d.ok && d.fields) {
+                    setDraft(prev => ({
+                      ...prev,
+                      name: d.fields.party2_name || prev.name,
+                      tax_office: d.fields.party2_tax_office || prev.tax_office,
+                      tax_no: d.fields.party2_tax_no || prev.tax_no,
+                      address: d.fields.party2_address || prev.address,
+                    }));
+                    alert("OCR tamamlandı. Lütfen bilgileri kontrol edin.");
+                  } else { alert("OCR hatası: " + (d.error || "Bilinmeyen hata")); }
+                } catch { alert("ML servisi çalışmıyor olabilir."); }
+                finally { setOcrLoading(false); }
+              };
+
+              const saveEdit = async (id) => {
+                const r = await fetch(`/contracts/companies/${id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(editDraft) });
+                const d = await r.json();
+                setCompanies(prev => prev.map(c => c.id === id ? d : c));
+                setEditingId(null);
+              };
+              const addCompany = async () => {
+                if (!addDraft.name.trim()) return;
+                const r = await fetch("/contracts/companies", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(addDraft) });
+                const d = await r.json();
+                setCompanies(prev => [...prev, d]);
+                setAddDraft({ name:"", short:"", tax_office:"", tax_no:"", address:"", iban:"" });
+                setShowAdd(false);
+              };
+              const deleteCompany = async (id) => {
+                if (!confirm(t("settings_companyDeleteConfirm"))) return;
+                await fetch(`/contracts/companies/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                setCompanies(prev => prev.filter(c => c.id !== id));
+              };
+              const companyFields = [
+                { key: "name",       label: t("settings_companyFullName"), full: true },
+                { key: "short",      label: t("settings_companyShort") },
+                { key: "tax_office", label: t("settings_companyTaxOffice") },
+                { key: "tax_no",     label: t("settings_companyTaxNo") },
+                { key: "address",    label: t("settings_companyAddress"),  full: true },
+                { key: "iban",       label: t("settings_companyIban") },
+              ];
+              return (
+                <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 18, marginBottom: 20 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{t("settings_companies")} <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 400 }}>{t("settings_companiesSub")}</span></h3>
+                    <button onClick={() => setShowAdd(p => !p)} style={{ padding: "5px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      {showAdd ? t("settings_cancelAdd") : t("settings_addCompany")}
+                    </button>
+                  </div>
+
+                  {showAdd && (
+                    <div style={{ background: colors.bg, borderRadius: 8, padding: 14, marginBottom: 14, border: `1px solid ${colors.border}` }}>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, marginBottom: 12 }}>
+                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setAddDraft); }} />
+                        <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{ocrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
+                      </label>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                        {companyFields.map(f => (
+                          <div key={f.key} style={{ gridColumn: f.full ? "1/-1" : "auto" }}>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 3 }}>{f.label}</div>
+                            <input value={addDraft[f.key]} onChange={e => setAddDraft(p => ({ ...p, [f.key]: e.target.value }))}
+                              style={{ width: "100%", padding: "7px 9px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                          </div>
+                        ))}
+                      </div>
+                      <button onClick={addCompany} style={{ padding: "7px 16px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{t("settings_save")}</button>
+                    </div>
+                  )}
+
+                  {companies.map(c => (
+                    <div key={c.id} style={{ borderBottom: `1px solid ${colors.border}`, padding: "12px 0" }}>
+                      {editingId === c.id ? (
+                        <div>
+                          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, marginBottom: 10 }}>
+                            <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setEditDraft); }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{ocrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
+                          </label>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                            {companyFields.map(f => (
+                              <div key={f.key} style={{ gridColumn: f.full ? "1/-1" : "auto" }}>
+                                <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 3 }}>{f.label}</div>
+                                <input value={editDraft[f.key] || ""} onChange={e => setEditDraft(p => ({ ...p, [f.key]: e.target.value }))}
+                                  style={{ width: "100%", padding: "7px 9px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={() => saveEdit(c.id)} style={{ padding: "6px 14px", background: colors.primary, border: "none", borderRadius: 5, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{t("settings_save")}</button>
+                            <button onClick={() => setEditingId(null)} style={{ padding: "6px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.textMuted, fontSize: 12, cursor: "pointer" }}>{t("settings_cancelAdd")}</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{c.short || c.name}</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{c.name}</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted }}>{c.tax_office} {c.tax_no ? `/ ${c.tax_no}` : ""}</div>
+                            {c.iban && <div style={{ fontSize: 11, color: colors.primary, fontWeight: 600 }}>IBAN: {c.iban}</div>}
+                          </div>
+                          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                            <button onClick={() => { setEditingId(c.id); setEditDraft({ ...c }); }} style={{ padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, cursor: "pointer" }}>{t("settings_edit")}</button>
+                            <button onClick={() => deleteCompany(c.id)} style={{ padding: "5px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>{t("settings_companyDelete")}</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
             {/* Twilio Cold Calling (Test Mode) */}
             <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>

@@ -41,6 +41,10 @@ export default defineConfig({
         target: "http://localhost:3001",
         changeOrigin: false,
       },
+      "/contracts": {
+        target: "http://localhost:3001",
+        changeOrigin: false,
+      },
     },
   },
 });
