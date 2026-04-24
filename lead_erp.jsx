@@ -2604,7 +2604,7 @@ Kurallar:
           const phoneCol    = mondayColumns.find(c => c.type === "phone" || /\btelefon\b|phone|tel\b|gsm\b|cep\b/i.test(c.title));
           const empCol      = mondayColumns.find(c => /çalışan sayısı|çalışan|calisan|employee|personel|kadro|eleman|staff/iu.test(c.title));
           const industryCol = mondayColumns.find(c => /sektör|sektor|industry|endüstri|endustri/i.test(c.title));
-          const normTR = s => s.trim().replace(/İ/g,"i").replace(/I/g,"i").replace(/ı/g,"i").replace(/Ş/g,"s").replace(/ş/g,"s").toLowerCase();
+          const normTR = s => [...s.trim()].map(c => ({'İ':'i','I':'i','ı':'i','Ş':'s','ş':'s'}[c] ?? c.toLowerCase())).join('');
           const nameCol    = mondayColumns.find(c => ["isim","ad","name"].includes(normTR(c.title)));
           const surnameCol = mondayColumns.find(c => ["soyisim","soyad","surname"].includes(normTR(c.title)));
 
