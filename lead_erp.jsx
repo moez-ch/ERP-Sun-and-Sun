@@ -3686,20 +3686,20 @@ Kurallar:
                     <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>{t("contract_loadedTemplates")(contractTemplates.length)}</div>
                     {contractTemplates.length === 0 ? (
                       <div style={{ padding: 30, textAlign: "center", color: colors.textMuted, fontSize: 13 }}>{t("contract_noTemplates")}</div>
-                    ) : contractTemplates.map(t => (
-                      <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: `1px solid ${colors.border}` }}>
+                    ) : contractTemplates.map(tpl => (
+                      <div key={tpl.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: `1px solid ${colors.border}` }}>
                         <FileTextIcon size={16} color={colors.primary} />
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{tpl.name}</div>
                           <div style={{ fontSize: 11, color: colors.textMuted }}>
-                            {t("contract_variables")}: {t.variables.length > 0 ? t.variables.map(v => `@@${v}@@`).join(", ") : "—"} · {new Date(t.created_at).toLocaleDateString("tr-TR")}
+                            {t("contract_variables")}: {tpl.variables.length > 0 ? tpl.variables.map(v => `@@${v}@@`).join(", ") : "—"} · {new Date(tpl.created_at).toLocaleDateString("tr-TR")}
                           </div>
                         </div>
-                        <button onClick={() => { setContractTemplate(t); setContractView("form"); }}
+                        <button onClick={() => { setContractTemplate(tpl); setContractView("form"); }}
                           style={{ padding: "5px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           {t("contract_select")}
                         </button>
-                        <button onClick={() => deleteTemplate(t.id)}
+                        <button onClick={() => deleteTemplate(tpl.id)}
                           style={{ padding: "5px 10px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 6, color: "#e57373", fontSize: 12, cursor: "pointer" }}>
                           {t("contract_delete")}
                         </button>
@@ -3717,7 +3717,7 @@ Kurallar:
                       <select value={contractTemplate?.id || ""} onChange={e => setContractTemplate(contractTemplates.find(t => String(t.id) === e.target.value) || null)}
                         style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" }}>
                         <option value="">{ t("contract_selectTemplate")}</option>
-                        {contractTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        {contractTemplates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
                       </select>
                       {contractTemplate && (
                         <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 6 }}>
