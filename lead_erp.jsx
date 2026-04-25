@@ -2702,6 +2702,10 @@ Kurallar:
           const mailKonulariCol = mondayColumns.find(c => /mail.konular/i.test(c.title));
           const ortakMailCol = mondayColumns.find(c => /ortak.mail/i.test(c.title));
           console.log("[Monday cols] mailKonulariCol:", mailKonulariCol, "| ortakMailCol:", ortakMailCol);
+          // Special column detection (must be before visibleCols)
+          const phoneCol    = mondayColumns.find(c => c.type === "phone" || /\btelefon\b|phone|tel\b|gsm\b|cep\b/i.test(c.title));
+          const empCol      = mondayColumns.find(c => /çalışan sayısı|çalışan|calisan|employee|personel|kadro|eleman|staff/iu.test(c.title));
+
           const reservedIds = new Set([emailCol?.id, mailKonulariCol?.id].filter(Boolean));
           const otherCols = mondayColumns.filter(c => !["name","checkbox","button"].includes(c.type) && !reservedIds.has(c.id) && c.id !== phoneCol?.id && c.id !== empCol?.id).slice(0, 2);
           const visibleCols = [
@@ -2714,12 +2718,8 @@ Kurallar:
           const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
           const isEmailOk = (email) => email && isValidEmail(email) && mondayEmailVerification[email] !== false && !mondayBounces.has(email.toLowerCase());
           const hasValidName = (item) => item.name && item.name.trim() && item.name.toLowerCase() !== "item";
-
-          // Special column detection
-          const phoneCol    = mondayColumns.find(c => c.type === "phone" || /\btelefon\b|phone|tel\b|gsm\b|cep\b/i.test(c.title));
-          const empCol      = mondayColumns.find(c => /çalışan sayısı|çalışan|calisan|employee|personel|kadro|eleman|staff/iu.test(c.title));
           const industryCol = mondayColumns.find(c => /sektör|sektor|industry|endüstri|endustri/i.test(c.title));
-          const normTR = s => [...s.trim()].map(c => ({'İ':'i','I':'i','ı':'i','Ş':'s','ş':'s'}[c] ?? c.toLowerCase())).join('');
+          const normTR     = s => [...s.trim()].map(c => ({'İ':'i','I':'i','ı':'i','Ş':'s','ş':'s'}[c] ?? c.toLowerCase())).join('');
           const nameCol    = mondayColumns.find(c => ["isim","ad","name"].includes(normTR(c.title)));
           const surnameCol = mondayColumns.find(c => ["soyisim","soyad","surname"].includes(normTR(c.title)));
 
