@@ -3160,7 +3160,7 @@ Kurallar:
               })()}
 
               {mondayItems.length > 0 && (
-                <div style={{ overflowX: "auto" }}>
+                <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: showFilterPanel ? 0 : 8, flexWrap: "wrap" }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: colors.textMuted, cursor: "pointer", userSelect: "none" }}>
                       <input type="checkbox" checked={showOnlyWithEmail} onChange={e => setShowOnlyWithEmail(e.target.checked)} />
@@ -3277,8 +3277,9 @@ Kurallar:
                     </div>
                   )}
 
+                  <div style={{ maxHeight: 420, overflowY: "auto", overflowX: "auto", border: `1px solid ${colors.border}`, borderRadius: 10 }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
+                    <thead style={{ position: "sticky", top: 0, zIndex: 1, background: colors.surface }}>
                       <tr style={{ borderBottom: `2px solid ${colors.border}` }}>
                         <th style={{ padding: "8px 12px", width: 36 }}>
                           <input type="checkbox" checked={allChecked} onChange={() => setMondaySelected(allChecked ? new Set() : new Set(allIds))} />
@@ -3342,6 +3343,7 @@ Kurallar:
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
 
