@@ -514,7 +514,7 @@ Kurallar:
   const [selectedSignature, setSelectedSignature] = useState("merve");
   const [newTemplateModal, setNewTemplateModal] = useState(false);
   const [newTemplateDraft, setNewTemplateDraft] = useState({ label: "", subject: "", body: "" });
-  const [showOnlyWithEmail, setShowOnlyWithEmail] = useState(true);
+  const [showOnlyWithEmail, setShowOnlyWithEmail] = useState(false);
   const [mondayBulkDraft, setMondayBulkDraft] = useState({ subject: "", body: "" });
   const [mondayBulkSending, setMondayBulkSending] = useState(false);
   const [mondayCampaigns, setMondayCampaigns] = useState([]);
@@ -2702,9 +2702,12 @@ Kurallar:
           const mailKonulariCol = mondayColumns.find(c => /mail.konular/i.test(c.title));
           const ortakMailCol = mondayColumns.find(c => /ortak.mail/i.test(c.title));
           console.log("[Monday cols] mailKonulariCol:", mailKonulariCol, "| ortakMailCol:", ortakMailCol);
-          const otherCols = mondayColumns.filter(c => !["name","checkbox","button"].includes(c.type) && c.id !== emailCol?.id && c.id !== mailKonulariCol?.id).slice(0, 4);
+          const reservedIds = new Set([emailCol?.id, mailKonulariCol?.id].filter(Boolean));
+          const otherCols = mondayColumns.filter(c => !["name","checkbox","button"].includes(c.type) && !reservedIds.has(c.id) && c.id !== phoneCol?.id && c.id !== empCol?.id).slice(0, 2);
           const visibleCols = [
             ...(emailCol ? [emailCol] : []),
+            ...(phoneCol ? [phoneCol] : []),
+            ...(empCol ? [empCol] : []),
             ...(mailKonulariCol ? [mailKonulariCol] : []),
             ...otherCols,
           ];
