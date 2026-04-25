@@ -749,6 +749,7 @@ Kurallar:
   useEffect(() => {
     if (view === "settings" && authUser?.role === "admin") { umFetch(); fetchSettingsCompanies(); }
     if (view === "monday") fetchMondayCampaigns();
+    if (view === "dashboard" && settings.mondayApiKey && settings.mondayBoardId && mondayItems.length === 0) fetchMondayBoard();
     if (view === "contracts") {
       const token = localStorage.getItem("sns_token");
       fetch("/contracts/templates", { headers: { Authorization: `Bearer ${token}` } })
@@ -1744,6 +1745,61 @@ Kurallar:
                 ))}
               </div>
             </div>
+
+            {/* Row 7 — Monday.com Board Summary */}
+            {settings.mondayApiKey && settings.mondayBoardId && (() => {
+              const isValidEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+              const emailCol  = mondayColumns.find(c => c.type === "email" || /e[\s-]?posta|e-?mail/i.test(c.title));
+              const phoneCol  = mondayColumns.find(c => c.type === "phone" || /\btelefon\b|phone|tel\b|gsm\b|cep\b/i.test(c.title));
+              const withEmail = mondayItems.filter(i => { const cv = emailCol && i.column_values.find(v => v.id === emailCol.id); return cv && isValidEmail(cv.text || ""); }).length;
+              const withPhone = mondayItems.filter(i => { const cv = phoneCol && i.column_values.find(v => v.id === phoneCol.id); return cv && (cv.text || "").trim(); }).length;
+              const withBoth  = mondayItems.filter(i => {
+                const ecv = emailCol && i.column_values.find(v => v.id === emailCol.id);
+                const pcv = phoneCol && i.column_values.find(v => v.id === phoneCol.id);
+                return ecv && isValidEmail(ecv.text || "") && pcv && (pcv.text || "").trim();
+              }).length;
+
+              return (
+                <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginTop: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                      Monday.com {mondayBoardName ? `— ${mondayBoardName}` : ""}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {mondayLoading && <span style={{ fontSize: 11, color: colors.textMuted }}>Fetching…</span>}
+                      <button onClick={() => { setView("monday"); }}
+                        style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight, background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+                        → Open Board
+                      </button>
+                      <button onClick={fetchMondayBoard} disabled={mondayLoading}
+                        style={{ fontSize: 11, fontWeight: 600, color: "#fff", background: colors.primary, border: "none", borderRadius: 6, padding: "4px 10px", cursor: "pointer", opacity: mondayLoading ? 0.6 : 1 }}>
+                        ↻ Refresh
+                      </button>
+                    </div>
+                  </div>
+                  {mondayItems.length === 0 && !mondayLoading ? (
+                    <div style={{ fontSize: 12, color: colors.textMuted, textAlign: "center", padding: "12px 0" }}>No board data yet — fetching…</div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                      {[
+                        { label: "Total Contacts", value: mondayItems.length, color: colors.primary },
+                        { label: emailCol ? `With Email (${emailCol.title})` : "With Email", value: withEmail, color: colors.success },
+                        { label: phoneCol ? `With Phone (${phoneCol.title})` : "With Phone", value: withPhone, color: colors.accent },
+                        { label: "Email + Phone", value: withBoth, color: colors.primaryLight },
+                      ].map((s, i) => (
+                        <div key={i} style={{ background: colors.bg, borderRadius: 10, padding: "14px 16px", border: `1px solid ${colors.border}` }}>
+                          <div style={{ fontSize: 10, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</div>
+                          <div style={{ fontSize: 26, fontWeight: 700, color: s.color, marginBottom: 4 }}>{mondayLoading ? "…" : s.value}</div>
+                          <div style={{ height: 4, background: colors.border, borderRadius: 2, overflow: "hidden" }}>
+                            <div style={{ width: `${mondayItems.length ? (s.value / mondayItems.length) * 100 : 0}%`, height: "100%", background: s.color, borderRadius: 2, transition: "width .5s" }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
