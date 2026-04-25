@@ -523,6 +523,7 @@ Kurallar:
   const [mondayVerifying, setMondayVerifying] = useState(false);
   const [mondayBounces, setMondayBounces] = useState(new Set());
   const [bounceSyncing, setBounceSyncing] = useState(false);
+  const [mondayErrorPanelOpen, setMondayErrorPanelOpen] = useState(false);
   const [bounceLastSync, setBounceLastSync] = useState(null);
   const [mondayMailKonulari, setMondayMailKonulari] = useState("");
   const [mondayOrtakMail, setMondayOrtakMail] = useState("");
@@ -3045,44 +3046,57 @@ Kurallar:
                   } catch (e) { alert(t("monday_error", e.message)); }
                 };
 
+                const totalIssues = toClear.length + toDelete.length;
                 return (
-                  <div style={{ marginBottom: 14 }}>
-                    {/* Items with other info — clear email only */}
-                    {toClear.length > 0 && (
-                      <div style={{ background: "rgba(220,53,69,0.07)", border: "1px solid rgba(220,53,69,0.22)", borderRadius: 8, padding: "10px 14px", marginBottom: 8, fontSize: 12 }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                          <span style={{ color: "#e57373", fontWeight: 700 }}>{t("monday_invalidEmailPanel", toClear.length)}</span>
-                          <button
-                            onClick={() => clearEmails(toClear)}
-                            style={{ background: "rgba(220,53,69,0.15)", border: "1px solid rgba(220,53,69,0.35)", borderRadius: 5, color: "#e57373", fontSize: 11, fontWeight: 600, padding: "3px 10px", cursor: "pointer" }}
-                          >
+                  <div style={{ marginBottom: 14, background: "rgba(220,53,69,0.06)", border: "1px solid rgba(220,53,69,0.2)", borderRadius: 10, overflow: "hidden" }}>
+                    {/* Collapsed header — always visible */}
+                    <div
+                      onClick={() => setMondayErrorPanelOpen(p => !p)}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px", cursor: "pointer", userSelect: "none" }}
+                    >
+                      <span style={{ color: "#e57373", fontWeight: 700, fontSize: 12 }}>
+                        ⚠ {totalIssues} {t("monday_invalidEmailPanel", totalIssues)}
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {mondayErrorPanelOpen && toClear.length > 0 && (
+                          <button onClick={e => { e.stopPropagation(); clearEmails(toClear); }}
+                            style={{ background: "rgba(220,53,69,0.15)", border: "1px solid rgba(220,53,69,0.35)", borderRadius: 5, color: "#e57373", fontSize: 11, fontWeight: 600, padding: "3px 10px", cursor: "pointer" }}>
                             {t("monday_clearEmailBtn", toClear.length)}
                           </button>
-                        </div>
-                        <div style={{ color: colors.textMuted, lineHeight: 1.7 }}>
-                          {toClear.map(({ item, email }) => (
-                            <span key={item.id} style={{ marginRight: 10 }}>{item.name}{email ? ` (${email})` : ""}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {/* Items with no useful info — delete */}
-                    {toDelete.length > 0 && (
-                      <div style={{ background: "rgba(220,53,69,0.07)", border: "1px solid rgba(220,53,69,0.22)", borderRadius: 8, padding: "10px 14px", marginBottom: 8, fontSize: 12 }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                          <span style={{ color: "#e57373", fontWeight: 700 }}>{t("monday_emptyRecordPanel", toDelete.length)}</span>
-                          <button
-                            onClick={() => deleteItems(toDelete)}
-                            style={{ background: "rgba(220,53,69,0.15)", border: "1px solid rgba(220,53,69,0.35)", borderRadius: 5, color: "#e57373", fontSize: 11, fontWeight: 600, padding: "3px 10px", cursor: "pointer" }}
-                          >
+                        )}
+                        {mondayErrorPanelOpen && toDelete.length > 0 && (
+                          <button onClick={e => { e.stopPropagation(); deleteItems(toDelete); }}
+                            style={{ background: "rgba(220,53,69,0.15)", border: "1px solid rgba(220,53,69,0.35)", borderRadius: 5, color: "#e57373", fontSize: 11, fontWeight: 600, padding: "3px 10px", cursor: "pointer" }}>
                             {t("monday_deleteAllBtn", toDelete.length)}
                           </button>
-                        </div>
-                        <div style={{ color: colors.textMuted, lineHeight: 1.7 }}>
-                          {toDelete.map(({ item }) => (
-                            <span key={item.id} style={{ marginRight: 10 }}>{item.name || t("monday_unnamed")}</span>
-                          ))}
-                        </div>
+                        )}
+                        <span style={{ color: "#e57373", fontSize: 11 }}>{mondayErrorPanelOpen ? "▲" : "▼"}</span>
+                      </div>
+                    </div>
+
+                    {/* Expandable content */}
+                    {mondayErrorPanelOpen && (
+                      <div style={{ borderTop: "1px solid rgba(220,53,69,0.2)", padding: "10px 14px", fontSize: 12 }}>
+                        {toClear.length > 0 && (
+                          <div style={{ marginBottom: toDelete.length > 0 ? 10 : 0 }}>
+                            <div style={{ color: "#e57373", fontWeight: 600, marginBottom: 4 }}>{t("monday_invalidEmailPanel", toClear.length)}</div>
+                            <div style={{ color: colors.textMuted, lineHeight: 1.8 }}>
+                              {toClear.map(({ item, email }) => (
+                                <span key={item.id} style={{ marginRight: 10 }}>{item.name}{email ? ` (${email})` : ""}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {toDelete.length > 0 && (
+                          <div>
+                            <div style={{ color: "#e57373", fontWeight: 600, marginBottom: 4 }}>{t("monday_emptyRecordPanel", toDelete.length)}</div>
+                            <div style={{ color: colors.textMuted, lineHeight: 1.8 }}>
+                              {toDelete.map(({ item }) => (
+                                <span key={item.id} style={{ marginRight: 10 }}>{item.name || t("monday_unnamed")}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
