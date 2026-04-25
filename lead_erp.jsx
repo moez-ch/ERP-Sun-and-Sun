@@ -547,6 +547,61 @@ Kurallar:
   const [contractUploadFile, setContractUploadFile] = useState(null);
   const [contractUploading, setContractUploading] = useState(false);
 
+  // ── Settings — companies state ────────────────────────────────
+  const [settingsCompanies, setSettingsCompanies] = useState([]);
+  const [settingsEditingId, setSettingsEditingId] = useState(null);
+  const [settingsEditDraft, setSettingsEditDraft] = useState({});
+  const [settingsAddDraft, setSettingsAddDraft] = useState({ name:"", short:"", tax_office:"", tax_no:"", address:"", iban:"" });
+  const [settingsShowAdd, setSettingsShowAdd] = useState(false);
+  const [settingsOcrLoading, setSettingsOcrLoading] = useState(false);
+
+  const fetchSettingsCompanies = async () => {
+    const token = localStorage.getItem("sns_token");
+    fetch("/contracts/companies", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(setSettingsCompanies).catch(() => {});
+  };
+
+  const settingsRunOcr = async (file, setDraft) => {
+    setSettingsOcrLoading(true);
+    try {
+      const token = localStorage.getItem("sns_token");
+      const fd = new FormData();
+      fd.append("image", file);
+      const r = await fetch("/contracts/ocr", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      const d = await r.json();
+      if (d.ok && d.fields) {
+        setDraft(prev => ({ ...prev, name: d.fields.party2_name || prev.name, tax_office: d.fields.party2_tax_office || prev.tax_office, tax_no: d.fields.party2_tax_no || prev.tax_no, address: d.fields.party2_address || prev.address }));
+        alert(t("contract_ocrDone"));
+      } else { alert(t("contract_ocrError")(d.error || "Unknown")); }
+    } catch { alert(t("contract_ocrUnavailable")); }
+    finally { setSettingsOcrLoading(false); }
+  };
+
+  const settingsSaveEdit = async (id) => {
+    const token = localStorage.getItem("sns_token");
+    const r = await fetch(`/contracts/companies/${id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(settingsEditDraft) });
+    const d = await r.json();
+    setSettingsCompanies(prev => prev.map(c => c.id === id ? d : c));
+    setSettingsEditingId(null);
+  };
+
+  const settingsAddCompany = async () => {
+    if (!settingsAddDraft.name.trim()) return;
+    const token = localStorage.getItem("sns_token");
+    const r = await fetch("/contracts/companies", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(settingsAddDraft) });
+    const d = await r.json();
+    setSettingsCompanies(prev => [...prev, d]);
+    setSettingsAddDraft({ name:"", short:"", tax_office:"", tax_no:"", address:"", iban:"" });
+    setSettingsShowAdd(false);
+  };
+
+  const settingsDeleteCompany = async (id) => {
+    if (!confirm(t("settings_companyDeleteConfirm"))) return;
+    const token = localStorage.getItem("sns_token");
+    await fetch(`/contracts/companies/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    setSettingsCompanies(prev => prev.filter(c => c.id !== id));
+  };
+
   const fetchMondayCampaigns = async () => {
     try {
       const token = localStorage.getItem("sns_token");
@@ -691,7 +746,7 @@ Kurallar:
 
   // Load users when admin enters settings
   useEffect(() => {
-    if (view === "settings" && authUser?.role === "admin") umFetch();
+    if (view === "settings" && authUser?.role === "admin") { umFetch(); fetchSettingsCompanies(); }
     if (view === "monday") fetchMondayCampaigns();
     if (view === "contracts") {
       const token = localStorage.getItem("sns_token");
@@ -3872,59 +3927,16 @@ Kurallar:
 
             {/* Sun Group Companies */}
             {(() => {
-              const [companies, setCompanies] = React.useState([]);
-              const [editingId, setEditingId] = React.useState(null);
-              const [editDraft, setEditDraft] = React.useState({});
-              const [addDraft, setAddDraft] = React.useState({ name:"", short:"", tax_office:"", tax_no:"", address:"", iban:"" });
-              const [showAdd, setShowAdd] = React.useState(false);
-              const [ocrLoading, setOcrLoading] = React.useState(false);
-              React.useEffect(() => {
-                const token = localStorage.getItem("sns_token");
-                fetch("/contracts/companies", { headers: { Authorization: `Bearer ${token}` } })
-                  .then(r => r.json()).then(setCompanies).catch(() => {});
-              }, []);
-              const token = localStorage.getItem("sns_token");
-
-              const runOcr = async (file, setDraft) => {
-                setOcrLoading(true);
-                try {
-                  const fd = new FormData();
-                  fd.append("image", file);
-                  const r = await fetch("/contracts/ocr", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
-                  const d = await r.json();
-                  if (d.ok && d.fields) {
-                    setDraft(prev => ({
-                      ...prev,
-                      name: d.fields.party2_name || prev.name,
-                      tax_office: d.fields.party2_tax_office || prev.tax_office,
-                      tax_no: d.fields.party2_tax_no || prev.tax_no,
-                      address: d.fields.party2_address || prev.address,
-                    }));
-                    alert("OCR tamamlandı. Lütfen bilgileri kontrol edin.");
-                  } else { alert("OCR hatası: " + (d.error || "Bilinmeyen hata")); }
-                } catch { alert("ML servisi çalışmıyor olabilir."); }
-                finally { setOcrLoading(false); }
-              };
-
-              const saveEdit = async (id) => {
-                const r = await fetch(`/contracts/companies/${id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(editDraft) });
-                const d = await r.json();
-                setCompanies(prev => prev.map(c => c.id === id ? d : c));
-                setEditingId(null);
-              };
-              const addCompany = async () => {
-                if (!addDraft.name.trim()) return;
-                const r = await fetch("/contracts/companies", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(addDraft) });
-                const d = await r.json();
-                setCompanies(prev => [...prev, d]);
-                setAddDraft({ name:"", short:"", tax_office:"", tax_no:"", address:"", iban:"" });
-                setShowAdd(false);
-              };
-              const deleteCompany = async (id) => {
-                if (!confirm(t("settings_companyDeleteConfirm"))) return;
-                await fetch(`/contracts/companies/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-                setCompanies(prev => prev.filter(c => c.id !== id));
-              };
+              const companies   = settingsCompanies;
+              const editingId   = settingsEditingId;
+              const editDraft   = settingsEditDraft;
+              const addDraft    = settingsAddDraft;
+              const showAdd     = settingsShowAdd;
+              const ocrLoading  = settingsOcrLoading;
+              const runOcr      = settingsRunOcr;
+              const saveEdit    = settingsSaveEdit;
+              const addCompany  = settingsAddCompany;
+              const deleteCompany = settingsDeleteCompany;
               const companyFields = [
                 { key: "name",       label: t("settings_companyFullName"), full: true },
                 { key: "short",      label: t("settings_companyShort") },
@@ -3937,7 +3949,7 @@ Kurallar:
                 <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 18, marginBottom: 20 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                     <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{t("settings_companies")} <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 400 }}>{t("settings_companiesSub")}</span></h3>
-                    <button onClick={() => setShowAdd(p => !p)} style={{ padding: "5px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    <button onClick={() => setSettingsShowAdd(p => !p)} style={{ padding: "5px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       {showAdd ? t("settings_cancelAdd") : t("settings_addCompany")}
                     </button>
                   </div>
@@ -3945,14 +3957,14 @@ Kurallar:
                   {showAdd && (
                     <div style={{ background: colors.bg, borderRadius: 8, padding: 14, marginBottom: 14, border: `1px solid ${colors.border}` }}>
                       <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, marginBottom: 12 }}>
-                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setAddDraft); }} />
+                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setSettingsAddDraft); }} />
                         <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{ocrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
                       </label>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                         {companyFields.map(f => (
                           <div key={f.key} style={{ gridColumn: f.full ? "1/-1" : "auto" }}>
                             <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 3 }}>{f.label}</div>
-                            <input value={addDraft[f.key]} onChange={e => setAddDraft(p => ({ ...p, [f.key]: e.target.value }))}
+                            <input value={addDraft[f.key]} onChange={e => setSettingsAddDraft(p => ({ ...p, [f.key]: e.target.value }))}
                               style={{ width: "100%", padding: "7px 9px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} />
                           </div>
                         ))}
@@ -3966,21 +3978,21 @@ Kurallar:
                       {editingId === c.id ? (
                         <div>
                           <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, marginBottom: 10 }}>
-                            <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setEditDraft); }} />
+                            <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setSettingsEditDraft); }} />
                             <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{ocrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
                           </label>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                             {companyFields.map(f => (
                               <div key={f.key} style={{ gridColumn: f.full ? "1/-1" : "auto" }}>
                                 <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 3 }}>{f.label}</div>
-                                <input value={editDraft[f.key] || ""} onChange={e => setEditDraft(p => ({ ...p, [f.key]: e.target.value }))}
+                                <input value={editDraft[f.key] || ""} onChange={e => setSettingsEditDraft(p => ({ ...p, [f.key]: e.target.value }))}
                                   style={{ width: "100%", padding: "7px 9px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} />
                               </div>
                             ))}
                           </div>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => saveEdit(c.id)} style={{ padding: "6px 14px", background: colors.primary, border: "none", borderRadius: 5, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{t("settings_save")}</button>
-                            <button onClick={() => setEditingId(null)} style={{ padding: "6px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.textMuted, fontSize: 12, cursor: "pointer" }}>{t("settings_cancelAdd")}</button>
+                            <button onClick={() => setSettingsEditingId(null)} style={{ padding: "6px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.textMuted, fontSize: 12, cursor: "pointer" }}>{t("settings_cancelAdd")}</button>
                           </div>
                         </div>
                       ) : (
@@ -3992,7 +4004,7 @@ Kurallar:
                             {c.iban && <div style={{ fontSize: 11, color: colors.primary, fontWeight: 600 }}>IBAN: {c.iban}</div>}
                           </div>
                           <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                            <button onClick={() => { setEditingId(c.id); setEditDraft({ ...c }); }} style={{ padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, cursor: "pointer" }}>{t("settings_edit")}</button>
+                            <button onClick={() => { setSettingsEditingId(c.id); setSettingsEditDraft({ ...c }); }} style={{ padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, cursor: "pointer" }}>{t("settings_edit")}</button>
                             <button onClick={() => deleteCompany(c.id)} style={{ padding: "5px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>{t("settings_companyDelete")}</button>
                           </div>
                         </div>
