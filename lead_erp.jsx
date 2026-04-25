@@ -572,7 +572,7 @@ Kurallar:
       if (d.ok && d.fields) {
         setDraft(prev => ({ ...prev, name: d.fields.party2_name || prev.name, tax_office: d.fields.party2_tax_office || prev.tax_office, tax_no: d.fields.party2_tax_no || prev.tax_no, address: d.fields.party2_address || prev.address }));
         alert(t("contract_ocrDone"));
-      } else { alert(t("contract_ocrError")(d.error || "Unknown")); }
+      } else { alert(t("contract_ocrError", d.error || "Unknown")); }
     } catch { alert(t("contract_ocrUnavailable")); }
     finally { setSettingsOcrLoading(false); }
   };
@@ -3572,8 +3572,8 @@ Kurallar:
               if (d.ok && d.fields) {
                 setContractData(prev => ({ ...prev, ...d.fields }));
                 alert(t("contract_ocrDone"));
-              } else { alert(t("contract_ocrError")(d.error || "Unknown")); }
-            } catch (e) { alert(t("contract_ocrError")(e.message)); }
+              } else { alert(t("contract_ocrError", d.error || "Unknown")); }
+            } catch (e) { alert(t("contract_ocrError", e.message)); }
             finally { setContractOcrLoading(false); }
           };
 
@@ -3609,7 +3609,7 @@ Kurallar:
               const r = await fetch("/contracts/templates", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
               const d = await r.json();
               if (!r.ok) { alert("Hata: " + d.error); return; }
-              alert(t("contract_uploadedMsg")(d.variables.join(", ")));
+              alert(t("contract_uploadedMsg", d.variables.join(", ")));
               setContractUploadFile(null); setContractUploadName("");
               const r2 = await fetch("/contracts/templates", { headers: { Authorization: `Bearer ${token}` } });
               setContractTemplates(await r2.json());
@@ -3659,7 +3659,7 @@ Kurallar:
                   <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 18, marginBottom: 20 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{t("contract_uploadTitle")}</div>
                     <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 12 }}>
-                      {t("contract_uploadHint")(<code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>@@variable_name@@</code>)}<br/>
+                      {t("contract_uploadHint", "@@variable_name@@")}<br/>
                       e.g. <code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>@@party2_name@@</code>, <code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>@@program_name@@</code>, <code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>@@iban@@</code>
                     </div>
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -3683,7 +3683,7 @@ Kurallar:
 
                   {/* Template list */}
                   <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
-                    <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>{t("contract_loadedTemplates")(contractTemplates.length)}</div>
+                    <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>{t("contract_loadedTemplates", contractTemplates.length)}</div>
                     {contractTemplates.length === 0 ? (
                       <div style={{ padding: 30, textAlign: "center", color: colors.textMuted, fontSize: 13 }}>{t("contract_noTemplates")}</div>
                     ) : contractTemplates.map(tpl => (
@@ -3821,7 +3821,7 @@ Kurallar:
                   <div style={{ gridColumn: "1 / -1" }}>
                     <button onClick={handleGenerate} disabled={contractGenerating || !contractTemplate || !contractData.party1_id}
                       style={{ width: "100%", padding: "13px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: (contractGenerating || !contractTemplate || !contractData.party1_id) ? 0.6 : 1 }}>
-                      {contractGenerating ? t("contract_generating") : t("contract_generate")()}
+                      {contractGenerating ? t("contract_generating") : t("contract_generate")}
                     </button>
                   </div>
                 </div>
