@@ -632,6 +632,7 @@ Kurallar:
   const [mondayMergedCount, setMondayMergedCount] = useState(0);
   const [mondayMergeLog, setMondayMergeLog] = useState([]);
   const [mondayMergeModal, setMondayMergeModal] = useState(false);
+  const [mondayRawItems, setMondayRawItems] = useState([]);
   const [mondayColumns, setMondayColumns] = useState([]);
   const [mondayBoardName, setMondayBoardName] = useState("");
   const [mondayLoading, setMondayLoading] = useState(false);
@@ -761,6 +762,7 @@ Kurallar:
       setMondayColumns(board.columns || []);
       const rawItems = board.items_page?.items || [];
       const { deduped: items, mergedCount, mergeLog } = deduplicateMondayItems(rawItems, board.columns || []);
+      setMondayRawItems(rawItems);
       setMondayItems(items);
       setMondayMergedCount(mergedCount);
       setMondayMergeLog(mergeLog);
@@ -3496,7 +3498,26 @@ Kurallar:
               )}
 
               {/* Merge Log Modal */}
-              {mondayMergeModal && (
+              {mondayMergeModal && (() => {
+                const unmergeOne = (entry) => {
+                  const mergedItem = mondayItems.find(i => i._mergedFrom && entry.originals.every(o => i._mergedFrom.includes(o.id)));
+                  if (!mergedItem) return;
+                  const originals = entry.originals.map(o => mondayRawItems.find(r => r.id === o.id)).filter(Boolean);
+                  setMondayItems(prev => {
+                    const idx = prev.findIndex(i => i.id === mergedItem.id);
+                    const next = [...prev];
+                    next.splice(idx, 1, ...originals);
+                    return next;
+                  });
+                  setMondayMergeLog(prev => prev.filter(e => e !== entry));
+                  setMondayMergedCount(prev => prev - (entry.total - 1));
+                };
+                const unmergeAll = () => {
+                  setMondayItems(mondayRawItems);
+                  setMondayMergedCount(0);
+                  setMondayMergeLog([]);
+                };
+                return (
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }} onClick={() => setMondayMergeModal(false)}>
                   <div style={{ background: colors.surface, borderRadius: 14, padding: 28, width: 680, maxWidth: "95vw", maxHeight: "80vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.3)" }} onClick={e => e.stopPropagation()}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -3506,7 +3527,15 @@ Kurallar:
                           {mondayMergeLog.length} group{mondayMergeLog.length !== 1 ? "s" : ""} merged — {mondayMergedCount} record{mondayMergedCount !== 1 ? "s" : ""} removed
                         </p>
                       </div>
-                      <button onClick={() => setMondayMergeModal(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: colors.textMuted, lineHeight: 1 }}>×</button>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        {mondayMergeLog.length > 0 && (
+                          <button onClick={() => { unmergeAll(); setMondayMergeModal(false); }}
+                            style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.4)", borderRadius: 7, color: "#e57373", cursor: "pointer" }}>
+                            Unmerge All
+                          </button>
+                        )}
+                        <button onClick={() => setMondayMergeModal(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: colors.textMuted, lineHeight: 1 }}>×</button>
+                      </div>
                     </div>
                     {mondayMergeLog.length === 0 ? (
                       <p style={{ fontSize: 13, color: colors.textMuted, textAlign: "center", padding: "20px 0" }}>No duplicates found.</p>
@@ -3522,12 +3551,16 @@ Kurallar:
                                   <span style={{ fontWeight: 700, fontSize: 13 }}>{entry.name}</span>
                                   <span style={{ fontSize: 11, color: colors.textMuted }}>{entry.total} records → 1</span>
                                 </div>
-                                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                                <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
                                   {entry.matchedBy.map(sig => (
                                     <span key={sig} style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 8, background: signalColors[sig]?.bg, color: signalColors[sig]?.text, border: `1px solid ${signalColors[sig]?.border}` }}>
                                       matched by {sig}
                                     </span>
                                   ))}
+                                  <button onClick={() => unmergeOne(entry)}
+                                    style={{ fontSize: 10, fontWeight: 600, padding: "2px 9px", background: "rgba(229,115,115,0.1)", border: "1px solid rgba(229,115,115,0.35)", borderRadius: 7, color: "#e57373", cursor: "pointer" }}>
+                                    Unmerge
+                                  </button>
                                 </div>
                               </div>
                               {/* Originals table */}
@@ -3571,7 +3604,8 @@ Kurallar:
                     )}
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {/* Bulk Email Modal */}
               {mondayBulkModal && (
