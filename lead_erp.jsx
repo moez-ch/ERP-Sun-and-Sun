@@ -316,7 +316,7 @@ function mondayColTitle(col, lang) {
 }
 
 // ─── MONDAY DEDUPLICATION ─────────────────────────────────────────
-function deduplicateMondayItems(items, columns) {
+function deduplicateMondayItems(items, columns, signals = { name: true, email: true, phone: true }) {
   if (!items || items.length === 0) return { deduped: [], mergedCount: 0, mergeLog: [] };
 
   const emailColId  = (columns.find(c => c.type === "email") || columns.find(c => /e[\s-]?posta|e-?mail/i.test(c.title)))?.id;
@@ -333,21 +333,23 @@ function deduplicateMondayItems(items, columns) {
 
   const byName = {}, byEmail = {}, byPhone = {};
   for (const item of items) {
-    const name = normName(item.name || "");
-    if (name && name !== "item") { if (!byName[name]) byName[name] = []; byName[name].push(item.id); }
-    if (emailColId) {
+    if (signals.name) {
+      const name = normName(item.name || "");
+      if (name && name !== "item") { if (!byName[name]) byName[name] = []; byName[name].push(item.id); }
+    }
+    if (signals.email && emailColId) {
       const email = normEmail(item.column_values.find(cv => cv.id === emailColId)?.text || "");
       if (email) { if (!byEmail[email]) byEmail[email] = []; byEmail[email].push(item.id); }
     }
-    if (phoneColId) {
+    if (signals.phone && phoneColId) {
       const phone = normPhone(item.column_values.find(cv => cv.id === phoneColId)?.text || "");
       if (phone && phone.length >= 7) { if (!byPhone[phone]) byPhone[phone] = []; byPhone[phone].push(item.id); }
     }
   }
 
-  for (const ids of Object.values(byName))  for (let i = 1; i < ids.length; i++) union(ids[0], ids[i]);
-  for (const ids of Object.values(byEmail)) for (let i = 1; i < ids.length; i++) union(ids[0], ids[i]);
-  for (const ids of Object.values(byPhone)) for (let i = 1; i < ids.length; i++) union(ids[0], ids[i]);
+  if (signals.name)  for (const ids of Object.values(byName))  for (let i = 1; i < ids.length; i++) union(ids[0], ids[i]);
+  if (signals.email) for (const ids of Object.values(byEmail)) for (let i = 1; i < ids.length; i++) union(ids[0], ids[i]);
+  if (signals.phone) for (const ids of Object.values(byPhone)) for (let i = 1; i < ids.length; i++) union(ids[0], ids[i]);
 
   const groups = {};
   for (const item of items) { const root = find(item.id); if (!groups[root]) groups[root] = []; groups[root].push(item); }
@@ -633,6 +635,7 @@ Kurallar:
   const [mondayMergeLog, setMondayMergeLog] = useState([]);
   const [mondayMergeModal, setMondayMergeModal] = useState(false);
   const [mondayRawItems, setMondayRawItems] = useState([]);
+  const [mondayMergeSignals, setMondayMergeSignals] = useState({ name: true, email: true, phone: true });
   const [mondayColumns, setMondayColumns] = useState([]);
   const [mondayBoardName, setMondayBoardName] = useState("");
   const [mondayLoading, setMondayLoading] = useState(false);
@@ -761,7 +764,7 @@ Kurallar:
       setMondayBoardName(board.name);
       setMondayColumns(board.columns || []);
       const rawItems = board.items_page?.items || [];
-      const { deduped: items, mergedCount, mergeLog } = deduplicateMondayItems(rawItems, board.columns || []);
+      const { deduped: items, mergedCount, mergeLog } = deduplicateMondayItems(rawItems, board.columns || [], mondayMergeSignals);
       setMondayRawItems(rawItems);
       setMondayItems(items);
       setMondayMergedCount(mergedCount);
@@ -3499,6 +3502,14 @@ Kurallar:
 
               {/* Merge Log Modal */}
               {mondayMergeModal && (() => {
+                const applySignals = (next) => {
+                  setMondayMergeSignals(next);
+                  const { deduped, mergedCount, mergeLog } = deduplicateMondayItems(mondayRawItems, mondayColumns, next);
+                  setMondayItems(deduped);
+                  setMondayMergedCount(mergedCount);
+                  setMondayMergeLog(mergeLog);
+                };
+                const toggleSignal = (key) => applySignals({ ...mondayMergeSignals, [key]: !mondayMergeSignals[key] });
                 const unmergeOne = (entry) => {
                   const mergedItem = mondayItems.find(i => i._mergedFrom && entry.originals.every(o => i._mergedFrom.includes(o.id)));
                   if (!mergedItem) return;
@@ -3520,22 +3531,41 @@ Kurallar:
                 return (
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }} onClick={() => setMondayMergeModal(false)}>
                   <div style={{ background: colors.surface, borderRadius: 14, padding: 28, width: 680, maxWidth: "95vw", maxHeight: "80vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.3)" }} onClick={e => e.stopPropagation()}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
                       <div>
                         <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Duplicate Contacts — Merge Report</h3>
                         <p style={{ fontSize: 12, color: colors.textMuted, margin: "4px 0 0" }}>
                           {mondayMergeLog.length} group{mondayMergeLog.length !== 1 ? "s" : ""} merged — {mondayMergedCount} record{mondayMergedCount !== 1 ? "s" : ""} removed
                         </p>
                       </div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        {mondayMergeLog.length > 0 && (
-                          <button onClick={() => { unmergeAll(); setMondayMergeModal(false); }}
-                            style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.4)", borderRadius: 7, color: "#e57373", cursor: "pointer" }}>
-                            Unmerge All
+                      <button onClick={() => setMondayMergeModal(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: colors.textMuted, lineHeight: 1 }}>×</button>
+                    </div>
+                    {/* Signal toggles */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, padding: "10px 14px", background: colors.bg, borderRadius: 8, border: `1px solid ${colors.border}` }}>
+                      <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginRight: 4 }}>Merge by:</span>
+                      {[
+                        { key: "name",  label: "Name",  on: { bg: "#e8f4ff", text: "#1565c0", border: "#90caf9" } },
+                        { key: "email", label: "Email", on: { bg: "#e8f5e9", text: "#2e7d32", border: "#a5d6a7" } },
+                        { key: "phone", label: "Phone", on: { bg: "#fce4ec", text: "#880e4f", border: "#f48fb1" } },
+                      ].map(({ key, label, on }) => {
+                        const active = mondayMergeSignals[key];
+                        return (
+                          <button key={key} onClick={() => toggleSignal(key)}
+                            style={{ fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 20, cursor: "pointer", transition: "all .15s",
+                              background: active ? on.bg : "transparent",
+                              color: active ? on.text : colors.textMuted,
+                              border: `1px solid ${active ? on.border : colors.border}` }}>
+                            {label}
                           </button>
-                        )}
-                        <button onClick={() => setMondayMergeModal(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: colors.textMuted, lineHeight: 1 }}>×</button>
-                      </div>
+                        );
+                      })}
+                      <div style={{ flex: 1 }} />
+                      {mondayMergeLog.length > 0 && (
+                        <button onClick={() => { unmergeAll(); setMondayMergeModal(false); }}
+                          style={{ fontSize: 11, fontWeight: 600, padding: "4px 12px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.4)", borderRadius: 7, color: "#e57373", cursor: "pointer" }}>
+                          Unmerge All
+                        </button>
+                      )}
                     </div>
                     {mondayMergeLog.length === 0 ? (
                       <p style={{ fontSize: 13, color: colors.textMuted, textAlign: "center", padding: "20px 0" }}>No duplicates found.</p>
