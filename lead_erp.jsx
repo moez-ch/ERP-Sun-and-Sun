@@ -2935,7 +2935,8 @@ Kurallar:
                 const val = (colMap[fid] || "").trim();
                 const matchesEmpty = !val && f.values.has("__empty__");
                 const matchesVal   = val  && f.values.has(val);
-                if (!matchesEmpty && !matchesVal) return false;
+                const matches = matchesEmpty || matchesVal;
+                if (f.exclude ? matches : !matches) return false;
               }
             }
             return true;
@@ -3409,11 +3410,21 @@ Kurallar:
                         // value_select — pill checkboxes
                         const vals = def.options || [];
                         const sel  = f.values || new Set();
+                        const excl = !!f.exclude;
                         const toggle = (v) => { const next = new Set(sel); sel.has(v) ? next.delete(v) : next.add(v); setF({ values: next }); };
                         const emptyOn = sel.has("__empty__");
                         return (
-                          <div key={def.id} style={{ ...cardStyle, minWidth: 140 }}>
-                            <div style={titleStyle}>{def.title}</div>
+                          <div key={def.id} style={{ ...cardStyle, minWidth: 140, borderColor: excl && sel.size > 0 ? "rgba(229,115,115,0.5)" : undefined, background: excl && sel.size > 0 ? "rgba(229,115,115,0.06)" : undefined }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                              <div style={titleStyle}>{def.title}</div>
+                              <button onClick={() => setF({ exclude: !excl })}
+                                style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6, cursor: "pointer", transition: "all .15s",
+                                  background: excl ? "rgba(229,115,115,0.15)" : "transparent",
+                                  color: excl ? "#e57373" : colors.textMuted,
+                                  border: `1px solid ${excl ? "rgba(229,115,115,0.4)" : colors.border}` }}>
+                                Exclude
+                              </button>
+                            </div>
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                               <button onClick={() => toggle("__empty__")}
                                 style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer", fontStyle: "italic",
