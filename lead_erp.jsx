@@ -621,6 +621,7 @@ Kurallar:
       sendgridFromName: "Sun & Sun International",
       mondayApiKey: "",
       mondayBoardId: "8368915",
+      mondayCompaniesBoardId: "",
     };
     try {
       const saved = localStorage.getItem("sns_settings");
@@ -636,6 +637,7 @@ Kurallar:
   const [mondayMergeModal, setMondayMergeModal] = useState(false);
   const [mondayRawItems, setMondayRawItems] = useState([]);
   const [mondayMergeSignals, setMondayMergeSignals] = useState({ name: true, email: true, phone: true });
+  const [mondayBoardType, setMondayBoardType] = useState("contacts"); // "contacts" | "companies"
   const [mondayColumns, setMondayColumns] = useState([]);
   const [mondayBoardName, setMondayBoardName] = useState("");
   const [mondayLoading, setMondayLoading] = useState(false);
@@ -743,11 +745,15 @@ Kurallar:
     } catch {}
   };
 
-  const fetchMondayBoard = async () => {
-    if (!settings.mondayApiKey || !settings.mondayBoardId) {
-      setMondayError("Add your Monday.com API key and Board ID in Settings first.");
+  const fetchMondayBoard = async (boardType = mondayBoardType) => {
+    const boardId = boardType === "companies" ? settings.mondayCompaniesBoardId : settings.mondayBoardId;
+    if (!settings.mondayApiKey || !boardId) {
+      setMondayError(boardType === "companies"
+        ? "Add your Companies Board ID in Settings first."
+        : "Add your Monday.com API key and Board ID in Settings first.");
       return;
     }
+    setMondayBoardType(boardType);
     setMondayLoading(true);
     setMondayError("");
     try {
@@ -755,7 +761,7 @@ Kurallar:
       const r = await fetch("/monday/board", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ apiKey: settings.mondayApiKey, boardId: settings.mondayBoardId }),
+        body: JSON.stringify({ apiKey: settings.mondayApiKey, boardId }),
       });
       const data = await r.json();
       if (data.errors) { setMondayError(data.errors[0]?.message || "Monday API error"); return; }
@@ -2946,12 +2952,12 @@ Kurallar:
           const selectedItems = mondayItems.filter(i => mondaySelected.has(i.id));
 
           const buildSalutation = (name, colMap) => {
+            if (mondayBoardType === "companies") return "Merhaba,";
             const rawName = (name || "").trim();
             const firstName = rawName.split(/\s+/)[0];
             const isPlaceholder = !firstName || firstName.toLowerCase() === "item";
-            const isCompany = /LTD|A\.?\s*[SŞ]\.?|TİC\.?|TIC\.?|SAN\.?|[SŞ]Tİ\.?|LİMİTED|ANONİM|HOLDİNG|GRUP|A\.G\.|KOOP/i.test(rawName);
             const genderVal = genderCol ? (colMap[genderCol.id] || "").toLowerCase().trim() : "";
-            if (isPlaceholder || isCompany) return "Merhaba,";
+            if (isPlaceholder) return "Merhaba,";
             if (/bey|erkek|bay|male|mr/i.test(genderVal)) return `Merhaba ${firstName} Bey,`;
             if (/han[ıi]m|kad[ıi]n|bayan|female|ms|mrs/i.test(genderVal)) return `Merhaba ${firstName} Hanım,`;
             return `Merhaba ${firstName},`;
@@ -2973,9 +2979,21 @@ Kurallar:
             <div style={{ animation: "slideIn .3s ease" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <div>
-                  <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
-                    {t("monday_title", mondayBoardName)}
-                  </h2>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
+                      {t("monday_title", mondayBoardName)}
+                    </h2>
+                    <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700 }}>
+                      {[{ key: "contacts", label: "Contacts" }, { key: "companies", label: "Companies" }].map(({ key, label }) => (
+                        <button key={key} onClick={() => { if (mondayBoardType !== key) fetchMondayBoard(key); }}
+                          style={{ padding: "4px 12px", cursor: "pointer", border: "none", transition: "all .15s",
+                            background: mondayBoardType === key ? colors.primary : "transparent",
+                            color: mondayBoardType === key ? "#fff" : colors.textMuted }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   {mondayItems.length > 0 && (
                     <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
                       {t("monday_items", mondayItems.length, mondaySelected.size)}
@@ -4247,7 +4265,8 @@ Kurallar:
               <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("settings_mondaySub_user")}</p>
               {[
                 { label: t("settings_apiKey"), key: "mondayApiKey", type: "password", placeholder: "eyJhbGci..." },
-                { label: t("settings_boardId"), key: "mondayBoardId", placeholder: "1234567890" },
+                { label: "Contacts Board ID", key: "mondayBoardId", placeholder: "1234567890" },
+                { label: "Companies Board ID", key: "mondayCompaniesBoardId", placeholder: "1234567890" },
               ].map((f) => (
                 <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
                   <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
@@ -4295,7 +4314,8 @@ Kurallar:
               <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("settings_mondaySub_admin")}</p>
               {[
                 { label: t("settings_apiKey"), key: "mondayApiKey", type: "password", placeholder: "eyJhbGci..." },
-                { label: t("settings_boardId"), key: "mondayBoardId", placeholder: "1234567890" },
+                { label: "Contacts Board ID", key: "mondayBoardId", placeholder: "1234567890" },
+                { label: "Companies Board ID", key: "mondayCompaniesBoardId", placeholder: "1234567890" },
               ].map((f) => (
                 <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
                   <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
