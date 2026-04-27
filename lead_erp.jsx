@@ -2933,7 +2933,9 @@ Kurallar:
               } else if (f.type === "value_select") {
                 if (!f.values || f.values.size === 0) continue;
                 const val = (colMap[fid] || "").trim();
-                if (!f.values.has(val)) return false;
+                const matchesEmpty = !val && f.values.has("__empty__");
+                const matchesVal   = val  && f.values.has(val);
+                if (!matchesEmpty && !matchesVal) return false;
               }
             }
             return true;
@@ -3407,14 +3409,23 @@ Kurallar:
                         // value_select — pill checkboxes
                         const vals = def.options || [];
                         const sel  = f.values || new Set();
+                        const toggle = (v) => { const next = new Set(sel); sel.has(v) ? next.delete(v) : next.add(v); setF({ values: next }); };
+                        const emptyOn = sel.has("__empty__");
                         return (
                           <div key={def.id} style={{ ...cardStyle, minWidth: 140 }}>
                             <div style={titleStyle}>{def.title}</div>
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                              <button onClick={() => toggle("__empty__")}
+                                style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer", fontStyle: "italic",
+                                  border: `1px solid ${emptyOn ? "#f59e0b" : colors.border}`,
+                                  background: emptyOn ? "#fef3c7" : "transparent",
+                                  color: emptyOn ? "#92400e" : colors.textMuted, transition: "all .15s" }}>
+                                No tag
+                              </button>
                               {vals.map(val => {
                                 const on = sel.has(val);
                                 return (
-                                  <button key={val} onClick={() => { const next = new Set(sel); on ? next.delete(val) : next.add(val); setF({ values: next }); }}
+                                  <button key={val} onClick={() => toggle(val)}
                                     style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer", border: `1px solid ${on ? colors.primary : colors.border}`,
                                       background: on ? colors.primary : "transparent", color: on ? "#fff" : colors.textMuted,
                                       maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", transition: "all .15s" }}
