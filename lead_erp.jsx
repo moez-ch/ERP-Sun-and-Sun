@@ -284,6 +284,37 @@ const LinkedInIcon = ({ size = 18 }) => (
   </svg>
 );
 
+// ─── MONDAY COLUMN TITLE TRANSLATION ─────────────────────────────
+const MONDAY_COL_TITLE_EN = {
+  "e-posta": "Email", "e posta": "Email", "eposta": "Email",
+  "telefon": "Phone", "cep telefonu": "Phone", "gsm": "Phone", "tel": "Phone",
+  "calisan sayisi": "Employee Count", "calisan": "Employees",
+  "personel": "Staff", "kadro": "Headcount", "eleman": "Staff",
+  "sektor": "Industry", "endustri": "Industry",
+  "cinsiyet": "Gender", "unvan": "Title", "hitap": "Salutation",
+  "mail konulari": "Email Topics",
+  "ortak mail": "Shared Email", "ortak e-posta": "Shared Email",
+  "isim": "First Name", "ad": "First Name",
+  "soyisim": "Last Name", "soyad": "Last Name",
+  "sirket": "Company", "firma": "Company",
+  "sehir": "City", "ulke": "Country",
+  "pozisyon": "Position", "pozisyon/unvan": "Position",
+  "web sitesi": "Website",
+  "not": "Notes", "notlar": "Notes",
+  "durum": "Status", "kaynak": "Source", "linkedin": "LinkedIn",
+};
+function normForColTitle(s) {
+  return (s || "").toLowerCase()
+    .replace(/[İI]/g, "i").replace(/ı/g, "i").replace(/[Şş]/g, "s")
+    .replace(/[Çç]/g, "c").replace(/[Öö]/g, "o").replace(/[Üü]/g, "u").replace(/[Ğğ]/g, "g")
+    .trim();
+}
+function mondayColTitle(col, lang) {
+  const title = col?.title || "";
+  if (lang !== "en") return title;
+  return MONDAY_COL_TITLE_EN[normForColTitle(title)] || title;
+}
+
 // ─── MONDAY DEDUPLICATION ─────────────────────────────────────────
 function deduplicateMondayItems(items, columns) {
   if (!items || items.length === 0) return { deduped: [], mergedCount: 0, mergeLog: [] };
@@ -1888,8 +1919,8 @@ Kurallar:
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
                       {[
                         { label: "Total Contacts", value: mondayItems.length, color: colors.primary },
-                        { label: emailCol ? `With Email (${emailCol.title})` : "With Email", value: withEmail, color: colors.success },
-                        { label: phoneCol ? `With Phone (${phoneCol.title})` : "With Phone", value: withPhone, color: colors.accent },
+                        { label: emailCol ? `With Email (${mondayColTitle(emailCol, lang)})` : "With Email", value: withEmail, color: colors.success },
+                        { label: phoneCol ? `With Phone (${mondayColTitle(phoneCol, lang)})` : "With Phone", value: withPhone, color: colors.accent },
                         { label: "Email + Phone", value: withBoth, color: colors.primaryLight },
                       ].map((s, i) => (
                         <div key={i} style={{ background: colors.bg, borderRadius: 10, padding: "14px 16px", border: `1px solid ${colors.border}` }}>
@@ -2840,23 +2871,23 @@ Kurallar:
           const specialIds = new Set([emailCol?.id, phoneCol?.id, empCol?.id, industryCol?.id, ortakMailCol?.id, genderCol?.id, nameCol?.id, surnameCol?.id].filter(Boolean));
           const filterDefs = [];
           filterDefs.push({ id: "_name", title: "Name", type: "presence" });
-          if (emailCol)    filterDefs.push({ id: emailCol.id,    title: emailCol.title,    type: "presence" });
-          if (phoneCol)    filterDefs.push({ id: phoneCol.id,    title: phoneCol.title,    type: "presence" });
-          if (genderCol)   filterDefs.push({ id: genderCol.id,   title: genderCol.title,   type: "presence" });
+          if (emailCol)    filterDefs.push({ id: emailCol.id,    title: mondayColTitle(emailCol, lang),    type: "presence" });
+          if (phoneCol)    filterDefs.push({ id: phoneCol.id,    title: mondayColTitle(phoneCol, lang),    type: "presence" });
+          if (genderCol)   filterDefs.push({ id: genderCol.id,   title: mondayColTitle(genderCol, lang),   type: "presence" });
           if (empCol) {
-            filterDefs.push({ id: empCol.id, title: empCol.title, type: "numeric_range" });
+            filterDefs.push({ id: empCol.id, title: mondayColTitle(empCol, lang), type: "numeric_range" });
           }
           if (industryCol) {
             const vals = new Set();
             mondayItems.forEach(i => { const cv = i.column_values.find(v => v.id === industryCol.id); const val = (cv?.text||"").trim(); if (val) vals.add(val); });
-            if (vals.size > 0) filterDefs.push({ id: industryCol.id, title: industryCol.title, type: "value_select", options: [...vals].sort() });
+            if (vals.size > 0) filterDefs.push({ id: industryCol.id, title: mondayColTitle(industryCol, lang), type: "value_select", options: [...vals].sort() });
           }
           mondayColumns.filter(c =>
             !["checkbox","button","name","email","phone","text"].includes(c.type) && !specialIds.has(c.id)
           ).forEach(col => {
             const vals = new Set();
             mondayItems.forEach(i => { const cv = i.column_values.find(v => v.id === col.id); const val = (cv?.text||"").trim(); if (val) vals.add(val); });
-            if (vals.size > 0 && vals.size <= 50) filterDefs.push({ id: col.id, title: col.title, type: "value_select", options: [...vals].sort() });
+            if (vals.size > 0 && vals.size <= 50) filterDefs.push({ id: col.id, title: mondayColTitle(col, lang), type: "value_select", options: [...vals].sort() });
           });
 
           const hasActiveFilters = Object.entries(mondayFilters).some(([, f]) => {
@@ -3403,7 +3434,7 @@ Kurallar:
                         </th>
                         <th style={{ textAlign: "left", padding: "8px 12px", color: colors.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>{t("monday_colName")}</th>
                         {visibleCols.map(c => (
-                          <th key={c.id} style={{ textAlign: "left", padding: "8px 12px", color: colors.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>{c.title}</th>
+                          <th key={c.id} style={{ textAlign: "left", padding: "8px 12px", color: colors.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>{mondayColTitle(c, lang)}</th>
                         ))}
                         <th style={{ padding: "8px 12px" }}></th>
                       </tr>
@@ -3530,7 +3561,7 @@ Kurallar:
                               {/* Filled fields note */}
                               {entry.filledFields.length > 0 && (
                                 <div style={{ padding: "7px 14px", background: "#fffde7", borderTop: `1px solid ${colors.border}`, fontSize: 11, color: "#6d4c00" }}>
-                                  Fields filled from duplicate: <strong>{entry.filledFields.join(", ")}</strong>
+                                  Fields filled from duplicate: <strong>{entry.filledFields.map(f => MONDAY_COL_TITLE_EN[normForColTitle(f)] || f).join(", ")}</strong>
                                 </div>
                               )}
                             </div>
@@ -3561,7 +3592,7 @@ Kurallar:
                       </p>
                     )}
                     {genderCol ? (
-                      <p style={{ fontSize: 11, color: "#81c784", marginBottom: 16 }}>{t("monday_genderFound", genderCol.title)}</p>
+                      <p style={{ fontSize: 11, color: "#81c784", marginBottom: 16 }}>{t("monday_genderFound", mondayColTitle(genderCol, lang))}</p>
                     ) : (
                       <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("monday_genderNotFound")}</p>
                     )}
