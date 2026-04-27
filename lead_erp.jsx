@@ -284,6 +284,67 @@ const LinkedInIcon = ({ size = 18 }) => (
   </svg>
 );
 
+// ─── MONDAY DEDUPLICATION ─────────────────────────────────────────
+function deduplicateMondayItems(items, columns) {
+  if (!items || items.length === 0) return { deduped: [], mergedCount: 0 };
+
+  const emailColId = (columns.find(c => c.type === "email") || columns.find(c => /e[\s-]?posta|e-?mail/i.test(c.title)))?.id;
+  const phoneColId = (columns.find(c => c.type === "phone" || /\btelefon\b|phone|tel\b|gsm\b|cep\b/i.test(c.title)))?.id;
+
+  const normName  = s => (s || "").trim().replace(/[İI]/g, "i").replace(/ı/g, "i").replace(/[Şş]/g, "s").toLowerCase().replace(/\s+/g, " ");
+  const normPhone = s => (s || "").replace(/[\s\-().+]/g, "");
+  const normEmail = s => (s || "").toLowerCase().trim();
+
+  const parent = {};
+  const find = id => { if (parent[id] === undefined) parent[id] = id; if (parent[id] !== id) parent[id] = find(parent[id]); return parent[id]; };
+  const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
+
+  const byName = {}, byEmail = {}, byPhone = {};
+  for (const item of items) {
+    const name = normName(item.name || "");
+    if (name && name !== "item") { if (!byName[name]) byName[name] = []; byName[name].push(item.id); }
+    if (emailColId) {
+      const email = normEmail(item.column_values.find(cv => cv.id === emailColId)?.text || "");
+      if (email) { if (!byEmail[email]) byEmail[email] = []; byEmail[email].push(item.id); }
+    }
+    if (phoneColId) {
+      const phone = normPhone(item.column_values.find(cv => cv.id === phoneColId)?.text || "");
+      if (phone && phone.length >= 7) { if (!byPhone[phone]) byPhone[phone] = []; byPhone[phone].push(item.id); }
+    }
+  }
+
+  for (const ids of Object.values(byName))  for (let i = 1; i < ids.length; i++) union(ids[0], ids[i]);
+  for (const ids of Object.values(byEmail)) for (let i = 1; i < ids.length; i++) union(ids[0], ids[i]);
+  for (const ids of Object.values(byPhone)) for (let i = 1; i < ids.length; i++) union(ids[0], ids[i]);
+
+  const groups = {};
+  for (const item of items) { const root = find(item.id); if (!groups[root]) groups[root] = []; groups[root].push(item); }
+
+  let mergedCount = 0;
+  const result = [];
+  for (const group of Object.values(groups)) {
+    if (group.length === 1) { result.push(group[0]); continue; }
+    mergedCount += group.length - 1;
+    const primary = [...group].sort((a, b) =>
+      b.column_values.filter(cv => cv.text?.trim()).length - a.column_values.filter(cv => cv.text?.trim()).length
+    )[0];
+    const mergedCVs = primary.column_values.map(cv => {
+      if (cv.text?.trim()) return cv;
+      for (const item of group) {
+        if (item === primary) continue;
+        const other = item.column_values.find(o => o.id === cv.id);
+        if (other?.text?.trim()) return { ...cv, text: other.text, value: other.value };
+      }
+      return cv;
+    });
+    result.push({ ...primary, column_values: mergedCVs, _mergedFrom: group.map(i => i.id) });
+  }
+
+  const order = Object.fromEntries(items.map((item, idx) => [item.id, idx]));
+  result.sort((a, b) => (order[a.id] ?? 0) - (order[b.id] ?? 0));
+  return { deduped: result, mergedCount };
+}
+
 // ─── MAIN APP ────────────────────────────────────────────────────
 export default function App() {
   const [authUser, setAuthUser] = useState(null);
@@ -504,6 +565,7 @@ Kurallar:
   // ── EMAIL CAMPAIGN STATE ────────────────────────────────────────
   // ── MONDAY STATE ───────────────────────────────────────────────
   const [mondayItems, setMondayItems] = useState([]);
+  const [mondayMergedCount, setMondayMergedCount] = useState(0);
   const [mondayColumns, setMondayColumns] = useState([]);
   const [mondayBoardName, setMondayBoardName] = useState("");
   const [mondayLoading, setMondayLoading] = useState(false);
@@ -631,8 +693,10 @@ Kurallar:
       if (!board) { setMondayError("Board not found. Check your Board ID."); return; }
       setMondayBoardName(board.name);
       setMondayColumns(board.columns || []);
-      const items = board.items_page?.items || [];
+      const rawItems = board.items_page?.items || [];
+      const { deduped: items, mergedCount } = deduplicateMondayItems(rawItems, board.columns || []);
       setMondayItems(items);
+      setMondayMergedCount(mergedCount);
       // verify email domains in background
       const emailColDef = (board.columns || []).find(c => c.type === "email") || (board.columns || []).find(c => /e[\s-]?posta|e-?mail/i.test(c.title));
       if (emailColDef) {
@@ -1762,8 +1826,13 @@ Kurallar:
               return (
                 <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginTop: 16 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
                       Monday.com {mondayBoardName ? `— ${mondayBoardName}` : ""}
+                      {mondayMergedCount > 0 && (
+                        <span style={{ fontSize: 10, fontWeight: 600, background: "#fff3cd", color: "#856404", border: "1px solid #ffc107", borderRadius: 10, padding: "2px 7px" }}>
+                          {mondayMergedCount} duplicate{mondayMergedCount !== 1 ? "s" : ""} merged
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       {mondayLoading && <span style={{ fontSize: 11, color: colors.textMuted }}>Fetching…</span>}
@@ -2831,7 +2900,16 @@ Kurallar:
                   <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
                     {t("monday_title", mondayBoardName)}
                   </h2>
-                  {mondayItems.length > 0 && <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>{t("monday_items", mondayItems.length, mondaySelected.size)}</div>}
+                  {mondayItems.length > 0 && (
+                    <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
+                      {t("monday_items", mondayItems.length, mondaySelected.size)}
+                      {mondayMergedCount > 0 && (
+                        <span style={{ fontSize: 10, fontWeight: 600, background: "#fff3cd", color: "#856404", border: "1px solid #ffc107", borderRadius: 10, padding: "2px 7px" }}>
+                          {mondayMergedCount} duplicate{mondayMergedCount !== 1 ? "s" : ""} merged
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   {mondaySelected.size > 0 && (
