@@ -286,10 +286,11 @@ const LinkedInIcon = ({ size = 18 }) => (
 
 // ─── MONDAY DEDUPLICATION ─────────────────────────────────────────
 function deduplicateMondayItems(items, columns) {
-  if (!items || items.length === 0) return { deduped: [], mergedCount: 0 };
+  if (!items || items.length === 0) return { deduped: [], mergedCount: 0, mergeLog: [] };
 
-  const emailColId = (columns.find(c => c.type === "email") || columns.find(c => /e[\s-]?posta|e-?mail/i.test(c.title)))?.id;
-  const phoneColId = (columns.find(c => c.type === "phone" || /\btelefon\b|phone|tel\b|gsm\b|cep\b/i.test(c.title)))?.id;
+  const emailColId  = (columns.find(c => c.type === "email") || columns.find(c => /e[\s-]?posta|e-?mail/i.test(c.title)))?.id;
+  const phoneColId  = (columns.find(c => c.type === "phone" || /\btelefon\b|phone|tel\b|gsm\b|cep\b/i.test(c.title)))?.id;
+  const colTitleById = Object.fromEntries(columns.map(c => [c.id, c.title]));
 
   const normName  = s => (s || "").trim().replace(/[İI]/g, "i").replace(/ı/g, "i").replace(/[Şş]/g, "s").toLowerCase().replace(/\s+/g, " ");
   const normPhone = s => (s || "").replace(/[\s\-().+]/g, "");
@@ -321,28 +322,60 @@ function deduplicateMondayItems(items, columns) {
   for (const item of items) { const root = find(item.id); if (!groups[root]) groups[root] = []; groups[root].push(item); }
 
   let mergedCount = 0;
+  const mergeLog = [];
   const result = [];
+
   for (const group of Object.values(groups)) {
     if (group.length === 1) { result.push(group[0]); continue; }
     mergedCount += group.length - 1;
+
     const primary = [...group].sort((a, b) =>
       b.column_values.filter(cv => cv.text?.trim()).length - a.column_values.filter(cv => cv.text?.trim()).length
     )[0];
+
+    const filledFields = [];
     const mergedCVs = primary.column_values.map(cv => {
       if (cv.text?.trim()) return cv;
       for (const item of group) {
         if (item === primary) continue;
         const other = item.column_values.find(o => o.id === cv.id);
-        if (other?.text?.trim()) return { ...cv, text: other.text, value: other.value };
+        if (other?.text?.trim()) {
+          filledFields.push(colTitleById[cv.id] || cv.id);
+          return { ...cv, text: other.text, value: other.value };
+        }
       }
       return cv;
     });
+
+    // Determine which signals caused the grouping
+    const matchedBy = [];
+    const names = group.map(i => normName(i.name || "")).filter(n => n && n !== "item");
+    if (names.length > 1 && new Set(names).size < names.length) matchedBy.push("name");
+    if (emailColId) {
+      const emails = group.map(i => normEmail(i.column_values.find(cv => cv.id === emailColId)?.text || "")).filter(Boolean);
+      if (emails.length > 1 && new Set(emails).size < emails.length) matchedBy.push("email");
+    }
+    if (phoneColId) {
+      const phones = group.map(i => normPhone(i.column_values.find(cv => cv.id === phoneColId)?.text || "")).filter(p => p.length >= 7);
+      if (phones.length > 1 && new Set(phones).size < phones.length) matchedBy.push("phone");
+    }
+
+    // Snapshot each original for display
+    const originals = group.map(i => ({
+      id: i.id,
+      name: i.name,
+      email: emailColId ? (i.column_values.find(cv => cv.id === emailColId)?.text || "") : "",
+      phone: phoneColId ? (i.column_values.find(cv => cv.id === phoneColId)?.text || "") : "",
+      isPrimary: i.id === primary.id,
+    }));
+
+    mergeLog.push({ name: primary.name, total: group.length, matchedBy, filledFields, originals });
     result.push({ ...primary, column_values: mergedCVs, _mergedFrom: group.map(i => i.id) });
   }
 
   const order = Object.fromEntries(items.map((item, idx) => [item.id, idx]));
   result.sort((a, b) => (order[a.id] ?? 0) - (order[b.id] ?? 0));
-  return { deduped: result, mergedCount };
+  return { deduped: result, mergedCount, mergeLog };
 }
 
 // ─── MAIN APP ────────────────────────────────────────────────────
@@ -566,6 +599,8 @@ Kurallar:
   // ── MONDAY STATE ───────────────────────────────────────────────
   const [mondayItems, setMondayItems] = useState([]);
   const [mondayMergedCount, setMondayMergedCount] = useState(0);
+  const [mondayMergeLog, setMondayMergeLog] = useState([]);
+  const [mondayMergeModal, setMondayMergeModal] = useState(false);
   const [mondayColumns, setMondayColumns] = useState([]);
   const [mondayBoardName, setMondayBoardName] = useState("");
   const [mondayLoading, setMondayLoading] = useState(false);
@@ -694,9 +729,10 @@ Kurallar:
       setMondayBoardName(board.name);
       setMondayColumns(board.columns || []);
       const rawItems = board.items_page?.items || [];
-      const { deduped: items, mergedCount } = deduplicateMondayItems(rawItems, board.columns || []);
+      const { deduped: items, mergedCount, mergeLog } = deduplicateMondayItems(rawItems, board.columns || []);
       setMondayItems(items);
       setMondayMergedCount(mergedCount);
+      setMondayMergeLog(mergeLog);
       // verify email domains in background
       const emailColDef = (board.columns || []).find(c => c.type === "email") || (board.columns || []).find(c => /e[\s-]?posta|e-?mail/i.test(c.title));
       if (emailColDef) {
@@ -1829,9 +1865,9 @@ Kurallar:
                     <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
                       Monday.com {mondayBoardName ? `— ${mondayBoardName}` : ""}
                       {mondayMergedCount > 0 && (
-                        <span style={{ fontSize: 10, fontWeight: 600, background: "#fff3cd", color: "#856404", border: "1px solid #ffc107", borderRadius: 10, padding: "2px 7px" }}>
-                          {mondayMergedCount} duplicate{mondayMergedCount !== 1 ? "s" : ""} merged
-                        </span>
+                        <button onClick={() => setMondayMergeModal(true)} style={{ fontSize: 10, fontWeight: 600, background: "#fff3cd", color: "#856404", border: "1px solid #ffc107", borderRadius: 10, padding: "2px 7px", cursor: "pointer" }}>
+                          {mondayMergedCount} duplicate{mondayMergedCount !== 1 ? "s" : ""} merged ↗
+                        </button>
                       )}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -2904,9 +2940,9 @@ Kurallar:
                     <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
                       {t("monday_items", mondayItems.length, mondaySelected.size)}
                       {mondayMergedCount > 0 && (
-                        <span style={{ fontSize: 10, fontWeight: 600, background: "#fff3cd", color: "#856404", border: "1px solid #ffc107", borderRadius: 10, padding: "2px 7px" }}>
-                          {mondayMergedCount} duplicate{mondayMergedCount !== 1 ? "s" : ""} merged
-                        </span>
+                        <button onClick={() => setMondayMergeModal(true)} style={{ fontSize: 10, fontWeight: 600, background: "#fff3cd", color: "#856404", border: "1px solid #ffc107", borderRadius: 10, padding: "2px 7px", cursor: "pointer" }}>
+                          {mondayMergedCount} duplicate{mondayMergedCount !== 1 ? "s" : ""} merged ↗
+                        </button>
                       )}
                     </div>
                   )}
@@ -3424,6 +3460,84 @@ Kurallar:
                       })}
                     </tbody>
                   </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Merge Log Modal */}
+              {mondayMergeModal && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }} onClick={() => setMondayMergeModal(false)}>
+                  <div style={{ background: colors.surface, borderRadius: 14, padding: 28, width: 680, maxWidth: "95vw", maxHeight: "80vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.3)" }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                      <div>
+                        <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Duplicate Contacts — Merge Report</h3>
+                        <p style={{ fontSize: 12, color: colors.textMuted, margin: "4px 0 0" }}>
+                          {mondayMergeLog.length} group{mondayMergeLog.length !== 1 ? "s" : ""} merged — {mondayMergedCount} record{mondayMergedCount !== 1 ? "s" : ""} removed
+                        </p>
+                      </div>
+                      <button onClick={() => setMondayMergeModal(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: colors.textMuted, lineHeight: 1 }}>×</button>
+                    </div>
+                    {mondayMergeLog.length === 0 ? (
+                      <p style={{ fontSize: 13, color: colors.textMuted, textAlign: "center", padding: "20px 0" }}>No duplicates found.</p>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                        {mondayMergeLog.map((entry, i) => {
+                          const signalColors = { name: { bg: "#e8f4ff", text: "#1565c0", border: "#90caf9" }, email: { bg: "#e8f5e9", text: "#2e7d32", border: "#a5d6a7" }, phone: { bg: "#fce4ec", text: "#880e4f", border: "#f48fb1" } };
+                          return (
+                            <div key={i} style={{ border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
+                              {/* Group header */}
+                              <div style={{ background: colors.bg, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ fontWeight: 700, fontSize: 13 }}>{entry.name}</span>
+                                  <span style={{ fontSize: 11, color: colors.textMuted }}>{entry.total} records → 1</span>
+                                </div>
+                                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                                  {entry.matchedBy.map(sig => (
+                                    <span key={sig} style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 8, background: signalColors[sig]?.bg, color: signalColors[sig]?.text, border: `1px solid ${signalColors[sig]?.border}` }}>
+                                      matched by {sig}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              {/* Originals table */}
+                              <div style={{ overflowX: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                  <thead>
+                                    <tr style={{ background: colors.surface }}>
+                                      <th style={{ padding: "6px 14px", textAlign: "left", color: colors.textMuted, fontWeight: 600, borderBottom: `1px solid ${colors.border}` }}>Name</th>
+                                      <th style={{ padding: "6px 14px", textAlign: "left", color: colors.textMuted, fontWeight: 600, borderBottom: `1px solid ${colors.border}` }}>Email</th>
+                                      <th style={{ padding: "6px 14px", textAlign: "left", color: colors.textMuted, fontWeight: 600, borderBottom: `1px solid ${colors.border}` }}>Phone</th>
+                                      <th style={{ padding: "6px 14px", textAlign: "left", color: colors.textMuted, fontWeight: 600, borderBottom: `1px solid ${colors.border}` }}>Role</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {entry.originals.map((orig, j) => (
+                                      <tr key={j} style={{ background: orig.isPrimary ? "#f0fdf4" : "transparent", borderBottom: `1px solid ${colors.border}` }}>
+                                        <td style={{ padding: "7px 14px", fontWeight: orig.isPrimary ? 600 : 400 }}>{orig.name || "—"}</td>
+                                        <td style={{ padding: "7px 14px", color: orig.email ? colors.text : colors.textMuted }}>{orig.email || <span style={{ fontStyle: "italic" }}>empty</span>}</td>
+                                        <td style={{ padding: "7px 14px", color: orig.phone ? colors.text : colors.textMuted }}>{orig.phone || <span style={{ fontStyle: "italic" }}>empty</span>}</td>
+                                        <td style={{ padding: "7px 14px" }}>
+                                          {orig.isPrimary
+                                            ? <span style={{ fontSize: 10, fontWeight: 700, background: "#e8f5e9", color: "#2e7d32", border: "1px solid #a5d6a7", borderRadius: 8, padding: "2px 7px" }}>★ kept</span>
+                                            : <span style={{ fontSize: 10, fontWeight: 600, background: "#fce4ec", color: "#880e4f", border: "1px solid #f48fb1", borderRadius: 8, padding: "2px 7px" }}>merged in</span>
+                                          }
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                              {/* Filled fields note */}
+                              {entry.filledFields.length > 0 && (
+                                <div style={{ padding: "7px 14px", background: "#fffde7", borderTop: `1px solid ${colors.border}`, fontSize: 11, color: "#6d4c00" }}>
+                                  Fields filled from duplicate: <strong>{entry.filledFields.join(", ")}</strong>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
