@@ -2949,8 +2949,9 @@ Kurallar:
             const rawName = (name || "").trim();
             const firstName = rawName.split(/\s+/)[0];
             const isPlaceholder = !firstName || firstName.toLowerCase() === "item";
+            const isCompany = /LTD|A\.?\s*[SŞ]\.?|TİC\.?|TIC\.?|SAN\.?|[SŞ]Tİ\.?|LİMİTED|ANONİM|HOLDİNG|GRUP|A\.G\.|KOOP/i.test(rawName);
             const genderVal = genderCol ? (colMap[genderCol.id] || "").toLowerCase().trim() : "";
-            if (isPlaceholder) return "Merhaba,";
+            if (isPlaceholder || isCompany) return "Merhaba,";
             if (/bey|erkek|bay|male|mr/i.test(genderVal)) return `Merhaba ${firstName} Bey,`;
             if (/han[ıi]m|kad[ıi]n|bayan|female|ms|mrs/i.test(genderVal)) return `Merhaba ${firstName} Hanım,`;
             return `Merhaba ${firstName},`;
