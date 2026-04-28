@@ -770,11 +770,10 @@ Kurallar:
       setMondayBoardName(board.name);
       setMondayColumns(board.columns || []);
       const rawItems = board.items_page?.items || [];
-      const { deduped: items, mergedCount, mergeLog } = deduplicateMondayItems(rawItems, board.columns || [], mondayMergeSignals);
       setMondayRawItems(rawItems);
-      setMondayItems(items);
-      setMondayMergedCount(mergedCount);
-      setMondayMergeLog(mergeLog);
+      setMondayItems(rawItems);
+      setMondayMergedCount(0);
+      setMondayMergeLog([]);
       // verify email domains in background
       const emailColDef = (board.columns || []).find(c => c.type === "email") || (board.columns || []).find(c => /e[\s-]?posta|e-?mail/i.test(c.title));
       if (emailColDef) {
@@ -809,6 +808,14 @@ Kurallar:
     } finally {
       setMondayLoading(false);
     }
+  };
+
+  const runDedup = () => {
+    const { deduped, mergedCount, mergeLog } = deduplicateMondayItems(mondayRawItems, mondayColumns, mondayMergeSignals);
+    setMondayItems(deduped);
+    setMondayMergedCount(mergedCount);
+    setMondayMergeLog(mergeLog);
+    setMondayMergeModal(true);
   };
 
   const syncBounces = async () => {
@@ -891,7 +898,6 @@ Kurallar:
   useEffect(() => {
     if (view === "settings" && authUser?.role === "admin") { umFetch(); fetchSettingsCompanies(); }
     if (view === "monday") fetchMondayCampaigns();
-    if (view === "dashboard" && settings.mondayApiKey && settings.mondayBoardId && mondayItems.length === 0) fetchMondayBoard();
     if (view === "contracts") {
       const token = localStorage.getItem("sns_token");
       fetch("/contracts/templates", { headers: { Authorization: `Bearer ${token}` } })
@@ -1906,9 +1912,13 @@ Kurallar:
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
                       Monday.com {mondayBoardName ? `— ${mondayBoardName}` : ""}
-                      {mondayMergedCount > 0 && (
-                        <button onClick={() => setMondayMergeModal(true)} style={{ fontSize: 10, fontWeight: 600, background: "#fff3cd", color: "#856404", border: "1px solid #ffc107", borderRadius: 10, padding: "2px 7px", cursor: "pointer" }}>
-                          {mondayMergedCount} duplicate{mondayMergedCount !== 1 ? "s" : ""} merged ↗
+                      {mondayItems.length > 0 && (
+                        <button onClick={() => mondayMergedCount > 0 ? setMondayMergeModal(true) : runDedup()}
+                          style={{ fontSize: 10, fontWeight: 600, borderRadius: 10, padding: "2px 7px", cursor: "pointer",
+                            background: mondayMergedCount > 0 ? "#fff3cd" : "transparent",
+                            color: mondayMergedCount > 0 ? "#856404" : colors.textMuted,
+                            border: `1px solid ${mondayMergedCount > 0 ? "#ffc107" : colors.border}` }}>
+                          {mondayMergedCount > 0 ? `${mondayMergedCount} duplicate${mondayMergedCount !== 1 ? "s" : ""} merged ↗` : "Find Duplicates"}
                         </button>
                       )}
                     </div>
@@ -2997,11 +3007,13 @@ Kurallar:
                   {mondayItems.length > 0 && (
                     <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
                       {t("monday_items", mondayItems.length, mondaySelected.size)}
-                      {mondayMergedCount > 0 && (
-                        <button onClick={() => setMondayMergeModal(true)} style={{ fontSize: 10, fontWeight: 600, background: "#fff3cd", color: "#856404", border: "1px solid #ffc107", borderRadius: 10, padding: "2px 7px", cursor: "pointer" }}>
-                          {mondayMergedCount} duplicate{mondayMergedCount !== 1 ? "s" : ""} merged ↗
-                        </button>
-                      )}
+                      <button onClick={() => mondayMergedCount > 0 ? setMondayMergeModal(true) : runDedup()}
+                        style={{ fontSize: 10, fontWeight: 600, borderRadius: 10, padding: "2px 7px", cursor: "pointer",
+                          background: mondayMergedCount > 0 ? "#fff3cd" : "transparent",
+                          color: mondayMergedCount > 0 ? "#856404" : colors.textMuted,
+                          border: `1px solid ${mondayMergedCount > 0 ? "#ffc107" : colors.border}` }}>
+                        {mondayMergedCount > 0 ? `${mondayMergedCount} duplicate${mondayMergedCount !== 1 ? "s" : ""} merged ↗` : "Find Duplicates"}
+                      </button>
                     </div>
                   )}
                 </div>
