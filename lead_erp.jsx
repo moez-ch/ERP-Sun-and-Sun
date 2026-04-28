@@ -675,10 +675,15 @@ Kurallar:
   const [contractTemplate, setContractTemplate] = useState(null);
   const [contractData, setContractData] = useState({
     party1_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
-    party2_address: "", party3_name: "", program_name: "", down_payment: "",
-    success_bonus: "", contract_date: new Date().toLocaleDateString("tr-TR"),
+    party2_address: "", party3_name: "",
+    program_name: "", down_payment: "", success_bonus: "",
+    program2_name: "", program2_fee: "", program2_bonus: "",
+    program3_name: "", program3_fee: "", program3_bonus: "",
+    notes: "",
+    contract_date: new Date().toLocaleDateString("tr-TR"),
     payment_schedule: [],
   });
+  const [contractProgramCount, setContractProgramCount] = useState(1);
   const [contractGenerating, setContractGenerating] = useState(false);
   const [contractOcrLoading, setContractOcrLoading] = useState(false);
   const [contractUploadName, setContractUploadName] = useState("");
@@ -4269,13 +4274,59 @@ Kurallar:
                       )}
                     </div>
 
-                    {/* Contract details */}
+                    {/* Contract details — up to 3 programs */}
                     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionDetails")}</div>
-                      {field(t("contract_programName"), "program_name", { placeholder: "e.g. SoGreen" })}
-                      {field(t("contract_downPayment"), "down_payment", { placeholder: "e.g. 50.000" })}
-                      {field(t("contract_successBonus"), "success_bonus", { placeholder: "e.g. 5" })}
+
+                      {/* Program 1 */}
+                      {[
+                        { label: "Program 1", nameKey: "program_name", feeKey: "down_payment", bonusKey: "success_bonus" },
+                        { label: "Program 2", nameKey: "program2_name", feeKey: "program2_fee", bonusKey: "program2_bonus" },
+                        { label: "Program 3", nameKey: "program3_name", feeKey: "program3_fee", bonusKey: "program3_bonus" },
+                      ].slice(0, contractProgramCount).map((prog, idx) => (
+                        <div key={prog.label} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: idx < contractProgramCount - 1 ? `1px dashed ${colors.border}` : "none" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: colors.primary, textTransform: "uppercase", letterSpacing: 0.5 }}>{prog.label}</div>
+                            {idx > 0 && (
+                              <button onClick={() => { setContractProgramCount(p => p - 1); setContractData(p => ({ ...p, [prog.nameKey]: "", [prog.feeKey]: "", [prog.bonusKey]: "" })); }}
+                                style={{ fontSize: 11, color: "#e57373", background: "none", border: "none", cursor: "pointer", padding: "0 4px" }}>✕ Remove</button>
+                            )}
+                          </div>
+                          {field("Program Name", prog.nameKey, { placeholder: "e.g. SoGreen" })}
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                            <div>
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Service Fee (TL + VAT)</div>
+                              <input value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))}
+                                placeholder="e.g. 50.000"
+                                style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Success Bonus (%)</div>
+                              <input value={contractData[prog.bonusKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusKey]: e.target.value }))}
+                                placeholder="e.g. 5"
+                                style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Add program button */}
+                      {contractProgramCount < 3 && (
+                        <button onClick={() => setContractProgramCount(p => p + 1)}
+                          style={{ fontSize: 12, fontWeight: 600, color: colors.primary, background: `${colors.primary}15`, border: `1px dashed ${colors.primary}55`, borderRadius: 7, padding: "6px 14px", cursor: "pointer", width: "100%", marginBottom: 14 }}>
+                          + Add Program
+                        </button>
+                      )}
+
                       {field(t("contract_contractDate"), "contract_date", { placeholder: t("contract_datePlaceholder") })}
+
+                      {/* Notes */}
+                      <div style={{ marginTop: 6 }}>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Notes</div>
+                        <textarea value={contractData.notes || ""} onChange={e => setContractData(p => ({ ...p, notes: e.target.value }))}
+                          rows={3} placeholder="Additional notes, conditions, or observations..."
+                          style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+                      </div>
                     </div>
                   </div>
 
