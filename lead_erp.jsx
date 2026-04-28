@@ -3991,7 +3991,6 @@ Kurallar:
 
           const handleGenerate = async () => {
             if (!contractTemplate) { alert("Lütfen bir sözleşme şablonu seçin."); return; }
-            if (contractTemplate.template_type !== "html" && !contractData.party1_id) { alert("Lütfen 1. Taraf şirketini seçin."); return; }
             setContractGenerating(true);
             try {
               const token = localStorage.getItem("sns_token");
