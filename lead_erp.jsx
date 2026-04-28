@@ -2919,13 +2919,6 @@ Kurallar:
             mondayItems.forEach(i => { const cv = i.column_values.find(v => v.id === ortakMailCol.id); const val = (cv?.text||"").trim(); if (val) vals.add(val); });
             filterDefs.push({ id: ortakMailCol.id, title: mondayColTitle(ortakMailCol, lang), type: "value_select", options: [...vals].sort() });
           }
-          mondayColumns.filter(c =>
-            !["checkbox","button","name","email","phone","text"].includes(c.type) && !specialIds.has(c.id)
-          ).forEach(col => {
-            const vals = new Set();
-            mondayItems.forEach(i => { const cv = i.column_values.find(v => v.id === col.id); const val = (cv?.text||"").trim(); if (val) vals.add(val); });
-            if (vals.size > 0 && vals.size <= 50) filterDefs.push({ id: col.id, title: mondayColTitle(col, lang), type: "value_select", options: [...vals].sort() });
-          });
 
           const hasActiveFilters = Object.entries(mondayFilters).some(([, f]) => {
             if (!f) return false;
