@@ -4201,7 +4201,7 @@ Kurallar:
                       </div>
                       <div style={{ flex: 1, minWidth: 180 }}>
                         <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{t("contract_fileDocx")}</div>
-                        <input type="file" accept=".docx" onChange={e => setContractUploadFile(e.target.files[0])}
+                        <input type="file" accept=".docx,.html" onChange={e => setContractUploadFile(e.target.files[0])}
                           style={{ width: "100%", padding: "6px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} />
                       </div>
                       <button onClick={handleUpload} disabled={contractUploading || !contractUploadFile}
@@ -4220,7 +4220,10 @@ Kurallar:
                       <div key={tpl.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: `1px solid ${colors.border}` }}>
                         <FileTextIcon size={16} color={colors.primary} />
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>{tpl.name}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                            {tpl.name}
+                            {tpl.template_type === "html" && <span style={{ fontSize: 9, fontWeight: 700, background: "#e8f5e9", color: "#2e7d32", border: "1px solid #a5d6a7", borderRadius: 4, padding: "1px 5px" }}>HTML</span>}
+                          </div>
                           <div style={{ fontSize: 11, color: colors.textMuted }}>
                             {t("contract_variables")}: {tpl.variables.length > 0 ? tpl.variables.map(v => `@@${v}@@`).join(", ") : "—"} · {new Date(tpl.created_at).toLocaleDateString("tr-TR")}
                           </div>

@@ -86,14 +86,16 @@ db.exec(`CREATE INDEX IF NOT EXISTS idx_email_sends_email   ON email_sends(recip
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS contract_templates (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL,
-    filename    TEXT NOT NULL,
-    file        BLOB NOT NULL,
-    variables   TEXT NOT NULL DEFAULT '[]',
-    created_at  TEXT DEFAULT (datetime('now'))
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    filename      TEXT NOT NULL,
+    file          BLOB NOT NULL,
+    variables     TEXT NOT NULL DEFAULT '[]',
+    template_type TEXT NOT NULL DEFAULT 'docx',
+    created_at    TEXT DEFAULT (datetime('now'))
   )
 `);
+try { db.exec(`ALTER TABLE contract_templates ADD COLUMN template_type TEXT NOT NULL DEFAULT 'docx'`); } catch {}
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -813,34 +815,40 @@ app.delete("/contracts/companies/:id", authenticate, (req, res) => {
 
 // GET /contracts/templates
 app.get("/contracts/templates", authenticate, (req, res) => {
-  const rows = db.prepare("SELECT id, name, filename, variables, created_at FROM contract_templates ORDER BY created_at DESC").all();
+  const rows = db.prepare("SELECT id, name, filename, variables, template_type, created_at FROM contract_templates ORDER BY created_at DESC").all();
   res.json(rows.map(r => ({ ...r, variables: JSON.parse(r.variables) })));
 });
 
-// POST /contracts/templates — upload .docx, detect @@var@@ tags
+// POST /contracts/templates — upload .docx or .html, detect @@var@@ tags
 app.post("/contracts/templates", authenticate, upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  if (!req.file.originalname.endsWith(".docx")) return res.status(400).json({ error: "Only .docx files are supported" });
-  const name = (req.body.name || req.file.originalname.replace(/\.docx$/i, "")).trim();
-  const buf = req.file.buffer;
+  const isHtml = req.file.originalname.toLowerCase().endsWith(".html");
+  const isDocx = req.file.originalname.toLowerCase().endsWith(".docx");
+  if (!isDocx && !isHtml) return res.status(400).json({ error: "Only .docx or .html files are supported" });
 
-  // Extract @@variable@@ tags from docx XML
+  const name = (req.body.name || req.file.originalname.replace(/\.(docx|html)$/i, "")).trim();
+  const buf  = req.file.buffer;
   let variables = [];
-  try {
-    const zip = new PizZip(buf);
-    const xmlFiles = ["word/document.xml", "word/header1.xml", "word/footer1.xml"];
-    const fullXml = xmlFiles.map(f => {
-      try { return mergeRuns(zip.file(f)?.asText() || ""); } catch { return ""; }
-    }).join("");
-    const stripped = fullXml.replace(/<[^>]+>/g, " ");
-    const matches = [...stripped.matchAll(/@@([a-zA-Z0-9_]+)@@/g)];
-    variables = [...new Set(matches.map(m => m[1]))];
-  } catch (e) {
-    return res.status(400).json({ error: "Could not parse .docx: " + e.message });
+
+  if (isHtml) {
+    const html = buf.toString("utf-8");
+    variables = [...new Set([...html.matchAll(/@@([a-zA-Z0-9_]+)@@/g)].map(m => m[1]))];
+  } else {
+    try {
+      const zip = new PizZip(buf);
+      const xmlFiles = ["word/document.xml", "word/header1.xml", "word/footer1.xml"];
+      const fullXml = xmlFiles.map(f => {
+        try { return mergeRuns(zip.file(f)?.asText() || ""); } catch { return ""; }
+      }).join("");
+      const stripped = fullXml.replace(/<[^>]+>/g, " ");
+      variables = [...new Set([...stripped.matchAll(/@@([a-zA-Z0-9_]+)@@/g)].map(m => m[1]))];
+    } catch (e) {
+      return res.status(400).json({ error: "Could not parse .docx: " + e.message });
+    }
   }
 
-  db.prepare("INSERT INTO contract_templates (name, filename, file, variables) VALUES (?, ?, ?, ?)")
-    .run(name, req.file.originalname, buf, JSON.stringify(variables));
+  db.prepare("INSERT INTO contract_templates (name, filename, file, variables, template_type) VALUES (?, ?, ?, ?, ?)")
+    .run(name, req.file.originalname, buf, JSON.stringify(variables), isHtml ? "html" : "docx");
   res.json({ ok: true, variables });
 });
 
@@ -856,6 +864,38 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
   const row = db.prepare("SELECT * FROM contract_templates WHERE id=?").get(templateId);
   if (!row) return res.status(404).json({ error: "Template not found" });
 
+  const tmpId   = Date.now() + "_" + Math.random().toString(36).slice(2);
+  const pdfPath = path.join(TMP_DIR, tmpId + ".pdf");
+
+  // ── HTML template path ────────────────────────────────────────────
+  if (row.template_type === "html") {
+    try {
+      let html = row.file.toString("utf-8");
+      for (const [key, val] of Object.entries(data)) {
+        if (key === "payment_schedule") continue;
+        html = html.split(`@@${key}@@`).join(String(val ?? ""));
+      }
+      // Clear any remaining unfilled variables
+      html = html.replace(/@@[a-zA-Z0-9_]+@@/g, "");
+      const htmlPath = path.join(TMP_DIR, tmpId + ".html");
+      fs.writeFileSync(htmlPath, html, "utf-8");
+      execSync(`"${LIBREOFFICE}" --headless --convert-to pdf --outdir "${TMP_DIR}" "${htmlPath}"`, { timeout: 30000 });
+      fs.unlinkSync(htmlPath);
+      if (!fs.existsSync(pdfPath)) throw new Error("PDF conversion failed");
+      const pdfBuf = fs.readFileSync(pdfPath);
+      fs.unlinkSync(pdfPath);
+      db.prepare("INSERT INTO contracts (template_id, template_name, data, created_by, created_by_name) VALUES (?,?,?,?,?)")
+        .run(templateId, row.name, JSON.stringify(data), req.user.id, req.user.name || req.user.email);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.pdf"`);
+      return res.send(pdfBuf);
+    } catch (e) {
+      console.error("[contracts/generate html]", e);
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── DOCX template path ────────────────────────────────────────────
   try {
     const zip = new PizZip(row.file);
     const xmlFiles = Object.keys(zip.files).filter(f => f.startsWith("word/") && f.endsWith(".xml") && !f.includes("theme") && !f.includes("settings"));
@@ -889,12 +929,8 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       zip.file(fname, xml);
     }
 
-    const docxBuf = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
-
-    // Write temp docx
-    const tmpId = Date.now() + "_" + Math.random().toString(36).slice(2);
+    const docxBuf  = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
     const docxPath = path.join(TMP_DIR, tmpId + ".docx");
-    const pdfPath  = path.join(TMP_DIR, tmpId + ".pdf");
     fs.writeFileSync(docxPath, docxBuf);
 
     // Convert to PDF with LibreOffice headless

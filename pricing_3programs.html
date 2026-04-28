@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Calibri', Arial, sans-serif; background: #fff; padding: 40px 40px; color: #1B2E5E; }
+  .title { text-align: center; font-size: 36px; font-weight: 900; color: #4B6428; letter-spacing: 2px; margin-bottom: 6px; }
+  .client { text-align: center; font-size: 14px; color: #1B2E5E; font-weight: 700; margin-bottom: 36px; }
+  .cards { display: flex; gap: 16px; justify-content: center; }
+  .card { flex: 1; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 18px rgba(27,46,94,0.10); border: 1px solid #dde6f0; }
+  .card-header { padding: 16px 16px; text-align: center; min-height: 64px; display: flex; align-items: center; justify-content: center; }
+  .card-header span { color: #fff; font-size: 12px; font-weight: 700; line-height: 1.5; }
+  .h1 { background: #1A2847; }
+  .h2 { background: #4B6428; }
+  .h3 { background: #1B5EA8; }
+  .card-body { background: #fff; padding: 20px 16px; }
+  .price-block { text-align: center; margin-bottom: 14px; }
+  .price-block:last-child { margin-bottom: 0; }
+  .price-label { font-size: 12px; color: #1B5EA8; font-weight: 600; margin-bottom: 4px; }
+  .price-value { font-size: 19px; font-weight: 900; color: #1B2E5E; }
+  .divider { border: none; border-top: 1px solid #E8EFF8; margin: 12px 0; }
+  .footer-bar { margin-top: 32px; background: linear-gradient(135deg, #2D5016 0%, #1B3A6B 100%); border-radius: 10px; padding: 18px 24px; }
+  .notes-box { background: #fff; border-radius: 8px; padding: 12px 16px; }
+  .notes-label { font-size: 10px; font-weight: 700; color: #1B2E5E; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+  .notes-text { font-size: 11px; color: #4A5568; font-style: italic; line-height: 1.6; }
+  .date-row { text-align: right; font-size: 11px; color: #9AA3B0; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <div class="title">UCRETLENDIRME</div>
+  <div class="client">@@party2_name@@</div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-header h1"><span>@@program_name@@</span></div>
+      <div class="card-body">
+        <div class="price-block">
+          <div class="price-label">Hizmet Bedeli</div>
+          <div class="price-value">@@down_payment@@ TL + KDV</div>
+        </div>
+        <hr class="divider">
+        <div class="price-block">
+          <div class="price-label">Basari Primi</div>
+          <div class="price-value">%@@success_bonus@@ + KDV</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header h2"><span>@@program2_name@@</span></div>
+      <div class="card-body">
+        <div class="price-block">
+          <div class="price-label">Hizmet Bedeli</div>
+          <div class="price-value">@@program2_fee@@ TL + KDV</div>
+        </div>
+        <hr class="divider">
+        <div class="price-block">
+          <div class="price-label">Basari Primi</div>
+          <div class="price-value">%@@program2_bonus@@ + KDV</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header h3"><span>@@program3_name@@</span></div>
+      <div class="card-body">
+        <div class="price-block">
+          <div class="price-label">Hizmet Bedeli</div>
+          <div class="price-value">@@program3_fee@@ TL + KDV</div>
+        </div>
+        <hr class="divider">
+        <div class="price-block">
+          <div class="price-label">Basari Primi</div>
+          <div class="price-value">%@@program3_bonus@@ + KDV</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <div class="notes-box">
+      <div class="notes-label">Notlar</div>
+      <div class="notes-text">@@notes@@</div>
+    </div>
+  </div>
+  <div class="date-row">@@contract_date@@</div>
+</body>
+</html>
