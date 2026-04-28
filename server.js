@@ -911,9 +911,6 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       if (!xmlFile) continue;
       let xml = xmlFile.asText();
 
-      // Merge split text runs so @@var@@ isn't fragmented across <w:t> elements
-      xml = mergeRuns(xml);
-
       // Replace each @@var@@ with its value
       for (const [key, val] of Object.entries(data)) {
         if (key === "payment_schedule") continue;
