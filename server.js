@@ -646,6 +646,7 @@ app.post("/monday/board", authenticate, async (req, res) => {
         }
       }
     }
+    tags { id name color }
   }`;
 
   try {
@@ -668,7 +669,7 @@ app.post("/monday/board", authenticate, async (req, res) => {
     }
 
     console.log(`[monday/board] fetched ${allItems.length} items total for board ${boardId}`);
-    res.json({ data: { boards: [{ ...board, items_page: { items: allItems } }] } });
+    res.json({ data: { boards: [{ ...board, items_page: { items: allItems } }], tags: firstData.data?.tags || [] } });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
