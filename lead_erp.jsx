@@ -797,12 +797,23 @@ Kurallar:
       }).then(r => r.json()).then(rows => {
         setMondayBounces(new Set(rows.map(r => r.email.toLowerCase())));
       }).catch(() => {});
-      // fetch all Monday tags in background
-      fetch("/monday/tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ apiKey: settings.mondayApiKey }),
-      }).then(r => r.json()).then(d => { if (d.tags) setMondayTags(d.tags); }).catch(() => {});
+      // Extract tags directly from board items (id+name from tag column values)
+      const tagColIds = (board.columns || [])
+        .filter(c => c.type === "tag" || /mail.konular|ortak.mail/i.test(c.title))
+        .map(c => c.id);
+      const tagMap = {};
+      rawItems.forEach(item => {
+        tagColIds.forEach(colId => {
+          const cv = item.column_values.find(c => c.id === colId);
+          if (!cv || !cv.value || !cv.text) return;
+          try {
+            const ids = (JSON.parse(cv.value).tag_ids || []);
+            const names = cv.text.split(",").map(s => s.trim()).filter(Boolean);
+            ids.forEach((id, i) => { if (names[i]) tagMap[id] = names[i]; });
+          } catch {}
+        });
+      });
+      setMondayTags(Object.entries(tagMap).map(([id, name]) => ({ id: Number(id), name })));
     } catch (e) {
       setMondayError(e.message);
     } finally {
