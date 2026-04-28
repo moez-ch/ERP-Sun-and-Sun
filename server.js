@@ -101,9 +101,12 @@ db.exec(`
     template_name TEXT,
     data        TEXT NOT NULL,
     created_by  INTEGER,
+    created_by_name TEXT,
     created_at  TEXT DEFAULT (datetime('now'))
   )
 `);
+// Migration: add created_by_name if it doesn't exist yet
+try { db.exec(`ALTER TABLE contracts ADD COLUMN created_by_name TEXT`); } catch {}
 
 // ── SUN GROUP COMPANIES (DB-backed, editable from Settings) ──────
 db.exec(`
@@ -904,8 +907,8 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     fs.unlinkSync(pdfPath);
 
     // Save contract record
-    db.prepare("INSERT INTO contracts (template_id, template_name, data, created_by) VALUES (?,?,?,?)")
-      .run(templateId, row.name, JSON.stringify(data), req.user.id);
+    db.prepare("INSERT INTO contracts (template_id, template_name, data, created_by, created_by_name) VALUES (?,?,?,?,?)")
+      .run(templateId, row.name, JSON.stringify(data), req.user.id, req.user.name || req.user.email);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.pdf"`);
@@ -936,8 +939,43 @@ app.post("/contracts/ocr", authenticate, upload.single("image"), async (req, res
 
 // GET /contracts/history
 app.get("/contracts/history", authenticate, (req, res) => {
-  const rows = db.prepare("SELECT id, template_name, data, created_at FROM contracts ORDER BY created_at DESC LIMIT 50").all();
+  const rows = db.prepare("SELECT id, template_name, data, created_by_name, created_at FROM contracts ORDER BY created_at DESC LIMIT 50").all();
   res.json(rows.map(r => ({ ...r, data: JSON.parse(r.data) })));
+});
+
+// GET /contracts/report — aggregated reporting with date + preparer filters
+app.get("/contracts/report", authenticate, (req, res) => {
+  const { date_from, date_to, prepared_by } = req.query;
+  let where = "WHERE 1=1";
+  const params = [];
+  if (date_from) { where += " AND date(created_at) >= date(?)"; params.push(date_from); }
+  if (date_to)   { where += " AND date(created_at) <= date(?)"; params.push(date_to); }
+  if (prepared_by) { where += " AND created_by_name = ?"; params.push(prepared_by); }
+
+  const rows = db.prepare(
+    `SELECT id, template_name, data, created_by_name, created_at FROM contracts ${where} ORDER BY created_at DESC`
+  ).all(...params);
+
+  const parsed = rows.map(r => {
+    const d = JSON.parse(r.data);
+    const raw = String(d.down_payment || "0").replace(/[^\d.,]/g, "").replace(/\./g, "").replace(",", ".");
+    const value = parseFloat(raw) || 0;
+    return { id: r.id, template_name: r.template_name, prepared_by: r.created_by_name, prepared_for: d.party2_name || "", value, created_at: r.created_at };
+  });
+
+  // Group by template_name + prepared_by
+  const groups = {};
+  parsed.forEach(c => {
+    const key = `${c.template_name}|||${c.prepared_by}`;
+    if (!groups[key]) groups[key] = { template_name: c.template_name, prepared_by: c.prepared_by, count: 0, total_value: 0, contracts: [] };
+    groups[key].count++;
+    groups[key].total_value += c.value;
+    groups[key].contracts.push(c);
+  });
+
+  const preparers = [...new Set(db.prepare("SELECT DISTINCT created_by_name FROM contracts WHERE created_by_name IS NOT NULL").all().map(r => r.created_by_name))].sort();
+
+  res.json({ groups: Object.values(groups), total_count: parsed.length, total_value: parsed.reduce((s, c) => s + c.value, 0), preparers });
 });
 
 // ── Helpers ───────────────────────────────────────────────────────

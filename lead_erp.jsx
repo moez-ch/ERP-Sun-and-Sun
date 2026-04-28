@@ -668,7 +668,10 @@ Kurallar:
   // ── Contracts state ───────────────────────────────────────────
   const [contractTemplates, setContractTemplates] = useState([]);
   const [contractCompanies, setContractCompanies] = useState([]);
-  const [contractView, setContractView] = useState("form"); // "form" | "templates"
+  const [contractView, setContractView] = useState("form"); // "form" | "templates" | "report"
+  const [contractReport, setContractReport] = useState(null);
+  const [contractReportLoading, setContractReportLoading] = useState(false);
+  const [contractReportFilters, setContractReportFilters] = useState({ date_from: "", date_to: "", prepared_by: "" });
   const [contractTemplate, setContractTemplate] = useState(null);
   const [contractData, setContractData] = useState({
     party1_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
@@ -4050,14 +4053,132 @@ Kurallar:
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t("contract_title")}</h2>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setContractView(contractView === "form" ? "templates" : "form")}
-                    style={{ padding: "7px 14px", background: contractView === "templates" ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 7, color: contractView === "templates" ? "#fff" : colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                    {contractView === "form" ? t("contract_manageTemplates") : t("contract_backToForm")}
+                  <button onClick={() => setContractView(contractView === "report" ? "form" : "report")}
+                    style={{ padding: "7px 14px", background: contractView === "report" ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 7, color: contractView === "report" ? "#fff" : colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    {contractView === "report" ? "← Back" : "📊 Report"}
                   </button>
+                  {contractView !== "report" && (
+                    <button onClick={() => setContractView(contractView === "form" ? "templates" : "form")}
+                      style={{ padding: "7px 14px", background: contractView === "templates" ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 7, color: contractView === "templates" ? "#fff" : colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      {contractView === "form" ? t("contract_manageTemplates") : t("contract_backToForm")}
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {contractView === "templates" ? (
+              {contractView === "report" ? (() => {
+                const runReport = async () => {
+                  setContractReportLoading(true);
+                  const token = localStorage.getItem("sns_token");
+                  const params = new URLSearchParams();
+                  if (contractReportFilters.date_from) params.append("date_from", contractReportFilters.date_from);
+                  if (contractReportFilters.date_to)   params.append("date_to",   contractReportFilters.date_to);
+                  if (contractReportFilters.prepared_by) params.append("prepared_by", contractReportFilters.prepared_by);
+                  try {
+                    const r = await fetch(`/contracts/report?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+                    setContractReport(await r.json());
+                  } catch (e) { alert("Report error: " + e.message); }
+                  finally { setContractReportLoading(false); }
+                };
+                const fmt = v => v ? Number(v).toLocaleString("tr-TR") : "—";
+                return (
+                  <div>
+                    {/* Filters */}
+                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 18, marginBottom: 20, display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+                      {[
+                        { label: "Start Date", key: "date_from", type: "date" },
+                        { label: "End Date",   key: "date_to",   type: "date" },
+                      ].map(f => (
+                        <div key={f.key}>
+                          <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{f.label}</div>
+                          <input type="date" value={contractReportFilters[f.key]}
+                            onChange={e => setContractReportFilters(p => ({ ...p, [f.key]: e.target.value }))}
+                            style={{ padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" }} />
+                        </div>
+                      ))}
+                      <div>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Prepared By</div>
+                        <select value={contractReportFilters.prepared_by}
+                          onChange={e => setContractReportFilters(p => ({ ...p, prepared_by: e.target.value }))}
+                          style={{ padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", minWidth: 160 }}>
+                          <option value="">All</option>
+                          {(contractReport?.preparers || []).map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                      </div>
+                      <button onClick={runReport} disabled={contractReportLoading}
+                        style={{ padding: "8px 20px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: contractReportLoading ? 0.6 : 1 }}>
+                        {contractReportLoading ? "Loading…" : "Run Report"}
+                      </button>
+                    </div>
+
+                    {contractReport && (
+                      <div>
+                        {/* Summary by template + preparer */}
+                        <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
+                          <div style={{ padding: "12px 18px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>
+                            Results — {contractReport.total_count} contract{contractReport.total_count !== 1 ? "s" : ""}
+                          </div>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                            <thead>
+                              <tr style={{ background: colors.bg }}>
+                                {["Contract Type", "Prepared By", "Count", "Total Value"].map(h => (
+                                  <th key={h} style={{ padding: "10px 16px", textAlign: h === "Count" || h === "Total Value" ? "right" : "left", color: colors.textMuted, fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, borderBottom: `1px solid ${colors.border}` }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {contractReport.groups.length === 0 ? (
+                                <tr><td colSpan={4} style={{ padding: "24px 16px", textAlign: "center", color: colors.textMuted }}>No contracts found for this period.</td></tr>
+                              ) : contractReport.groups.map((g, i) => (
+                                <tr key={i} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                                  <td style={{ padding: "12px 16px", fontWeight: 600 }}>{g.template_name}</td>
+                                  <td style={{ padding: "12px 16px", color: colors.textMuted }}>{g.prepared_by || "—"}</td>
+                                  <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 600 }}>{g.count}</td>
+                                  <td style={{ padding: "12px 16px", textAlign: "right", color: colors.primary, fontWeight: 700 }}>{fmt(g.total_value)} TL + KDV</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr style={{ background: `${colors.primary}10`, borderTop: `2px solid ${colors.primary}44` }}>
+                                <td colSpan={2} style={{ padding: "12px 16px", fontWeight: 700, fontSize: 13 }}>TOTAL</td>
+                                <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 700 }}>{contractReport.total_count}</td>
+                                <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 700, color: colors.primary, fontSize: 14 }}>{fmt(contractReport.total_value)} TL + KDV</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+
+                        {/* Individual contracts detail */}
+                        {contractReport.groups.flatMap(g => g.contracts).length > 0 && (
+                          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
+                            <div style={{ padding: "12px 18px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>Details</div>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                              <thead>
+                                <tr style={{ background: colors.bg }}>
+                                  {["Date", "Type", "Prepared By", "Prepared For", "Value"].map(h => (
+                                    <th key={h} style={{ padding: "8px 14px", textAlign: h === "Value" ? "right" : "left", color: colors.textMuted, fontWeight: 600, fontSize: 11, borderBottom: `1px solid ${colors.border}` }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {contractReport.groups.flatMap(g => g.contracts).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((c, i) => (
+                                  <tr key={i} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                                    <td style={{ padding: "9px 14px", color: colors.textMuted }}>{new Date(c.created_at).toLocaleDateString("tr-TR")}</td>
+                                    <td style={{ padding: "9px 14px", fontWeight: 600 }}>{c.template_name}</td>
+                                    <td style={{ padding: "9px 14px" }}>{c.prepared_by || "—"}</td>
+                                    <td style={{ padding: "9px 14px" }}>{c.prepared_for || "—"}</td>
+                                    <td style={{ padding: "9px 14px", textAlign: "right", color: colors.primary, fontWeight: 600 }}>{fmt(c.value)} TL</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })() : contractView === "templates" ? (
                 <div>
                   {/* Upload new template */}
                   <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 18, marginBottom: 20 }}>
