@@ -4295,52 +4295,6 @@ Kurallar:
               </div>
             </div>
 
-            {/* Update & Restart */}
-            {(() => {
-              const [updating, setUpdating] = React.useState(false);
-              const [updateLog, setUpdateLog] = React.useState(null);
-              const [reconnecting, setReconnecting] = React.useState(false);
-
-              const handleUpdate = async () => {
-                if (!confirm("Pull latest changes, install packages, and restart the server?")) return;
-                setUpdating(true); setUpdateLog(null);
-                const token = localStorage.getItem("sns_token");
-                try {
-                  const r = await fetch("/system/update", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-                  const d = await r.json();
-                  if (!d.ok) { setUpdateLog(`Error: ${d.error}`); setUpdating(false); return; }
-                  setUpdateLog(`✔ ${d.pull || "Already up to date."}\n✔ Dependencies up to date.`);
-                  setReconnecting(true);
-                  // Poll /health until the new server is up, then reload
-                  const poll = async () => {
-                    try { const h = await fetch("/health"); if (h.ok) { window.location.reload(); return; } } catch {}
-                    setTimeout(poll, 2000);
-                  };
-                  setTimeout(poll, 4000);
-                } catch { setUpdateLog("Server restarting…"); setReconnecting(true); setTimeout(() => window.location.reload(), 8000); }
-              };
-
-              return (
-                <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Update App</div>
-                      <div style={{ fontSize: 11, color: colors.textMuted }}>Pull latest changes from GitHub, install packages, and restart the server.</div>
-                    </div>
-                    <button onClick={handleUpdate} disabled={updating}
-                      style={{ padding: "8px 20px", background: updating ? colors.border : colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: updating ? "not-allowed" : "pointer", whiteSpace: "nowrap", minWidth: 140 }}>
-                      {reconnecting ? "⟳ Restarting…" : updating ? "Updating…" : "⬇ Update & Restart"}
-                    </button>
-                  </div>
-                  {updateLog && (
-                    <pre style={{ marginTop: 12, padding: "10px 14px", background: colors.bg, borderRadius: 6, fontSize: 11, color: colors.text, whiteSpace: "pre-wrap", border: `1px solid ${colors.border}` }}>
-                      {updateLog}
-                      {reconnecting && "\n\nServer is restarting — page will reload automatically when it's back up…"}
-                    </pre>
-                  )}
-                </div>
-              );
-            })()}
           </div>
         )}
         {view === "settings" && isAdmin && (

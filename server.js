@@ -6,7 +6,7 @@ import cors from "cors";
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
-import { execSync, spawn } from "child_process";
+import { execSync } from "child_process";
 import multer from "multer";
 import PizZip from "pizzip";
 
@@ -967,28 +967,6 @@ function escapeXml(s) {
 }
 
 
-// GET /health — simple liveness check (used by update flow to detect restart)
-app.get("/health", (req, res) => res.json({ ok: true }));
-
-// POST /system/update — git pull + npm install, then restart
-app.post("/system/update", authenticate, (req, res) => {
-  let pullOut = "", installOut = "";
-  try {
-    pullOut    = execSync("git pull", { cwd: __dirname, encoding: "utf8" }).trim();
-    installOut = execSync("npm install", { cwd: __dirname, encoding: "utf8" }).trim();
-  } catch (e) {
-    return res.status(500).json({ ok: false, error: e.message });
-  }
-  res.json({ ok: true, pull: pullOut, install: installOut });
-  // Spawn a new npm run dev in a detached window and exit this process
-  setTimeout(() => {
-    const child = spawn("cmd", ["/c", "start", "cmd", "/k", "npm run dev"], {
-      cwd: __dirname, detached: true, stdio: "ignore", shell: false,
-    });
-    child.unref();
-    process.exit(0);
-  }, 400);
-});
 
 app.listen(PORT, () => {
   console.log(`🔐 Sun & Sun ERP Auth Server → http://localhost:${PORT}`);
