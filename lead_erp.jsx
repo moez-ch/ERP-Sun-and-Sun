@@ -2905,14 +2905,8 @@ Kurallar:
           filterDefs.push({ id: "_name", title: "Name", type: "presence" });
           if (emailCol)    filterDefs.push({ id: emailCol.id,    title: mondayColTitle(emailCol, lang),    type: "presence" });
           if (phoneCol)    filterDefs.push({ id: phoneCol.id,    title: mondayColTitle(phoneCol, lang),    type: "presence" });
-          if (genderCol)   filterDefs.push({ id: genderCol.id,   title: mondayColTitle(genderCol, lang),   type: "presence" });
           if (empCol) {
             filterDefs.push({ id: empCol.id, title: mondayColTitle(empCol, lang), type: "numeric_range" });
-          }
-          if (industryCol) {
-            const vals = new Set();
-            mondayItems.forEach(i => { const cv = i.column_values.find(v => v.id === industryCol.id); const val = (cv?.text||"").trim(); if (val) vals.add(val); });
-            if (vals.size > 0) filterDefs.push({ id: industryCol.id, title: mondayColTitle(industryCol, lang), type: "value_select", options: [...vals].sort() });
           }
           if (mondayBoardType === "companies" && ortakMailCol) {
             const vals = new Set();
