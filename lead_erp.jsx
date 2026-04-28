@@ -797,11 +797,20 @@ Kurallar:
       }).then(r => r.json()).then(rows => {
         setMondayBounces(new Set(rows.map(r => r.email.toLowerCase())));
       }).catch(() => {});
-      // Extract tags directly from board items (id+name from tag column values)
+      // Extract available tags from tag column settings_str (all defined tags, not just used ones)
+      const tagMap = {};
+      (board.columns || [])
+        .filter(c => c.type === "tag" || /mail.konular|ortak.mail/i.test(c.title))
+        .forEach(col => {
+          try {
+            const settings = JSON.parse(col.settings_str || "{}");
+            (settings.tags || []).forEach(t => { if (t.id && t.label) tagMap[t.id] = t.label; });
+          } catch {}
+        });
+      // Fallback: also pick up any tags from item values not in settings
       const tagColIds = (board.columns || [])
         .filter(c => c.type === "tag" || /mail.konular|ortak.mail/i.test(c.title))
         .map(c => c.id);
-      const tagMap = {};
       rawItems.forEach(item => {
         tagColIds.forEach(colId => {
           const cv = item.column_values.find(c => c.id === colId);
@@ -809,11 +818,11 @@ Kurallar:
           try {
             const ids = (JSON.parse(cv.value).tag_ids || []);
             const names = cv.text.split(",").map(s => s.trim()).filter(Boolean);
-            ids.forEach((id, i) => { if (names[i]) tagMap[id] = names[i]; });
+            ids.forEach((id, i) => { if (names[i] && !tagMap[id]) tagMap[id] = names[i]; });
           } catch {}
         });
       });
-      setMondayTags(Object.entries(tagMap).map(([id, name]) => ({ id: Number(id), name })));
+      setMondayTags(Object.entries(tagMap).map(([id, name]) => ({ id: Number(id), name })).sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e) {
       setMondayError(e.message);
     } finally {

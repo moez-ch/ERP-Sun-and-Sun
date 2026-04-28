@@ -637,7 +637,7 @@ app.post("/monday/board", authenticate, async (req, res) => {
   const firstQuery = `query {
     boards(ids: [${boardInt}]) {
       name
-      columns { id title type }
+      columns { id title type settings_str }
       items_page(limit: 500) {
         cursor
         items {
