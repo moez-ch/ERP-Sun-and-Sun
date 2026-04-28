@@ -4407,11 +4407,11 @@ Kurallar:
                           style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
                       </div>
 
-                      {/* Download button for HTML pricing templates */}
-                      {contractTemplate?.template_type === "html" && (
-                        <button onClick={handleGenerate} disabled={contractGenerating || !contractTemplate}
-                          style={{ marginTop: 14, width: "100%", padding: "10px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: (contractGenerating || !contractTemplate) ? 0.6 : 1 }}>
-                          {contractGenerating ? t("contract_generating") : "⬇ Download Pricing Proposal"}
+                      {/* Download button */}
+                      {contractTemplate && (
+                        <button onClick={handleGenerate} disabled={contractGenerating}
+                          style={{ marginTop: 14, width: "100%", padding: "10px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: contractGenerating ? 0.6 : 1 }}>
+                          {contractGenerating ? t("contract_generating") : "⬇ " + t("contract_generate")}
                         </button>
                       )}
                     </div>
