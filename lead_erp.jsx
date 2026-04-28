@@ -3991,7 +3991,7 @@ Kurallar:
 
           const handleGenerate = async () => {
             if (!contractTemplate) { alert("Lütfen bir sözleşme şablonu seçin."); return; }
-            if (!contractData.party1_id) { alert("Lütfen 1. Taraf şirketini seçin."); return; }
+            if (contractTemplate.template_type !== "html" && !contractData.party1_id) { alert("Lütfen 1. Taraf şirketini seçin."); return; }
             setContractGenerating(true);
             try {
               const token = localStorage.getItem("sns_token");
@@ -4240,6 +4240,75 @@ Kurallar:
                     ))}
                   </div>
                 </div>
+              ) : contractTemplate?.template_type === "html" ? (
+                /* ── Simplified form for HTML pricing templates ── */
+                <div style={{ maxWidth: 560, margin: "0 auto" }}>
+                  {/* Template selector */}
+                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionTemplate")}</div>
+                    <select value={contractTemplate?.id || ""} onChange={e => {
+                      const tpl = contractTemplates.find(t => String(t.id) === e.target.value) || null;
+                      setContractTemplate(tpl);
+                      if (tpl) {
+                        const v = tpl.variables || [];
+                        setContractProgramCount(v.includes("program3_name") ? 3 : v.includes("program2_name") ? 2 : 1);
+                      }
+                    }}
+                      style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" }}>
+                      <option value="">{t("contract_selectTemplate")}</option>
+                      {contractTemplates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Client name */}
+                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Client</div>
+                    {field("Company Name", "party2_name", { placeholder: "e.g. ABC Ltd." })}
+                  </div>
+
+                  {/* Contract details (programs + notes) */}
+                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionDetails")}</div>
+                    {[
+                      { label: "Program 1", nameKey: "program_name",  feeKey: "down_payment",  bonusKey: "success_bonus"  },
+                      { label: "Program 2", nameKey: "program2_name", feeKey: "program2_fee",  bonusKey: "program2_bonus" },
+                      { label: "Program 3", nameKey: "program3_name", feeKey: "program3_fee",  bonusKey: "program3_bonus" },
+                    ].slice(0, contractProgramCount).map((prog, idx) => (
+                      <div key={prog.label} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: idx < contractProgramCount - 1 ? `1px dashed ${colors.border}` : "none" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: colors.primary, textTransform: "uppercase", letterSpacing: 0.5 }}>{prog.label}</div>
+                          {idx > 0 && <button onClick={() => { setContractProgramCount(p => p - 1); setContractData(p => ({ ...p, [prog.nameKey]: "", [prog.feeKey]: "", [prog.bonusKey]: "" })); }} style={{ fontSize: 11, color: "#e57373", background: "none", border: "none", cursor: "pointer" }}>✕ Remove</button>}
+                        </div>
+                        {field("Program Name", prog.nameKey, { placeholder: "e.g. SoGreen" })}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Service Fee (TL + VAT)</div>
+                            <input value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))} placeholder="e.g. 50.000" style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Success Bonus (%)</div>
+                            <input value={contractData[prog.bonusKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusKey]: e.target.value }))} placeholder="e.g. 5" style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {contractProgramCount < 3 && (
+                      <button onClick={() => setContractProgramCount(p => p + 1)} style={{ fontSize: 12, fontWeight: 600, color: colors.primary, background: `${colors.primary}15`, border: `1px dashed ${colors.primary}55`, borderRadius: 7, padding: "6px 14px", cursor: "pointer", width: "100%", marginBottom: 14 }}>
+                        + Add Program
+                      </button>
+                    )}
+                    {field(t("contract_contractDate"), "contract_date", { placeholder: t("contract_datePlaceholder") })}
+                    <div style={{ marginTop: 6 }}>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Notes</div>
+                      <textarea value={contractData.notes || ""} onChange={e => setContractData(p => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Additional notes..." style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+                    </div>
+                  </div>
+
+                  <button onClick={handleGenerate} disabled={contractGenerating || !contractTemplate}
+                    style={{ width: "100%", padding: "13px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: (contractGenerating || !contractTemplate) ? 0.6 : 1 }}>
+                    {contractGenerating ? t("contract_generating") : "⬇ Download Pricing Proposal"}
+                  </button>
+                </div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                   {/* Left column */}
@@ -4247,7 +4316,14 @@ Kurallar:
                     {/* Template selector */}
                     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionTemplate")}</div>
-                      <select value={contractTemplate?.id || ""} onChange={e => setContractTemplate(contractTemplates.find(t => String(t.id) === e.target.value) || null)}
+                      <select value={contractTemplate?.id || ""} onChange={e => {
+                        const tpl = contractTemplates.find(t => String(t.id) === e.target.value) || null;
+                        setContractTemplate(tpl);
+                        if (tpl) {
+                          const v = tpl.variables || [];
+                          setContractProgramCount(v.includes("program3_name") ? 3 : v.includes("program2_name") ? 2 : 1);
+                        }
+                      }}
                         style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" }}>
                         <option value="">{ t("contract_selectTemplate")}</option>
                         {contractTemplates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
