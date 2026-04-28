@@ -4265,8 +4265,7 @@ Kurallar:
               <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("settings_mondaySub_user")}</p>
               {[
                 { label: t("settings_apiKey"), key: "mondayApiKey", type: "password", placeholder: "eyJhbGci..." },
-                { label: "Contacts Board ID", key: "mondayBoardId", placeholder: "1234567890" },
-                { label: "Companies Board ID", key: "mondayCompaniesBoardId", placeholder: "1234567890" },
+                { label: mondayBoardType === "companies" ? "Companies Board ID" : "Contacts Board ID", key: mondayBoardType === "companies" ? "mondayCompaniesBoardId" : "mondayBoardId", placeholder: "1234567890" },
               ].map((f) => (
                 <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
                   <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
@@ -4279,6 +4278,9 @@ Kurallar:
                   />
                 </div>
               ))}
+              <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 8, fontStyle: "italic" }}>
+                Switch between Contacts / Companies in the Monday tab to configure each board ID.
+              </div>
             </div>
           </div>
         )}
@@ -4314,8 +4316,7 @@ Kurallar:
               <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("settings_mondaySub_admin")}</p>
               {[
                 { label: t("settings_apiKey"), key: "mondayApiKey", type: "password", placeholder: "eyJhbGci..." },
-                { label: "Contacts Board ID", key: "mondayBoardId", placeholder: "1234567890" },
-                { label: "Companies Board ID", key: "mondayCompaniesBoardId", placeholder: "1234567890" },
+                { label: mondayBoardType === "companies" ? "Companies Board ID" : "Contacts Board ID", key: mondayBoardType === "companies" ? "mondayCompaniesBoardId" : "mondayBoardId", placeholder: "1234567890" },
               ].map((f) => (
                 <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
                   <span style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</span>
@@ -4328,6 +4329,9 @@ Kurallar:
                   />
                 </div>
               ))}
+              <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 8, fontStyle: "italic" }}>
+                Switch between Contacts / Companies in the Monday tab to configure each board ID.
+              </div>
             </div>
 
             {/* Sun Group Companies */}
