@@ -869,7 +869,8 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
   const pdfPath = path.join(TMP_DIR, tmpId + ".pdf");
 
   // ── HTML template path ────────────────────────────────────────────
-  if (row.template_type === "html") {
+  const isHtmlTemplate = row.template_type === "html" || (row.filename || "").toLowerCase().endsWith(".html");
+  if (isHtmlTemplate) {
     try {
       let html = row.file.toString("utf-8");
       for (const [key, val] of Object.entries(data)) {
