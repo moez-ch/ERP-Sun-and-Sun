@@ -880,11 +880,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       html = html.replace(/@@[a-zA-Z0-9_]+@@/g, "");
       const htmlPath = path.join(TMP_DIR, tmpId + ".html");
       fs.writeFileSync(htmlPath, html, "utf-8");
-      const loProfile1 = path.join(TMP_DIR, "lo_" + tmpId);
-      fs.mkdirSync(loProfile1, { recursive: true });
-      try {
-        execSync(`"${LIBREOFFICE}" --headless --norestore --nofirststartwizard "-env:UserInstallation=file:///${loProfile1.replace(/\\/g, "/")}" --convert-to pdf --outdir "${TMP_DIR}" "${htmlPath}"`, { timeout: 60000 });
-      } finally { try { fs.rmSync(loProfile1, { recursive: true, force: true }); } catch {} }
+      execSync(`"${LIBREOFFICE}" --headless --convert-to pdf --outdir "${TMP_DIR}" "${htmlPath}"`, { timeout: 60000 });
       fs.unlinkSync(htmlPath);
       if (!fs.existsSync(pdfPath)) throw new Error("PDF conversion failed");
       const pdfBuf = fs.readFileSync(pdfPath);
@@ -938,12 +934,8 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     const docxPath = path.join(TMP_DIR, tmpId + ".docx");
     fs.writeFileSync(docxPath, docxBuf);
 
-    // Convert to PDF with LibreOffice headless (isolated profile to avoid lock conflicts)
-    const loProfile2 = path.join(TMP_DIR, "lo_" + tmpId);
-    fs.mkdirSync(loProfile2, { recursive: true });
-    try {
-      execSync(`"${LIBREOFFICE}" --headless --norestore --nofirststartwizard "-env:UserInstallation=file:///${loProfile2.replace(/\\/g, "/")}" --convert-to pdf --outdir "${TMP_DIR}" "${docxPath}"`, { timeout: 60000 });
-    } finally { try { fs.rmSync(loProfile2, { recursive: true, force: true }); } catch {} }
+    // Convert to PDF with LibreOffice headless
+    execSync(`"${LIBREOFFICE}" --headless --convert-to pdf --outdir "${TMP_DIR}" "${docxPath}"`, { timeout: 60000 });
 
     if (!fs.existsSync(pdfPath)) throw new Error("PDF conversion failed");
 
