@@ -1,109 +1,72 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#fff;color:#1B2E5E;">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Arial', sans-serif; background: #fff; color: #1B2E5E; width: 210mm; min-height: 297mm; }
+  .page { display: flex; flex-direction: column; min-height: 297mm; }
 
-<table width="640" align="center" cellpadding="0" cellspacing="0" border="0">
+  .top { padding: 40px 50px 28px; background: #fff; text-align: center; }
+  .title { font-size: 34px; font-weight: 900; color: #4B6428; letter-spacing: 3px; margin-bottom: 8px; }
+  .client { font-size: 14px; font-weight: 700; color: #1B2E5E; }
 
-  <!-- TITLE -->
-  <tr>
-    <td align="center" style="font-size:30pt;font-weight:900;color:#4B6428;letter-spacing:3px;padding:32px 20px 14px;">UCRETLENDİRME</td>
-  </tr>
+  .columns-section { padding: 0 30px; background: #fff; }
+  .cols { display: flex; gap: 14px; }
+  .col { flex: 1; border-radius: 10px; overflow: hidden; box-shadow: 0 3px 16px rgba(27,46,94,0.10); }
+  .col-header { padding: 16px 14px; text-align: center; }
+  .col-header span { color: #fff; font-size: 13px; font-weight: 700; line-height: 1.4; }
+  .h1 { background: #1A2847; }
+  .h2 { background: #4B6428; }
+  .col-body { background: #fff; padding: 22px 16px; }
+  .price-label { text-align: center; font-size: 12px; color: #1B5EA8; font-weight: 700; margin-bottom: 5px; }
+  .price-value { text-align: center; font-size: 20px; font-weight: 900; color: #1B2E5E; margin-bottom: 18px; }
+  .divider { border: none; border-top: 1px solid #E0EAF4; margin: 4px 0 14px; }
 
-  <!-- CLIENT NAME -->
-  <tr>
-    <td align="center" style="font-size:13pt;font-weight:700;color:#1B2E5E;padding:0 20px 26px;">@@party2_name@@</td>
-  </tr>
+  .dark-section { background: linear-gradient(135deg, #2D5016 0%, #1B2E5E 100%); padding: 28px 50px 36px; flex: 1; display: flex; flex-direction: column; align-items: center; margin-top: 24px; }
+  .notes-area { background: rgba(255,255,255,0.12); border-radius: 10px; padding: 14px 20px; width: 100%; }
+  .notes-text { font-size: 10px; color: rgba(255,255,255,0.85); font-style: italic; line-height: 1.6; text-align: center; }
+  .date { text-align: right; font-size: 10px; color: rgba(255,255,255,0.55); margin-top: 10px; width: 100%; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top">
+    <div class="title">ÜCRETLENDİRME</div>
+    <div class="client">@@party2_name@@</div>
+  </div>
 
-  <!-- SINGLE TABLE: headers + pricing in one -->
-  <tr>
-    <td style="padding:0 16px;">
-      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <div class="columns-section">
+    <div class="cols">
+      <div class="col">
+        <div class="col-header h1"><span>@@program_name@@</span></div>
+        <div class="col-body">
+          <div class="price-label">Hizmet Bedeli</div>
+          <div class="price-value">@@down_payment@@ TL + KDV</div>
+          <hr class="divider">
+          <div class="price-label">Başarı Primi</div>
+          <div class="price-value">%@@success_bonus@@ + KDV</div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="col-header h2"><span>@@program2_name@@</span></div>
+        <div class="col-body">
+          <div class="price-label">Hizmet Bedeli</div>
+          <div class="price-value">@@program2_fee@@ TL + KDV</div>
+          <hr class="divider">
+          <div class="price-label">Başarı Primi</div>
+          <div class="price-value">%@@program2_bonus@@ + KDV</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-        <!-- HEADER ROW -->
-        <tr>
-          <td width="50%" bgcolor="#1A2847" align="center" style="padding:14px 12px;">
-            <span style="color:#fff;font-size:12pt;font-weight:700;">@@program_name@@</span>
-          </td>
-          <td width="6" bgcolor="#ffffff">&nbsp;</td>
-          <td width="50%" bgcolor="#4B6428" align="center" style="padding:14px 12px;">
-            <span style="color:#fff;font-size:12pt;font-weight:700;">@@program2_name@@</span>
-          </td>
-        </tr>
-
-        <!-- SPACER ROW -->
-        <tr><td colspan="3" height="6" bgcolor="#ffffff">&nbsp;</td></tr>
-
-        <!-- SERVICE FEE LABEL ROW -->
-        <tr>
-          <td bgcolor="#F3F7FD" align="center" style="font-size:11pt;color:#1B5EA8;font-weight:700;padding:20px 10px 6px;">Hizmet Bedeli</td>
-          <td bgcolor="#ffffff">&nbsp;</td>
-          <td bgcolor="#F3F7FD" align="center" style="font-size:11pt;color:#1B5EA8;font-weight:700;padding:20px 10px 6px;">Hizmet Bedeli</td>
-        </tr>
-
-        <!-- SERVICE FEE VALUE ROW -->
-        <tr>
-          <td bgcolor="#F3F7FD" align="center" style="font-size:15pt;font-weight:900;color:#1B2E5E;padding:4px 10px 20px;">@@down_payment@@ TL + KDV</td>
-          <td bgcolor="#ffffff">&nbsp;</td>
-          <td bgcolor="#F3F7FD" align="center" style="font-size:15pt;font-weight:900;color:#1B2E5E;padding:4px 10px 20px;">@@program2_fee@@ TL + KDV</td>
-        </tr>
-
-        <!-- SMALL SPACER -->
-        <tr>
-          <td bgcolor="#F3F7FD" height="4">&nbsp;</td>
-          <td bgcolor="#ffffff">&nbsp;</td>
-          <td bgcolor="#F3F7FD" height="4">&nbsp;</td>
-        </tr>
-
-        <!-- BONUS LABEL ROW -->
-        <tr>
-          <td bgcolor="#F3F7FD" align="center" style="font-size:11pt;color:#1B5EA8;font-weight:700;padding:10px 10px 6px;">Başarı Primi</td>
-          <td bgcolor="#ffffff">&nbsp;</td>
-          <td bgcolor="#F3F7FD" align="center" style="font-size:11pt;color:#1B5EA8;font-weight:700;padding:10px 10px 6px;">Başarı Primi</td>
-        </tr>
-
-        <!-- BONUS VALUE ROW -->
-        <tr>
-          <td bgcolor="#F3F7FD" align="center" style="font-size:15pt;font-weight:900;color:#1B2E5E;padding:4px 10px 24px;">%@@success_bonus@@ + KDV</td>
-          <td bgcolor="#ffffff">&nbsp;</td>
-          <td bgcolor="#F3F7FD" align="center" style="font-size:15pt;font-weight:900;color:#1B2E5E;padding:4px 10px 24px;">%@@program2_bonus@@ + KDV</td>
-        </tr>
-
-      </table>
-    </td>
-  </tr>
-
-  <!-- SPACER -->
-  <tr><td height="24">&nbsp;</td></tr>
-
-  <!-- SPLIT BAR -->
-  <tr>
-    <td>
-      <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-          <td width="50%" height="60" bgcolor="#4B6428">&nbsp;</td>
-          <td width="50%" height="60" bgcolor="#1B3060">&nbsp;</td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-
-  <!-- NOTES -->
-  <tr>
-    <td style="padding:16px 20px 6px;">
-      <table width="100%" cellpadding="12" cellspacing="0" border="1" bordercolor="#C8D8EE" bgcolor="#F7FAFF">
-        <tr>
-          <td style="font-size:9pt;color:#4A5568;font-style:italic;line-height:1.6;">@@notes@@</td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-
-  <!-- DATE -->
-  <tr>
-    <td align="right" style="font-size:9pt;color:#9AA3B0;padding:8px 20px 30px;">@@contract_date@@</td>
-  </tr>
-
-</table>
+  <div class="dark-section">
+    <div class="notes-area">
+      <div class="notes-text">@@notes@@</div>
+    </div>
+    <div class="date">@@contract_date@@</div>
+  </div>
+</div>
 </body>
 </html>

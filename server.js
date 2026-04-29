@@ -9,6 +9,9 @@ import fs from "fs";
 import { execSync } from "child_process";
 import multer from "multer";
 import PizZip from "pizzip";
+import puppeteer from "puppeteer-core";
+
+const EDGE_PATH = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || "sns-erp-2025-secret-key";
@@ -881,11 +884,14 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       html = html.replace(/@@[a-zA-Z0-9_]+@@/g, "");
       const htmlPath = path.join(TMP_DIR, tmpId + ".html");
       fs.writeFileSync(htmlPath, html, "utf-8");
-      execSync(`"${LIBREOFFICE}" --headless --convert-to pdf --outdir "${TMP_DIR}" "${htmlPath}"`, { timeout: 60000 });
+      // Use Edge via Puppeteer for full CSS support
+      const browser = await puppeteer.launch({ executablePath: EDGE_PATH, headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+      const page = await browser.newPage();
+      await page.goto("file:///" + htmlPath.replaceAll("\\", "/"), { waitUntil: "networkidle0" });
+      const pdfBytes = await page.pdf({ format: "A4", printBackground: true, margin: { top: "0mm", bottom: "0mm", left: "0mm", right: "0mm" } });
+      await browser.close();
       fs.unlinkSync(htmlPath);
-      if (!fs.existsSync(pdfPath)) throw new Error("PDF conversion failed");
-      const pdfBuf = fs.readFileSync(pdfPath);
-      fs.unlinkSync(pdfPath);
+      fs.writeFileSync(pdfPath, pdfBytes);
       db.prepare("INSERT INTO contracts (template_id, template_name, data, created_by, created_by_name) VALUES (?,?,?,?,?)")
         .run(templateId, row.name, JSON.stringify(data), req.user.id, req.user.name || req.user.email);
       res.setHeader("Content-Type", "application/pdf");
