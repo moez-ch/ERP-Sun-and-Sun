@@ -1,56 +1,96 @@
 <!DOCTYPE html>
 <html>
-<head>
-<meta charset="UTF-8">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Calibri', Arial, sans-serif; background: #fff; padding: 48px 60px; color: #1B2E5E; }
-  .title { text-align: center; font-size: 38px; font-weight: 900; color: #1B2E5E; letter-spacing: 2px; margin-bottom: 6px; }
-  .client { text-align: center; font-size: 15px; color: #4B6B35; font-weight: 700; margin-bottom: 44px; }
-  .card-wrap { display: flex; justify-content: center; }
-  .card { width: 340px; border-radius: 12px; overflow: hidden; box-shadow: 0 6px 28px rgba(27,46,94,0.12); border: 1px solid #dde6f0; }
-  .card-header { background: #4B6428; padding: 20px 24px; text-align: center; }
-  .card-header span { color: #fff; font-size: 15px; font-weight: 700; line-height: 1.4; }
-  .card-body { background: #fff; padding: 28px 24px; }
-  .price-block { text-align: center; margin-bottom: 20px; }
-  .price-block:last-child { margin-bottom: 0; }
-  .price-label { font-size: 13px; color: #1B5EA8; font-weight: 600; margin-bottom: 6px; }
-  .price-value { font-size: 24px; font-weight: 900; color: #1B2E5E; }
-  .divider { border: none; border-top: 1px solid #E8EFF8; margin: 18px 0; }
-  .footer-bar { margin-top: 40px; background: linear-gradient(135deg, #2D5016 0%, #1B3A6B 100%); border-radius: 10px; padding: 20px 28px; }
-  .notes-box { background: #fff; border-radius: 8px; padding: 14px 18px; }
-  .notes-label { font-size: 11px; font-weight: 700; color: #1B2E5E; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-  .notes-text { font-size: 12px; color: #4A5568; font-style: italic; line-height: 1.6; }
-  .date-row { text-align: right; font-size: 11px; color: #9AA3B0; margin-top: 14px; }
-</style>
-</head>
-<body>
-  <div class="title">PRICING</div>
-  <div class="client">@@party2_name@@</div>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#fff;color:#1B2E5E;">
 
-  <div class="card-wrap">
-    <div class="card">
-      <div class="card-header"><span>@@program_name@@</span></div>
-      <div class="card-body">
-        <div class="price-block">
-          <div class="price-label">Service Fee</div>
-          <div class="price-value">@@down_payment@@ TL + VAT</div>
-        </div>
-        <hr class="divider">
-        <div class="price-block">
-          <div class="price-label">Success Bonus</div>
-          <div class="price-value">%@@success_bonus@@ + VAT</div>
-        </div>
-      </div>
-    </div>
-  </div>
+<table width="640" align="center" cellpadding="0" cellspacing="0" border="0">
 
-  <div class="footer-bar">
-    <div class="notes-box">
-      <div class="notes-label">Notes</div>
-      <div class="notes-text">@@notes@@</div>
-    </div>
-  </div>
-  <div class="date-row">@@contract_date@@</div>
+  <!-- TITLE -->
+  <tr>
+    <td align="center" style="font-size:34pt;font-weight:900;color:#1B2E5E;letter-spacing:4px;padding:36px 20px 16px;">PRICING</td>
+  </tr>
+
+  <!-- CLIENT NAME -->
+  <tr>
+    <td align="center" style="font-size:13pt;font-weight:700;color:#4B6428;padding:0 20px 6px;">@@party2_name@@</td>
+  </tr>
+
+  <!-- SPACER -->
+  <tr><td height="18">&nbsp;</td></tr>
+
+  <!-- PROGRAM BADGE -->
+  <tr>
+    <td align="center" style="padding:0 20px 22px;">
+      <table align="center" cellpadding="0" cellspacing="0" border="0" bgcolor="#4B6428">
+        <tr>
+          <td align="center" style="color:#fff;font-size:13pt;font-weight:700;padding:13px 50px;">@@program_name@@</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- CARD: Service Fee -->
+  <tr>
+    <td style="padding:0 50px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F3F7FD">
+        <tr>
+          <td align="center" style="font-size:12pt;color:#1B5EA8;font-weight:700;padding:26px 20px 8px;">Service Fee</td>
+        </tr>
+        <tr>
+          <td align="center" style="font-size:20pt;font-weight:900;color:#1B2E5E;padding:4px 20px 26px;">@@down_payment@@ TL + VAT</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- SPACER between sections -->
+  <tr><td height="10">&nbsp;</td></tr>
+
+  <!-- CARD: Success Bonus -->
+  <tr>
+    <td style="padding:0 50px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F3F7FD">
+        <tr>
+          <td align="center" style="font-size:12pt;color:#1B5EA8;font-weight:700;padding:22px 20px 8px;">Success Bonus</td>
+        </tr>
+        <tr>
+          <td align="center" style="font-size:20pt;font-weight:900;color:#1B2E5E;padding:4px 20px 26px;">%@@success_bonus@@ + VAT</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- SPACER -->
+  <tr><td height="24">&nbsp;</td></tr>
+
+  <!-- SPLIT BAR -->
+  <tr>
+    <td>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td width="50%" height="60" bgcolor="#4B6428">&nbsp;</td>
+          <td width="50%" height="60" bgcolor="#1B3060">&nbsp;</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- NOTES -->
+  <tr>
+    <td style="padding:16px 20px 6px;">
+      <table width="100%" cellpadding="12" cellspacing="0" border="1" bordercolor="#C8D8EE" bgcolor="#F7FAFF">
+        <tr>
+          <td style="font-size:9pt;color:#4A5568;font-style:italic;line-height:1.6;">@@notes@@</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- DATE -->
+  <tr>
+    <td align="right" style="font-size:9pt;color:#9AA3B0;padding:8px 20px 30px;">@@contract_date@@</td>
+  </tr>
+
+</table>
 </body>
 </html>
