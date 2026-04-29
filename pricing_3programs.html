@@ -7,30 +7,25 @@
   body { font-family: 'Arial', sans-serif; background: #fff; color: #1B2E5E; width: 338.67mm; min-height: 190.5mm; }
   .page { display: flex; flex-direction: column; min-height: 190.5mm; }
 
-  .top { padding: 30px 16px 18px; background: #fff; text-align: center; }
-  .title { font-size: 34px; font-weight: 900; color: #4B6428; letter-spacing: 3px; margin-bottom: 8px; }
-  .client { font-size: 14px; font-weight: 700; color: #1B2E5E; }
+  .top { padding: 32px 16px 0; background: #fff; text-align: center; }
+  .title { font-size: 38px; font-weight: 900; color: #1B2E5E; letter-spacing: 4px; margin-bottom: 10px; }
+  .client { font-size: 15px; font-weight: 700; color: #4B6428; margin-bottom: 22px; }
+  .badges { display: flex; gap: 12px; justify-content: center; }
+  .badge { flex: 1; color: #fff; font-size: 13px; font-weight: 700; padding: 13px 16px; border-radius: 6px; text-align: center; line-height: 1.4; }
+  .badge.b1 { background: #1A2847; }
+  .badge.b2 { background: #4B6428; }
+  .badge.b3 { background: #1B5EA8; }
 
-  .dark-section { background: linear-gradient(135deg, #2D5016 0%, #1B2E5E 100%); padding: 22px 16px 26px; flex: 1; display: flex; flex-direction: column; align-items: stretch; }
-
-  /* Column headers */
-  .col-headers { display: flex; gap: 12px; margin-bottom: 12px; }
-  .col-header { flex: 1; padding: 14px 12px; text-align: center; border-radius: 8px; display: flex; align-items: center; justify-content: center; min-height: 54px; }
-  .col-header span { color: #fff; font-size: 13px; font-weight: 700; line-height: 1.4; }
-  .h1 { background: #1A2847; }
-  .h2 { background: #4B6428; }
-  .h3 { background: #1B5EA8; }
-
-  /* Cards row */
+  .dark-section { background: linear-gradient(135deg, #2D5016 0%, #1B2E5E 100%); padding: 28px 16px 34px; flex: 1; display: flex; flex-direction: column; align-items: stretch; }
   .cols { display: flex; gap: 12px; }
-  .col-card { flex: 1; background: #fff; border-radius: 12px; padding: 18px 16px; box-shadow: 0 6px 24px rgba(0,0,0,0.18); }
-  .price-label { text-align: center; font-size: 12px; color: #1B5EA8; font-weight: 700; margin-bottom: 5px; }
-  .price-value { text-align: center; font-size: 19px; font-weight: 900; color: #1B2E5E; margin-bottom: 14px; }
-  .divider { border: none; border-top: 1px solid #E0EAF4; margin: 4px 0 12px; }
+  .card { flex: 1; background: #fff; border-radius: 14px; padding: 22px 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+  .price-label { text-align: center; font-size: 13px; color: #1B5EA8; font-weight: 700; margin-bottom: 6px; }
+  .price-value { text-align: center; font-size: 22px; font-weight: 900; color: #1B2E5E; margin-bottom: 18px; }
+  .divider { border: none; border-top: 1px solid #E0EAF4; margin: 4px 0 14px; }
 
-  .notes-area { background: rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 20px; margin-top: 14px; }
+  .notes-area { background: rgba(255,255,255,0.12); border-radius: 10px; padding: 12px 24px; margin-top: 16px; width: 100%; text-align: center; }
   .notes-text { font-size: 11px; color: rgba(255,255,255,0.85); font-style: italic; line-height: 1.6; text-align: center; }
-  .date { text-align: right; font-size: 10px; color: rgba(255,255,255,0.55); margin-top: 8px; }
+  .date { text-align: right; font-size: 10px; color: rgba(255,255,255,0.55); margin-top: 10px; width: 100%; }
 </style>
 </head>
 <body>
@@ -38,30 +33,30 @@
   <div class="top">
     <div class="title">ÜCRETLENDİRME</div>
     <div class="client">@@party2_name@@</div>
-    <div class="col-headers" style="margin-top:18px;">
-      <div class="col-header h1"><span>@@program_name@@</span></div>
-      <div class="col-header h2"><span>@@program2_name@@</span></div>
-      <div class="col-header h3"><span>@@program3_name@@</span></div>
+    <div class="badges">
+      <div class="badge b1">@@program_name@@</div>
+      <div class="badge b2">@@program2_name@@</div>
+      <div class="badge b3">@@program3_name@@</div>
     </div>
   </div>
 
   <div class="dark-section">
     <div class="cols">
-      <div class="col-card">
+      <div class="card">
         <div class="price-label">Hizmet Bedeli</div>
         <div class="price-value">@@down_payment@@ TL + KDV</div>
         <hr class="divider">
         <div class="price-label">Başarı Primi</div>
         <div class="price-value">%@@success_bonus@@ + KDV</div>
       </div>
-      <div class="col-card">
+      <div class="card">
         <div class="price-label">Hizmet Bedeli</div>
         <div class="price-value">@@program2_fee@@ TL + KDV</div>
         <hr class="divider">
         <div class="price-label">Başarı Primi</div>
         <div class="price-value">%@@program2_bonus@@ + KDV</div>
       </div>
-      <div class="col-card">
+      <div class="card">
         <div class="price-label">Hizmet Bedeli</div>
         <div class="price-value">@@program3_fee@@ TL + KDV</div>
         <hr class="divider">
