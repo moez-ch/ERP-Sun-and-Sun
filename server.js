@@ -896,7 +896,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
         .run(templateId, row.name, JSON.stringify(data), req.user.id, req.user.name || req.user.email);
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.pdf"`);
-      return res.send(pdfBuf);
+      return res.send(pdfBytes);
     } catch (e) {
       console.error("[contracts/generate html]", e);
       return res.status(500).json({ error: e.message });
