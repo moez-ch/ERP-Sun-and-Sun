@@ -888,7 +888,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       const browser = await puppeteer.launch({ executablePath: EDGE_PATH, headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
       const page = await browser.newPage();
       await page.goto("file:///" + htmlPath.replaceAll("\\", "/"), { waitUntil: "networkidle0" });
-      const pdfBytes = await page.pdf({ format: "A4", printBackground: true, margin: { top: "0mm", bottom: "0mm", left: "0mm", right: "0mm" } });
+      const pdfBytes = await page.pdf({ width: "338.67mm", height: "190.5mm", printBackground: true, margin: { top: "0mm", bottom: "0mm", left: "0mm", right: "0mm" } });
       await browser.close();
       fs.unlinkSync(htmlPath);
       fs.writeFileSync(pdfPath, pdfBytes);
