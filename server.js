@@ -127,9 +127,11 @@ db.exec(`
     tax_no      TEXT NOT NULL DEFAULT '',
     address     TEXT NOT NULL DEFAULT '',
     iban        TEXT NOT NULL DEFAULT '',
-    sort_order  INTEGER NOT NULL DEFAULT 0
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    is_default  INTEGER NOT NULL DEFAULT 0
   )
 `);
+try { db.exec(`ALTER TABLE contract_companies ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`); } catch {}
 // Seed known companies if table is empty
 const companyCount = db.prepare("SELECT COUNT(*) as c FROM contract_companies").get().c;
 if (companyCount === 0) {
@@ -911,6 +913,14 @@ app.put("/contracts/companies/:id", authenticate, (req, res) => {
 // DELETE /contracts/companies/:id
 app.delete("/contracts/companies/:id", authenticate, (req, res) => {
   db.prepare("DELETE FROM contract_companies WHERE id=?").run(req.params.id);
+  res.json({ ok: true });
+});
+
+// PUT /contracts/companies/:id/set-default (admin only)
+app.put("/contracts/companies/:id/set-default", authenticate, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  db.prepare("UPDATE contract_companies SET is_default=0").run();
+  db.prepare("UPDATE contract_companies SET is_default=1 WHERE id=?").run(req.params.id);
   res.json({ ok: true });
 });
 

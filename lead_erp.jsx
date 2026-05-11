@@ -774,6 +774,12 @@ Kurallar:
     setSettingsCompanies(prev => prev.filter(c => c.id !== id));
   };
 
+  const settingsSetDefault = async (id) => {
+    const token = localStorage.getItem("sns_token");
+    await fetch(`/contracts/companies/${id}/set-default`, { method: "PUT", headers: { Authorization: `Bearer ${token}` } });
+    setSettingsCompanies(prev => prev.map(c => ({ ...c, is_default: c.id === id ? 1 : 0 })));
+  };
+
   const fetchMondayCampaigns = async () => {
     try {
       const token = localStorage.getItem("sns_token");
@@ -945,7 +951,11 @@ Kurallar:
       fetch("/contracts/templates", { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json()).then(setContractTemplates).catch(() => {});
       fetch("/contracts/companies", { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.json()).then(setContractCompanies).catch(() => {});
+        .then(r => r.json()).then(companies => {
+          setContractCompanies(companies);
+          const def = companies.find(c => c.is_default);
+          if (def) setContractData(p => p.party1_id ? p : { ...p, party1_id: String(def.id) });
+        }).catch(() => {});
       fetch("/canva/config", { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json()).then(setCanvaConfig).catch(() => {});
       fetch("/canva/designs", { headers: { Authorization: `Bearer ${token}` } })
@@ -5225,12 +5235,20 @@ Kurallar:
                       ) : (
                         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600 }}>{c.short || c.name}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 13, fontWeight: 600 }}>{c.short || c.name}</span>
+                              {c.is_default === 1 && (
+                                <span style={{ fontSize: 10, fontWeight: 700, background: `${colors.success}22`, color: colors.success, border: `1px solid ${colors.success}55`, borderRadius: 4, padding: "1px 7px", letterSpacing: "0.04em" }}>DEFAULT</span>
+                              )}
+                            </div>
                             <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{c.name}</div>
                             <div style={{ fontSize: 11, color: colors.textMuted }}>{c.tax_office} {c.tax_no ? `/ ${c.tax_no}` : ""}</div>
                             {c.iban && <div style={{ fontSize: 11, color: colors.primary, fontWeight: 600 }}>IBAN: {c.iban}</div>}
                           </div>
                           <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                            {c.is_default !== 1 && (
+                              <button onClick={() => settingsSetDefault(c.id)} style={{ padding: "5px 10px", background: `${colors.success}18`, border: `1px solid ${colors.success}44`, borderRadius: 5, color: colors.success, fontSize: 11, cursor: "pointer" }}>Set as Default</button>
+                            )}
                             <button onClick={() => { setSettingsEditingId(c.id); setSettingsEditDraft({ ...c }); }} style={{ padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, cursor: "pointer" }}>{t("settings_edit")}</button>
                             <button onClick={() => deleteCompany(c.id)} style={{ padding: "5px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>{t("settings_companyDelete")}</button>
                           </div>
