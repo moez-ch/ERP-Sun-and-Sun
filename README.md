@@ -64,8 +64,11 @@ Node.js / Express backend  ──────►  SQLite database (erp_auth.db)
 
 ### 1. Authentication
 Role-based login system. Two roles:
-- **Admin** — full access including user management and template management
+- **Admin** — full access including user management, template management, and company/IBAN settings
 - **User** — standard access to all operational features
+
+### Navigation
+The left sidebar is collapsible. Click the **‹** arrow in the header to collapse it to icon-only mode (56px), and the **›** arrow to expand it back. Each icon shows a tooltip on hover when collapsed.
 
 ### 2. CRM (Monday.com Integration)
 Pulls all contact and company data from the Sun & Sun Monday.com board.
@@ -114,7 +117,7 @@ When preparing a `.docx` contract file, use these tags exactly as written — th
 | `@@party2_tax_no@@` | Client tax number |
 | `@@party2_address@@` | Client address |
 | `@@contract_date@@` | Date the contract is signed |
-| `@@iban@@` | Sun & Sun bank IBAN for payments |
+| `@@iban@@` | Sun & Sun bank IBAN — auto-filled from the selected company's default IBAN |
 | `@@down_payment@@` | Upfront service fee amount (e.g. `50000 TL + KDV`) |
 | `@@success_bonus@@` | Success fee percentage (e.g. `3`) |
 | `@@program_name@@` | Name of the first / main program |
@@ -147,7 +150,23 @@ Features:
 - If Canva is not connected, a standalone PDF is returned instead
 - Admin can add or remove presentations from the list by pasting a Canva link
 
-### 7. OCR / ML Service
+### 7. Settings (Admin only)
+Manage system-wide configuration. Only visible to admin users.
+
+**Sun Group Companies**
+Each company used as Party 1 in contracts is managed here:
+- Add / edit / delete companies (name, short name, tax office, tax number, address)
+- Mark one company as **Default** — it is automatically pre-selected when opening the Contracts form
+- Each company supports **multiple IBANs**: add as many as needed with an optional label (e.g. "Garanti", "İş Bankası"), mark one as the default IBAN, and remove any that are no longer needed
+- When generating a contract, the default IBAN fills automatically; if the company has multiple IBANs a dropdown appears to switch for that specific contract
+
+**Other settings panels**
+- SendGrid API key, sender name and email
+- Monday.com API key and board IDs
+- Twilio and Vapi configuration for cold calling
+- Canva OAuth2 connection
+
+### 8. OCR / ML Service
 A Python-based service (FastAPI + EasyOCR) that reads tax certificates and extracts structured data.
 
 Features:
@@ -202,16 +221,18 @@ ERP-Sun-and-Sun/
 
 ## Database Tables (overview)
 
-| Table                   | Stores                                            |
-|-------------------------|---------------------------------------------------|
-| `users`                 | Login accounts and roles                          |
-| `email_templates`       | Saved bulk email templates                        |
-| `campaigns`             | History of sent email campaigns                   |
-| `contracts`             | Generated contract records                        |
-| `contract_templates`    | Uploaded .docx / .html template files             |
-| `canva_config`          | Canva OAuth2 tokens and client credentials        |
-| `canva_designs`         | Registered Canva designs for contract integration |
-| `program_presentations` | Curated presentation list for Price Quote tab     |
+| Table                   | Stores                                                        |
+|-------------------------|---------------------------------------------------------------|
+| `users`                 | Login accounts and roles                                      |
+| `email_templates`       | Saved bulk email templates                                    |
+| `campaigns`             | History of sent email campaigns                               |
+| `contracts`             | Generated contract records                                    |
+| `contract_templates`    | Uploaded .docx / .html template files                         |
+| `contract_companies`    | Sun Group company records (name, tax info, address, default)  |
+| `company_ibans`         | Multiple IBANs per company, each with a label and default flag|
+| `canva_config`          | Canva OAuth2 tokens and client credentials                    |
+| `canva_designs`         | Registered Canva designs for contract integration             |
+| `program_presentations` | Curated presentation list for Price Quote tab                 |
 
 ---
 
