@@ -99,6 +99,34 @@ Features:
 - Optional: merge the generated contract page into a Canva presentation at a specific slide position
 - Full English / Turkish interface
 
+#### Contract Template Placeholders
+
+When preparing a `.docx` contract file, use these tags exactly as written — the system detects and fills them automatically.
+
+| Placeholder | What it represents |
+|---|---|
+| `@@party1_name@@` | Sun & Sun company name (auto-filled from Settings) |
+| `@@party1_tax_office@@` | Sun & Sun tax office (auto-filled from Settings) |
+| `@@party1_tax_no@@` | Sun & Sun tax number (auto-filled from Settings) |
+| `@@party1_address@@` | Sun & Sun address (auto-filled from Settings) |
+| `@@party2_name@@` | Client company name |
+| `@@party2_tax_office@@` | Client tax office |
+| `@@party2_tax_no@@` | Client tax number |
+| `@@party2_address@@` | Client address |
+| `@@contract_date@@` | Date the contract is signed |
+| `@@iban@@` | Sun & Sun bank IBAN for payments |
+| `@@down_payment@@` | Upfront service fee amount (e.g. `50000 TL + KDV`) |
+| `@@success_bonus@@` | Success fee percentage (e.g. `3`) |
+| `@@program_name@@` | Name of the first / main program |
+| `@@program2_name@@` | Name of the second program |
+| `@@program2_fee@@` | Service fee for the second program |
+| `@@program2_bonus@@` | Success fee for the second program |
+| `@@program3_name@@` | Name of the third program |
+| `@@program3_fee@@` | Service fee for the third program |
+| `@@program3_bonus@@` | Success fee for the third program |
+| `@@notes@@` | General notes or additional terms |
+| `@@payment_schedule@@` | ⚠ Special — replaced by a full EK-1 payment schedule table |
+
 ### 5. Contracts Reporting
 View and filter all contracts that have been generated.
 
