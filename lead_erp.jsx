@@ -573,6 +573,7 @@ function Dashboard({ authUser, onLogout: handleLogout }) {
     } catch { return []; }
   });
   const [view, setView] = useState("dashboard"); // dashboard | leads | agent | pipeline | detail
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [search, setSearch] = useState("");
   const [filterIndustry, setFilterIndustry] = useState("All");
@@ -1621,69 +1622,104 @@ Kurallar:
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: font, background: colors.bg, color: colors.text, overflow: "hidden" }}>
       {/* SIDEBAR */}
-      <div style={{ width: 220, background: colors.surface, borderRight: `1px solid ${colors.border}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
-        <div style={{ padding: "20px 16px", borderBottom: `1px solid ${colors.border}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ width: sidebarCollapsed ? 56 : 220, background: colors.surface, borderRight: `1px solid ${colors.border}`, display: "flex", flexDirection: "column", flexShrink: 0, transition: "width .2s ease", overflow: "hidden" }}>
+        {/* Logo + toggle */}
+        <div style={{ padding: sidebarCollapsed ? "16px 10px" : "16px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "space-between", minHeight: 64 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, overflow: "hidden", flexShrink: 0 }}>
               <img src={snsLogo} alt="Sun&Sun Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>Sun&Sun</div>
-              <div style={{ fontSize: 10, color: colors.textMuted, letterSpacing: 0.5, textTransform: "uppercase" }}>Lead Agent ERP</div>
-            </div>
+            {!sidebarCollapsed && (
+              <div style={{ overflow: "hidden" }}>
+                <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3, whiteSpace: "nowrap" }}>Sun&Sun</div>
+                <div style={{ fontSize: 10, color: colors.textMuted, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap" }}>Lead Agent ERP</div>
+              </div>
+            )}
           </div>
+          {!sidebarCollapsed && (
+            <button onClick={() => setSidebarCollapsed(true)} title="Collapse sidebar"
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: colors.textMuted, padding: 4, borderRadius: 6, display: "flex", alignItems: "center", flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+          )}
+          {sidebarCollapsed && (
+            <button onClick={() => setSidebarCollapsed(false)} title="Expand sidebar"
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: colors.textMuted, padding: 4, borderRadius: 6, display: "flex", alignItems: "center", position: "absolute", left: 56, zIndex: 10 }}>
+            </button>
+          )}
         </div>
         <nav style={{ flex: 1, padding: "12px 8px" }}>
+          {sidebarCollapsed && (
+            <button onClick={() => setSidebarCollapsed(false)} title="Expand sidebar"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", padding: "8px 0", border: "none", borderRadius: 8, cursor: "pointer", background: "transparent", color: colors.textMuted, marginBottom: 6 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          )}
           {sidebarItems.map((item) => (
             <button
               key={item.id}
               onClick={() => { setView(item.id); setSelectedLead(null); }}
+              title={sidebarCollapsed ? item.label : undefined}
               style={{
-                display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: font, marginBottom: 2, transition: "all .15s",
+                display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "flex-start", gap: 10, width: "100%", padding: sidebarCollapsed ? "10px 0" : "10px 12px", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: font, marginBottom: 2, transition: "all .15s", position: "relative",
                 background: view === item.id ? `${colors.primary}18` : "transparent",
                 color: view === item.id ? colors.primaryLight : colors.textMuted,
               }}
             >
               {item.icon}
-              {item.label}
+              {!sidebarCollapsed && item.label}
               {item.id === "agent" && agentRunning && (
-                <span style={{ marginLeft: "auto", width: 8, height: 8, borderRadius: "50%", background: colors.success, animation: "pulse 1s infinite" }} />
+                <span style={{ marginLeft: sidebarCollapsed ? undefined : "auto", position: sidebarCollapsed ? "absolute" : "static", top: sidebarCollapsed ? 6 : undefined, right: sidebarCollapsed ? 6 : undefined, width: 8, height: 8, borderRadius: "50%", background: colors.success, animation: "pulse 1s infinite" }} />
               )}
-              {item.badge && item.id !== "agent" && (
+              {item.badge && item.id !== "agent" && !sidebarCollapsed && (
                 <span style={{ marginLeft: "auto", minWidth: 18, height: 18, borderRadius: 9, background: colors.primary, color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{item.badge}</span>
               )}
             </button>
           ))}
         </nav>
         {/* User + Logout */}
-        <div style={{ padding: "12px 16px", borderTop: `1px solid ${colors.border}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: "50%", background: colors.primary, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
-              {authUser.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+        <div style={{ padding: sidebarCollapsed ? "12px 8px" : "12px 16px", borderTop: `1px solid ${colors.border}` }}>
+          {sidebarCollapsed ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+              <div title={authUser.name} style={{ width: 30, height: 30, borderRadius: "50%", background: colors.primary, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", cursor: "default" }}>
+                {authUser.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+              </div>
+              <button onClick={handleLogout} title={t("nav_logout")}
+                style={{ background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textDim, cursor: "pointer", padding: "5px 8px", fontSize: 13 }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = colors.danger; e.currentTarget.style.color = colors.danger; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.color = colors.textDim; }}
+              >↩</button>
             </div>
-            <div style={{ overflow: "hidden" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: colors.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{authUser.name}</div>
-              <div style={{ fontSize: 10, color: colors.textDim, textTransform: "capitalize" }}>{authUser.role}</div>
-            </div>
-          </div>
-          <div style={{ fontSize: 10, color: colors.textDim, marginBottom: 8 }}>{t("nav_leadsInDb", leads.length)}</div>
-          {/* Language toggle */}
-          <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
-            {["tr", "en"].map(l => (
-              <button key={l} onClick={() => setLang(l)}
-                style={{ flex: 1, padding: "5px 0", border: `1px solid ${lang === l ? colors.primary : colors.border}`, borderRadius: 5, background: lang === l ? `${colors.primary}22` : "transparent", color: lang === l ? colors.primaryLight : colors.textDim, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: font, textTransform: "uppercase", letterSpacing: 0.5, transition: "all .15s" }}>
-                {l}
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <div style={{ width: 30, height: 30, borderRadius: "50%", background: colors.primary, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+                  {authUser.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                </div>
+                <div style={{ overflow: "hidden" }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: colors.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{authUser.name}</div>
+                  <div style={{ fontSize: 10, color: colors.textDim, textTransform: "capitalize" }}>{authUser.role}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: colors.textDim, marginBottom: 8 }}>{t("nav_leadsInDb", leads.length)}</div>
+              <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                {["tr", "en"].map(l => (
+                  <button key={l} onClick={() => setLang(l)}
+                    style={{ flex: 1, padding: "5px 0", border: `1px solid ${lang === l ? colors.primary : colors.border}`, borderRadius: 5, background: lang === l ? `${colors.primary}22` : "transparent", color: lang === l ? colors.primaryLight : colors.textDim, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: font, textTransform: "uppercase", letterSpacing: 0.5, transition: "all .15s" }}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={handleLogout}
+                style={{ width: "100%", padding: "7px 10px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textDim, fontSize: 11, fontWeight: 500, cursor: "pointer", fontFamily: font, textAlign: "left", transition: "all .15s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = colors.danger; e.currentTarget.style.color = colors.danger; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.color = colors.textDim; }}
+              >
+                ↩ {t("nav_logout")}
               </button>
-            ))}
-          </div>
-          <button
-            onClick={handleLogout}
-            style={{ width: "100%", padding: "7px 10px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textDim, fontSize: 11, fontWeight: 500, cursor: "pointer", fontFamily: font, textAlign: "left", transition: "all .15s" }}
-            onMouseEnter={(e) => { e.target.style.borderColor = colors.danger; e.target.style.color = colors.danger; }}
-            onMouseLeave={(e) => { e.target.style.borderColor = colors.border; e.target.style.color = colors.textDim; }}
-          >
-            ↩ {t("nav_logout")}
-          </button>
+            </>
+          )}
         </div>
       </div>
 
