@@ -132,6 +132,26 @@ db.exec(`
   )
 `);
 try { db.exec(`ALTER TABLE contract_companies ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`); } catch {}
+
+// ── COMPANY IBANs (multiple IBANs per company) ────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS company_ibans (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER NOT NULL,
+    label      TEXT NOT NULL DEFAULT '',
+    iban       TEXT NOT NULL,
+    is_default INTEGER NOT NULL DEFAULT 0
+  )
+`);
+// Migrate any existing single IBANs from contract_companies into company_ibans
+{
+  const toMigrate = db.prepare("SELECT id, iban FROM contract_companies WHERE iban != ''").all();
+  for (const c of toMigrate) {
+    const already = db.prepare("SELECT COUNT(*) as n FROM company_ibans WHERE company_id=?").get(c.id).n;
+    if (!already) db.prepare("INSERT INTO company_ibans (company_id, label, iban, is_default) VALUES (?,?,?,1)").run(c.id, "", c.iban);
+  }
+}
+
 // Seed known companies if table is empty
 const companyCount = db.prepare("SELECT COUNT(*) as c FROM contract_companies").get().c;
 if (companyCount === 0) {
@@ -890,7 +910,9 @@ app.post("/monday/update-columns", authenticate, async (req, res) => {
 
 // GET /contracts/companies
 app.get("/contracts/companies", authenticate, (req, res) => {
-  res.json(db.prepare("SELECT * FROM contract_companies ORDER BY sort_order, id").all());
+  const companies = db.prepare("SELECT * FROM contract_companies ORDER BY sort_order, id").all();
+  const allIbans = db.prepare("SELECT * FROM company_ibans ORDER BY is_default DESC, id").all();
+  res.json(companies.map(c => ({ ...c, ibans: allIbans.filter(i => i.company_id === c.id) })));
 });
 
 // POST /contracts/companies
@@ -921,6 +943,47 @@ app.put("/contracts/companies/:id/set-default", authenticate, (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
   db.prepare("UPDATE contract_companies SET is_default=0").run();
   db.prepare("UPDATE contract_companies SET is_default=1 WHERE id=?").run(req.params.id);
+  res.json({ ok: true });
+});
+
+// POST /contracts/companies/:id/ibans (admin only)
+app.post("/contracts/companies/:id/ibans", authenticate, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  const { iban, label } = req.body || {};
+  if (!iban?.trim()) return res.status(400).json({ error: "IBAN required" });
+  const hasDefault = db.prepare("SELECT COUNT(*) as n FROM company_ibans WHERE company_id=? AND is_default=1").get(req.params.id).n;
+  const isDefault = hasDefault ? 0 : 1;
+  const r = db.prepare("INSERT INTO company_ibans (company_id, label, iban, is_default) VALUES (?,?,?,?)").run(req.params.id, label||"", iban.trim(), isDefault);
+  if (isDefault) db.prepare("UPDATE contract_companies SET iban=? WHERE id=?").run(iban.trim(), req.params.id);
+  res.json(db.prepare("SELECT * FROM company_ibans WHERE id=?").get(r.lastInsertRowid));
+});
+
+// DELETE /contracts/companies/ibans/:ibanId (admin only)
+app.delete("/contracts/companies/ibans/:ibanId", authenticate, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  const row = db.prepare("SELECT * FROM company_ibans WHERE id=?").get(req.params.ibanId);
+  if (!row) return res.status(404).json({ error: "Not found" });
+  db.prepare("DELETE FROM company_ibans WHERE id=?").run(req.params.ibanId);
+  if (row.is_default) {
+    const next = db.prepare("SELECT * FROM company_ibans WHERE company_id=? ORDER BY id LIMIT 1").get(row.company_id);
+    if (next) {
+      db.prepare("UPDATE company_ibans SET is_default=1 WHERE id=?").run(next.id);
+      db.prepare("UPDATE contract_companies SET iban=? WHERE id=?").run(next.iban, row.company_id);
+    } else {
+      db.prepare("UPDATE contract_companies SET iban='' WHERE id=?").run(row.company_id);
+    }
+  }
+  res.json({ ok: true });
+});
+
+// PUT /contracts/companies/ibans/:ibanId/set-default (admin only)
+app.put("/contracts/companies/ibans/:ibanId/set-default", authenticate, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  const row = db.prepare("SELECT * FROM company_ibans WHERE id=?").get(req.params.ibanId);
+  if (!row) return res.status(404).json({ error: "Not found" });
+  db.prepare("UPDATE company_ibans SET is_default=0 WHERE company_id=?").run(row.company_id);
+  db.prepare("UPDATE company_ibans SET is_default=1 WHERE id=?").run(req.params.ibanId);
+  db.prepare("UPDATE contract_companies SET iban=? WHERE id=?").run(row.iban, row.company_id);
   res.json({ ok: true });
 });
 

@@ -724,9 +724,11 @@ Kurallar:
   const [settingsCompanies, setSettingsCompanies] = useState([]);
   const [settingsEditingId, setSettingsEditingId] = useState(null);
   const [settingsEditDraft, setSettingsEditDraft] = useState({});
-  const [settingsAddDraft, setSettingsAddDraft] = useState({ name:"", short:"", tax_office:"", tax_no:"", address:"", iban:"" });
+  const [settingsAddDraft, setSettingsAddDraft] = useState({ name:"", short:"", tax_office:"", tax_no:"", address:"" });
   const [settingsShowAdd, setSettingsShowAdd] = useState(false);
   const [settingsOcrLoading, setSettingsOcrLoading] = useState(false);
+  const [settingsIbanAdding, setSettingsIbanAdding] = useState(null); // company id whose add-iban form is open
+  const [settingsIbanDraft, setSettingsIbanDraft] = useState({ label: "", iban: "" });
 
   const fetchSettingsCompanies = async () => {
     const token = localStorage.getItem("sns_token");
@@ -764,7 +766,7 @@ Kurallar:
     const r = await fetch("/contracts/companies", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(settingsAddDraft) });
     const d = await r.json();
     setSettingsCompanies(prev => [...prev, d]);
-    setSettingsAddDraft({ name:"", short:"", tax_office:"", tax_no:"", address:"", iban:"" });
+    setSettingsAddDraft({ name:"", short:"", tax_office:"", tax_no:"", address:"" });
     setSettingsShowAdd(false);
   };
 
@@ -779,6 +781,45 @@ Kurallar:
     const token = localStorage.getItem("sns_token");
     await fetch(`/contracts/companies/${id}/set-default`, { method: "PUT", headers: { Authorization: `Bearer ${token}` } });
     setSettingsCompanies(prev => prev.map(c => ({ ...c, is_default: c.id === id ? 1 : 0 })));
+  };
+
+  const settingsAddIban = async (companyId) => {
+    if (!settingsIbanDraft.iban.trim()) return;
+    const token = localStorage.getItem("sns_token");
+    const r = await fetch(`/contracts/companies/${companyId}/ibans`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(settingsIbanDraft) });
+    const newIban = await r.json();
+    setSettingsCompanies(prev => prev.map(c => {
+      if (c.id !== companyId) return c;
+      const ibans = newIban.is_default ? [...(c.ibans||[]).map(i => ({ ...i, is_default: 0 })), newIban] : [...(c.ibans||[]), newIban];
+      const defaultIban = ibans.find(i => i.is_default);
+      return { ...c, ibans, iban: defaultIban ? defaultIban.iban : c.iban };
+    }));
+    setSettingsIbanDraft({ label: "", iban: "" });
+    setSettingsIbanAdding(null);
+  };
+
+  const settingsDeleteIban = async (ibanId, companyId) => {
+    const token = localStorage.getItem("sns_token");
+    await fetch(`/contracts/companies/ibans/${ibanId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    setSettingsCompanies(prev => prev.map(c => {
+      if (c.id !== companyId) return c;
+      const remaining = (c.ibans||[]).filter(i => i.id !== ibanId);
+      const wasDefault = (c.ibans||[]).find(i => i.id === ibanId)?.is_default;
+      if (wasDefault && remaining.length) remaining[0] = { ...remaining[0], is_default: 1 };
+      const defaultIban = remaining.find(i => i.is_default);
+      return { ...c, ibans: remaining, iban: defaultIban ? defaultIban.iban : "" };
+    }));
+  };
+
+  const settingsSetDefaultIban = async (ibanId, companyId) => {
+    const token = localStorage.getItem("sns_token");
+    await fetch(`/contracts/companies/ibans/${ibanId}/set-default`, { method: "PUT", headers: { Authorization: `Bearer ${token}` } });
+    setSettingsCompanies(prev => prev.map(c => {
+      if (c.id !== companyId) return c;
+      const ibans = (c.ibans||[]).map(i => ({ ...i, is_default: i.id === ibanId ? 1 : 0 }));
+      const defaultIban = ibans.find(i => i.is_default);
+      return { ...c, ibans, iban: defaultIban ? defaultIban.iban : c.iban };
+    }));
   };
 
   const fetchMondayCampaigns = async () => {
@@ -4058,7 +4099,7 @@ Kurallar:
             party1_tax_office: selectedCompany.tax_office,
             party1_tax_no: selectedCompany.tax_no,
             party1_address: selectedCompany.address,
-            iban: selectedCompany.iban,
+            iban: contractData.iban || selectedCompany.iban,
           } : contractData;
 
           const handleOcr = async (file) => {
@@ -4694,7 +4735,11 @@ Kurallar:
                     {/* Party 1 */}
                     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionParty1")}</div>
-                      <select value={contractData.party1_id} onChange={e => setContractData(p => ({ ...p, party1_id: e.target.value }))}
+                      <select value={contractData.party1_id} onChange={e => {
+                        const company = contractCompanies.find(c => String(c.id) === e.target.value);
+                        const defaultIban = company?.ibans?.find(i => i.is_default)?.iban || company?.iban || "";
+                        setContractData(p => ({ ...p, party1_id: e.target.value, iban: defaultIban }));
+                      }}
                         style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" }}>
                         <option value="">{t("contract_selectCompany")}</option>
                         {contractCompanies.map(c => <option key={c.id} value={c.id}>{c.short}</option>)}
@@ -4704,7 +4749,19 @@ Kurallar:
                           <div>{selectedCompany.name}</div>
                           <div>{selectedCompany.tax_office} / {selectedCompany.tax_no}</div>
                           <div>{selectedCompany.address}</div>
-                          <div style={{ color: colors.primary, fontWeight: 600 }}>IBAN: {selectedCompany.iban}</div>
+                          {(selectedCompany.ibans||[]).length > 1 ? (
+                            <div style={{ marginTop: 6 }}>
+                              <div style={{ fontSize: 11, marginBottom: 4, color: colors.textMuted }}>IBAN</div>
+                              <select value={contractData.iban || ""} onChange={e => setContractData(p => ({ ...p, iban: e.target.value }))}
+                                style={{ width: "100%", padding: "6px 8px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.primary, fontSize: 12, fontWeight: 600, outline: "none", fontFamily: "monospace" }}>
+                                {(selectedCompany.ibans||[]).map(ib => (
+                                  <option key={ib.id} value={ib.iban}>{ib.iban}{ib.label ? ` (${ib.label})` : ""}{ib.is_default ? " ★" : ""}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            <div style={{ color: colors.primary, fontWeight: 600, fontFamily: "monospace" }}>IBAN: {contractData.iban || selectedCompany.iban}</div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -5216,7 +5273,6 @@ Kurallar:
                 { key: "tax_office", label: t("settings_companyTaxOffice") },
                 { key: "tax_no",     label: t("settings_companyTaxNo") },
                 { key: "address",    label: t("settings_companyAddress"),  full: true },
-                { key: "iban",       label: t("settings_companyIban") },
               ];
               return (
                 <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 18, marginBottom: 20 }}>
@@ -5279,7 +5335,28 @@ Kurallar:
                             </div>
                             <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{c.name}</div>
                             <div style={{ fontSize: 11, color: colors.textMuted }}>{c.tax_office} {c.tax_no ? `/ ${c.tax_no}` : ""}</div>
-                            {c.iban && <div style={{ fontSize: 11, color: colors.primary, fontWeight: 600 }}>IBAN: {c.iban}</div>}
+                            {/* IBAN list */}
+                            <div style={{ marginTop: 8 }}>
+                              {(c.ibans||[]).map(ib => (
+                                <div key={ib.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                  <span style={{ fontSize: 11, fontFamily: "monospace", color: colors.primary, fontWeight: 600 }}>{ib.iban}</span>
+                                  {ib.label ? <span style={{ fontSize: 10, color: colors.textMuted }}>({ib.label})</span> : null}
+                                  {ib.is_default ? <span style={{ fontSize: 9, fontWeight: 700, background: `${colors.primary}22`, color: colors.primaryLight, borderRadius: 3, padding: "1px 5px" }}>DEFAULT</span>
+                                    : <button onClick={() => settingsSetDefaultIban(ib.id, c.id)} style={{ fontSize: 9, background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 3, color: colors.textMuted, cursor: "pointer", padding: "1px 5px" }}>Set default</button>}
+                                  <button onClick={() => settingsDeleteIban(ib.id, c.id)} style={{ fontSize: 10, background: "transparent", border: "none", color: "#e57373", cursor: "pointer", padding: "0 2px" }}>✕</button>
+                                </div>
+                              ))}
+                              {settingsIbanAdding === c.id ? (
+                                <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+                                  <input value={settingsIbanDraft.label} onChange={e => setSettingsIbanDraft(p => ({ ...p, label: e.target.value }))} placeholder="Label (e.g. Garanti)" style={{ width: 110, padding: "4px 7px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 4, color: colors.text, fontSize: 11, outline: "none" }} />
+                                  <input value={settingsIbanDraft.iban} onChange={e => setSettingsIbanDraft(p => ({ ...p, iban: e.target.value }))} placeholder="TR00 0000 ..." style={{ flex: 1, padding: "4px 7px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 4, color: colors.text, fontSize: 11, outline: "none", fontFamily: "monospace" }} />
+                                  <button onClick={() => settingsAddIban(c.id)} style={{ padding: "4px 10px", background: colors.primary, border: "none", borderRadius: 4, color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Save</button>
+                                  <button onClick={() => { setSettingsIbanAdding(null); setSettingsIbanDraft({ label: "", iban: "" }); }} style={{ padding: "4px 8px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 4, color: colors.textMuted, fontSize: 11, cursor: "pointer" }}>✕</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => { setSettingsIbanAdding(c.id); setSettingsIbanDraft({ label: "", iban: "" }); }} style={{ marginTop: 4, fontSize: 11, background: "transparent", border: `1px dashed ${colors.border}`, borderRadius: 4, color: colors.textMuted, cursor: "pointer", padding: "3px 10px" }}>+ Add IBAN</button>
+                              )}
+                            </div>
                           </div>
                           <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                             {c.is_default !== 1 && (
