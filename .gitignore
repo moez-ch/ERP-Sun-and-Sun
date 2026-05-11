@@ -48,3 +48,14 @@ Thumbs.db
 
 # OS files
 Desktop.ini
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Log files
+*.log
+
+# Temporary generated files
+tmp_contracts/

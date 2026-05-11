@@ -690,6 +690,35 @@ Kurallar:
   const [contractUploadFile, setContractUploadFile] = useState(null);
   const [contractUploading, setContractUploading] = useState(false);
 
+  // ── Canva state ───────────────────────────────────────────────
+  const [canvaConfig, setCanvaConfig] = useState({ connected: false, has_credentials: false, client_id: "" });
+  const [canvaDesigns, setCanvaDesigns] = useState([]);
+  const [canvaDesignDraft, setCanvaDesignDraft] = useState({ label: "", design_id: "", slide_index: "1" });
+  const [canvaShowAdd, setCanvaShowAdd] = useState(false);
+  const [canvaActiveDesign, setCanvaActiveDesign] = useState(null);
+  const [canvaGenerating, setCanvaGenerating] = useState(null);
+  const [canvaCredDraft, setCanvaCredDraft] = useState({ client_id: "", client_secret: "" });
+  const [canvaSavingCreds, setCanvaSavingCreds] = useState(false);
+  // ── Pricing state ─────────────────────────────────────────────
+  const EMPTY_OPT = () => ({ title: "", dp: "", succ_fee_1: "", note1: "", succ_fee_2: "", note2: "" });
+  const [pricingData, setPricingData] = useState({ num_options: 1, gen_note: "", design_id: "", theme: "blue", opt: [EMPTY_OPT(), EMPTY_OPT(), EMPTY_OPT()] });
+  const [pricingMode, setPricingMode] = useState("quote"); // "quote" | "program"
+  const EMPTY_PROG = () => ({ name: "", fee: "", bonus: "" });
+  const [programData, setProgramData] = useState({ num_programs: 1, party2_name: "", contract_date: new Date().toLocaleDateString("tr-TR"), notes: "", programs: [EMPTY_PROG(), EMPTY_PROG(), EMPTY_PROG()] });
+  const [programGenerating, setProgramGenerating] = useState(false);
+  const [pricingGenerating, setPricingGenerating] = useState(false);
+
+  const [canvaThemeEdit, setCanvaThemeEdit] = useState({});   // { [id]: { accent_color, dark_color } }
+  const [canvaThumbUrls, setCanvaThumbUrls] = useState({});   // { [id]: url | "loading" | "error" }
+  const [canvaPresentations, setCanvaPresentations] = useState([]);
+  const [canvaPresentationsLoading, setCanvaPresentationsLoading] = useState(false);
+  const [progPresEntations, setProgPresentations] = useState([]);
+  const [progPresLoading, setProgPresLoading] = useState(false);
+  const [progPresShowAdd, setProgPresShowAdd] = useState(false);
+  const [progPresDraft, setProgPresDraft] = useState({ category: "", name: "", canva_link: "" });
+  const [progPresAdding, setProgPresAdding] = useState(false);
+  const [canvaSavingTheme, setCanvaSavingTheme] = useState({});// { [id]: bool }
+
   // ── Settings — companies state ────────────────────────────────
   const [settingsCompanies, setSettingsCompanies] = useState([]);
   const [settingsEditingId, setSettingsEditingId] = useState(null);
@@ -899,16 +928,28 @@ Kurallar:
       .finally(() => setUmLoading(false));
   }, []);
 
+
   // Load users when admin enters settings
   useEffect(() => {
     if (view === "settings" && authUser?.role === "admin") { umFetch(); fetchSettingsCompanies(); }
     if (view === "monday") fetchMondayCampaigns();
+    if (view === "pricing") {
+      const token = localStorage.getItem("sns_token");
+      setProgPresLoading(true);
+      fetch("/presentations", { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(d => { if (Array.isArray(d)) setProgPresentations(d); })
+        .catch(() => {}).finally(() => setProgPresLoading(false));
+    }
     if (view === "contracts") {
       const token = localStorage.getItem("sns_token");
       fetch("/contracts/templates", { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json()).then(setContractTemplates).catch(() => {});
       fetch("/contracts/companies", { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json()).then(setContractCompanies).catch(() => {});
+      fetch("/canva/config", { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(setCanvaConfig).catch(() => {});
+      fetch("/canva/designs", { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(setCanvaDesigns).catch(() => {});
     }
   }, [view, authUser, umFetch]);
 
@@ -1558,6 +1599,7 @@ Kurallar:
     { id: "email", label: t("nav_email"), icon: <MailIcon size={18} /> },
     { id: "monday", label: t("nav_monday"), icon: <GridIcon size={18} /> },
     { id: "contracts", label: t("nav_contracts"), icon: <FileTextIcon size={18} /> },
+    { id: "pricing", label: "Price Quote", icon: <FileTextIcon size={18} /> },
     ...(isAdmin ? [
       { id: "inbox", label: t("nav_inbox"), icon: <InboxIcon size={18} /> },
       { id: "agent", label: t("nav_agent"), icon: <BotIcon size={18} /> },
@@ -4036,6 +4078,88 @@ Kurallar:
             if (contractTemplate?.id === id) setContractTemplate(null);
           };
 
+          const handleSaveCanvaCreds = async () => {
+            if (!canvaCredDraft.client_id || !canvaCredDraft.client_secret) { alert("Both Client ID and Client Secret are required."); return; }
+            setCanvaSavingCreds(true);
+            try {
+              const token = localStorage.getItem("sns_token");
+              const r = await fetch("/canva/config", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(canvaCredDraft) });
+              if (!r.ok) { const e = await r.json(); alert("Error: " + e.error); return; }
+              setCanvaCredDraft({ client_id: "", client_secret: "" });
+              const cfg = await fetch("/canva/config", { headers: { Authorization: `Bearer ${token}` } }).then(r2 => r2.json());
+              setCanvaConfig(cfg);
+              alert("Credentials saved. Now click Connect Canva to authorize.");
+            } catch (e) { alert("Error: " + e.message); }
+            finally { setCanvaSavingCreds(false); }
+          };
+
+          const handleAddCanvaDesign = async () => {
+            if (!canvaDesignDraft.label || !canvaDesignDraft.design_id) { alert("Label and Design ID are required."); return; }
+            try {
+              const token = localStorage.getItem("sns_token");
+              const r = await fetch("/canva/designs", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ ...canvaDesignDraft, slide_index: parseInt(canvaDesignDraft.slide_index) || 1 }) });
+              const d = await r.json();
+              if (!r.ok) { alert("Error: " + d.error); return; }
+              setCanvaDesigns(prev => [d, ...prev]);
+              setCanvaDesignDraft({ label: "", design_id: "", slide_index: "1" });
+              setCanvaShowAdd(false);
+            } catch (e) { alert("Error: " + e.message); }
+          };
+
+          const handleDeleteCanvaDesign = async (id) => {
+            if (!confirm("Remove this presentation?")) return;
+            const token = localStorage.getItem("sns_token");
+            await fetch(`/canva/designs/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+            setCanvaDesigns(prev => prev.filter(d => d.id !== id));
+            if (canvaActiveDesign?.id === id) setCanvaActiveDesign(null);
+          };
+
+          const handleCanvaGenerate = async (design) => {
+            setCanvaGenerating(design.id);
+            try {
+              const token = localStorage.getItem("sns_token");
+              const r = await fetch("/canva/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ designDbId: design.id, contractData }),
+              });
+              if (!r.ok) { const e = await r.json(); alert("Error: " + e.error); return; }
+              const blob = await r.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url; a.download = `${design.label.replace(/[^a-z0-9]/gi,"_")}_${Date.now()}.pdf`;
+              a.click(); URL.revokeObjectURL(url);
+            } catch (e) { alert("Error: " + e.message); }
+            finally { setCanvaGenerating(null); }
+          };
+
+          const handleCanvaThumbLoad = async (designId) => {
+            setCanvaThumbUrls(p => ({ ...p, [designId]: "loading" }));
+            try {
+              const token = localStorage.getItem("sns_token");
+              const r = await fetch(`/canva/designs/${designId}/thumbnail`, { headers: { Authorization: `Bearer ${token}` } });
+              const d = await r.json();
+              setCanvaThumbUrls(p => ({ ...p, [designId]: d.url || "error" }));
+            } catch { setCanvaThumbUrls(p => ({ ...p, [designId]: "error" })); }
+          };
+
+          const handleCanvaSaveTheme = async (design) => {
+            const theme = canvaThemeEdit[design.id] || { accent_color: design.accent_color || "#2563eb", dark_color: design.dark_color || "#1a2e47" };
+            setCanvaSavingTheme(p => ({ ...p, [design.id]: true }));
+            try {
+              const token = localStorage.getItem("sns_token");
+              const r = await fetch(`/canva/designs/${design.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ label: design.label, design_id: design.design_id, slide_index: design.slide_index, ...theme })
+              });
+              const updated = await r.json();
+              setCanvaDesigns(prev => prev.map(d => d.id === design.id ? updated : d));
+              setCanvaThemeEdit(p => { const n = { ...p }; delete n[design.id]; return n; });
+            } catch (e) { alert("Error: " + e.message); }
+            finally { setCanvaSavingTheme(p => ({ ...p, [design.id]: false })); }
+          };
+
           const field = (label, key, opts = {}) => (
             <div key={key} style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{label}</div>
@@ -4061,10 +4185,16 @@ Kurallar:
                     style={{ padding: "7px 14px", background: contractView === "report" ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 7, color: contractView === "report" ? "#fff" : colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     {contractView === "report" ? "← Back" : "📊 Report"}
                   </button>
-                  {contractView !== "report" && (
+                  {contractView !== "report" && contractView !== "canva" && (
                     <button onClick={() => setContractView(contractView === "form" ? "templates" : "form")}
                       style={{ padding: "7px 14px", background: contractView === "templates" ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 7, color: contractView === "templates" ? "#fff" : colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       {contractView === "form" ? t("contract_manageTemplates") : t("contract_backToForm")}
+                    </button>
+                  )}
+                  {contractView !== "report" && (
+                    <button onClick={() => setContractView(contractView === "canva" ? "form" : "canva")}
+                      style={{ padding: "7px 14px", background: contractView === "canva" ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 7, color: contractView === "canva" ? "#fff" : colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                      {contractView === "canva" ? "← Back" : <><span style={{ fontSize: 15 }}>✦</span> Canva PDF</>}
                     </button>
                   )}
                 </div>
@@ -4235,6 +4365,187 @@ Kurallar:
                           style={{ padding: "5px 10px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 6, color: "#e57373", fontSize: 12, cursor: "pointer" }}>
                           {t("contract_delete")}
                         </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : contractView === "canva" ? (
+                /* ── Canva Presentations ── */
+                <div>
+                  {/* Connection card */}
+                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 18, marginBottom: 20 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: isAdmin ? 16 : 0 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>Canva Account</div>
+                        <div style={{ fontSize: 12, color: canvaConfig.connected ? "#4caf50" : "#f59e0b", fontWeight: 600 }}>
+                          {canvaConfig.connected ? "✓ Connected" : "Not connected"}
+                        </div>
+                      </div>
+                      <button onClick={() => {
+                          const popup = window.open("/canva/auth", "_blank", "width=600,height=700");
+                          const check = setInterval(() => {
+                            if (popup && popup.closed) {
+                              clearInterval(check);
+                              const token = localStorage.getItem("sns_token");
+                              fetch("/canva/config", { headers: { Authorization: `Bearer ${token}` } })
+                                .then(r => r.json()).then(setCanvaConfig).catch(() => {});
+                            }
+                          }, 500);
+                        }}
+                        style={{ padding: "8px 16px", background: canvaConfig.connected ? `${colors.primary}22` : colors.primary, border: `1px solid ${colors.primary}44`, borderRadius: 7, color: canvaConfig.connected ? colors.primaryLight : "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                        {canvaConfig.connected ? "Re-connect" : "Connect Canva"}
+                      </button>
+                    </div>
+                    {isAdmin && (
+                      <div>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em" }}>App Credentials</div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <input value={canvaCredDraft.client_id} onChange={e => setCanvaCredDraft(p => ({ ...p, client_id: e.target.value }))}
+                            placeholder="Client ID"
+                            style={{ flex: 1, minWidth: 160, padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none" }} />
+                          <input value={canvaCredDraft.client_secret} onChange={e => setCanvaCredDraft(p => ({ ...p, client_secret: e.target.value }))}
+                            type="password" placeholder="Client Secret"
+                            style={{ flex: 1, minWidth: 160, padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none" }} />
+                          <button onClick={handleSaveCanvaCreds} disabled={canvaSavingCreds}
+                            style={{ padding: "7px 16px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 7, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: canvaSavingCreds ? 0.6 : 1 }}>
+                            Save
+                          </button>
+                        </div>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 8 }}>
+                          Get your credentials at <strong>canva.com/developers</strong> → Create an app → OAuth 2.0 → redirect URI: <code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>http://127.0.0.1:3001/canva/callback</code>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Designs list */}
+                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
+                    <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>Presentations ({canvaDesigns.length})</div>
+                      {isAdmin && (
+                        <button onClick={() => setCanvaShowAdd(p => !p)}
+                          style={{ padding: "5px 12px", background: canvaShowAdd ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: canvaShowAdd ? "#fff" : colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          {canvaShowAdd ? "Cancel" : "+ Add"}
+                        </button>
+                      )}
+                    </div>
+
+                    {canvaShowAdd && isAdmin && (
+                      <div style={{ padding: 16, borderBottom: `1px solid ${colors.border}`, background: `${colors.primary}08` }}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                          <input value={canvaDesignDraft.label} onChange={e => setCanvaDesignDraft(p => ({ ...p, label: e.target.value }))}
+                            placeholder="Label (e.g. Project A – Version 1)"
+                            style={{ flex: 2, minWidth: 180, padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none" }} />
+                          <input value={canvaDesignDraft.design_id} onChange={e => setCanvaDesignDraft(p => ({ ...p, design_id: e.target.value }))}
+                            placeholder="Design ID (from Canva URL)"
+                            style={{ flex: 2, minWidth: 180, padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none" }} />
+                          <input value={canvaDesignDraft.slide_index} onChange={e => setCanvaDesignDraft(p => ({ ...p, slide_index: e.target.value }))}
+                            placeholder="Slide #" type="number" min="1"
+                            style={{ width: 80, padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none" }} />
+                        </div>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 10 }}>
+                          Design ID: from the Canva URL — canva.com/design/<strong>DAF…</strong>/… · Slide # is the page number of the contract details slide.
+                        </div>
+                        <button onClick={handleAddCanvaDesign}
+                          style={{ padding: "7px 18px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          Save Presentation
+                        </button>
+                      </div>
+                    )}
+
+                    {canvaDesigns.length === 0 ? (
+                      <div style={{ padding: 32, textAlign: "center", color: colors.textMuted, fontSize: 13 }}>No presentations added yet. Click + Add to register a Canva design.</div>
+                    ) : canvaDesigns.map(d => (
+                      <div key={d.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{d.label}</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                              ID: <code style={{ background: colors.bg, padding: "0 4px", borderRadius: 3 }}>{d.design_id}</code> · Contract slide: #{d.slide_index}
+                            </div>
+                          </div>
+                          <button onClick={() => setCanvaActiveDesign(canvaActiveDesign?.id === d.id ? null : d)}
+                            style={{ padding: "6px 14px", background: canvaActiveDesign?.id === d.id ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: canvaActiveDesign?.id === d.id ? "#fff" : colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                            {canvaActiveDesign?.id === d.id ? "▲ Hide" : "⬇ Generate PDF"}
+                          </button>
+                          {isAdmin && (
+                            <button onClick={() => handleDeleteCanvaDesign(d.id)}
+                              style={{ padding: "5px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 6, color: "#e57373", fontSize: 12, cursor: "pointer" }}>✕</button>
+                          )}
+                        </div>
+
+                        {canvaActiveDesign?.id === d.id && (
+                          <div style={{ padding: "0 16px 16px" }}>
+                            <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, padding: 16 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 10 }}>Data from contract form</div>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
+                                {[
+                                  { label: "Client", val: contractData.party2_name },
+                                  { label: "Date", val: contractData.contract_date },
+                                  { label: "Program 1", val: contractData.program_name },
+                                  { label: "Fee 1", val: contractData.down_payment },
+                                  { label: "Bonus 1", val: contractData.success_bonus ? contractData.success_bonus + "%" : "" },
+                                  contractData.program2_name && { label: "Program 2", val: contractData.program2_name },
+                                  contractData.program2_name && { label: "Fee 2", val: contractData.program2_fee },
+                                  contractData.program3_name && { label: "Program 3", val: contractData.program3_name },
+                                  contractData.program3_name && { label: "Fee 3", val: contractData.program3_fee },
+                                ].filter(Boolean).map(({ label, val }) => val ? (
+                                  <div key={label} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                                    <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</span>
+                                    <span style={{ fontSize: 12, color: colors.text, fontWeight: 500 }}>{val}</span>
+                                  </div>
+                                ) : null)}
+                              </div>
+                              {contractData.notes && (
+                                <div style={{ marginBottom: 12, fontSize: 12, color: colors.textMuted, borderTop: `1px solid ${colors.border}`, paddingTop: 8 }}>
+                                  <span style={{ fontWeight: 600 }}>Notes: </span>{contractData.notes}
+                                </div>
+                              )}
+                              {!contractData.party2_name && !contractData.program_name && (
+                                <div style={{ marginBottom: 12, padding: "8px 12px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 6, fontSize: 12, color: "#f59e0b" }}>
+                                  Fill in the contract form first, then come back here to generate the PDF.
+                                </div>
+                              )}
+                              <button onClick={() => handleCanvaGenerate(d)} disabled={!!canvaGenerating}
+                                style={{ width: "100%", padding: "11px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontSize: 13, fontWeight: 700, cursor: canvaGenerating ? "not-allowed" : "pointer", opacity: canvaGenerating ? 0.6 : 1 }}>
+                                {canvaGenerating === d.id ? "⏳ Exporting from Canva & building PDF…" : "⬇ Download PDF"}
+                              </button>
+
+                              {isAdmin && (
+                                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${colors.border}` }}>
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".04em" }}>Slide Theme</div>
+                                    <button onClick={() => handleCanvaThumbLoad(d.id)}
+                                      style={{ fontSize: 11, padding: "3px 8px", background: `${colors.primary}18`, border: `1px solid ${colors.primary}33`, borderRadius: 5, color: colors.primaryLight, cursor: "pointer" }}>
+                                      {canvaThumbUrls[d.id] === "loading" ? "…" : "👁 Preview"}
+                                    </button>
+                                  </div>
+                                  {canvaThumbUrls[d.id] && canvaThumbUrls[d.id] !== "loading" && canvaThumbUrls[d.id] !== "error" && (
+                                    <img src={canvaThumbUrls[d.id]} alt="cover" style={{ width: "100%", borderRadius: 6, marginBottom: 8, border: `1px solid ${colors.border}` }} />
+                                  )}
+                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                                    {[["Accent color", "accent_color", d.accent_color || "#2563eb"], ["Dark color", "dark_color", d.dark_color || "#1a2e47"]].map(([lbl, key, def]) => (
+                                      <div key={key}>
+                                        <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 3, fontWeight: 600 }}>{lbl}</div>
+                                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                          <input type="color"
+                                            value={(canvaThemeEdit[d.id] || {})[key] || def}
+                                            onChange={e => setCanvaThemeEdit(p => ({ ...p, [d.id]: { ...(p[d.id] || { accent_color: d.accent_color||"#2563eb", dark_color: d.dark_color||"#1a2e47" }), [key]: e.target.value } }))}
+                                            style={{ width: 32, height: 28, padding: 2, border: `1px solid ${colors.border}`, borderRadius: 4, cursor: "pointer", background: "none" }} />
+                                          <span style={{ fontSize: 11, color: colors.textMuted, fontFamily: "monospace" }}>{(canvaThemeEdit[d.id] || {})[key] || def}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <button onClick={() => handleCanvaSaveTheme(d)} disabled={canvaSavingTheme[d.id]}
+                                    style={{ width: "100%", padding: "7px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: canvaSavingTheme[d.id] ? 0.6 : 1 }}>
+                                    {canvaSavingTheme[d.id] ? "Saving…" : "Save theme"}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -4488,6 +4799,253 @@ Kurallar:
                   </div>
                 </div>
               )}
+            </div>
+          );
+        })()}
+
+        {view === "pricing" && (() => {
+          const NOTE_OPTIONS = [
+            "Based on approved support",
+            "Based on approved grant",
+            "Based on approved loan",
+            "Based on benefit provided",
+          ];
+          const FEE_OPTIONS = Array.from({ length: 15 }, (_, i) => i + 1);
+          const pd = (k, v) => setPricingData(p => ({ ...p, [k]: v }));
+          const pdOpt = (i, k, v) => setPricingData(p => {
+            const opt = p.opt.map((o, idx) => idx === i ? { ...o, [k]: v } : o);
+            return { ...p, opt };
+          });
+          const inputStyle = { width: "100%", padding: "9px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 7, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" };
+          const labelStyle = { fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 5 };
+          const BADGE_COLORS = ["#C1272D", "#1B2E5E", "#1B5EA8"];
+
+          const handleGenerate = async () => {
+            setPricingGenerating(true);
+            try {
+              const token = localStorage.getItem("sns_token");
+              const r = await fetch("/pricing/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify(pricingData),
+              });
+              if (!r.ok) {
+                let msg = `HTTP ${r.status}`;
+                try { const e = await r.json(); msg = e.error || msg; } catch {}
+                alert("Error: " + msg); return;
+              }
+              const blob = await r.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url; a.download = `pricing_${Date.now()}.pdf`; a.click();
+              URL.revokeObjectURL(url);
+            } catch (e) { alert("Error: " + e.message); }
+            finally { setPricingGenerating(false); }
+          };
+
+          const ppd = (k, v) => setProgramData(p => ({ ...p, [k]: v }));
+          const ppdProg = (i, k, v) => setProgramData(p => {
+            const programs = p.programs.map((pr, idx) => idx === i ? { ...pr, [k]: v } : pr);
+            return { ...p, programs };
+          });
+
+          const handleGenerateProgram = async () => {
+            setProgramGenerating(true);
+            try {
+              const token = localStorage.getItem("sns_token");
+              const r = await fetch("/pricing/generate-program", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ ...programData, design_id: pricingData.design_id }),
+              });
+              if (!r.ok) { const e = await r.json(); alert("Error: " + e.error); return; }
+              const blob = await r.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a"); a.href = url; a.download = `pricing_${Date.now()}.pdf`; a.click();
+              URL.revokeObjectURL(url);
+            } catch (e) { alert("Error: " + e.message); }
+            finally { setProgramGenerating(false); }
+          };
+
+          return (
+            <div style={{ flex: 1, overflowY: "auto", padding: 32 }}>
+              <div style={{ maxWidth: 580, margin: "0 auto" }}>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>Price Quote</div>
+                  {/* Theme toggle */}
+                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16 }}>
+                    <div style={{ ...labelStyle, marginBottom: 12 }}>Slide Theme</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[["blue", "🔵 Blue"], ["green", "🟢 Green"]].map(([t, label]) => (
+                        <button key={t} onClick={() => pd("theme", t)}
+                          style={{ flex: 1, padding: "10px 0", border: `2px solid ${pricingData.theme === t ? colors.primary : colors.border}`, borderRadius: 8, background: pricingData.theme === t ? `${colors.primary}18` : "transparent", color: pricingData.theme === t ? colors.primaryLight : colors.textMuted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <>
+
+                {/* Program presentations picker */}
+                {(() => {
+                  const grouped = progPresEntations.reduce((acc, p) => {
+                    const cat = p.category || "Other";
+                    if (!acc[cat]) acc[cat] = [];
+                    acc[cat].push(p);
+                    return acc;
+                  }, {});
+
+                  const handleAddPres = async () => {
+                    if (!progPresDraft.name || !progPresDraft.canva_link) return;
+                    setProgPresAdding(true);
+                    try {
+                      const token = localStorage.getItem("sns_token");
+                      const r = await fetch("/presentations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(progPresDraft) });
+                      const d = await r.json();
+                      if (!r.ok) { alert(d.error); return; }
+                      setProgPresentations(prev => [...prev, d]);
+                      setProgPresDraft({ category: "", name: "", canva_link: "" });
+                      setProgPresShowAdd(false);
+                    } finally { setProgPresAdding(false); }
+                  };
+
+                  const handleDeletePres = async (id) => {
+                    if (!confirm("Remove this presentation?")) return;
+                    const token = localStorage.getItem("sns_token");
+                    await fetch(`/presentations/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                    setProgPresentations(prev => prev.filter(p => p.id !== id));
+                    if (pricingData.design_id === progPresEntations.find(p => p.id === id)?.design_id) pd("design_id", "");
+                  };
+
+                  return (
+                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                        <div style={labelStyle}>Presentation</div>
+                        {isAdmin && <button onClick={() => setProgPresShowAdd(s => !s)} style={{ fontSize: 11, padding: "4px 10px", background: `${colors.primary}18`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, cursor: "pointer", fontWeight: 600 }}>{progPresShowAdd ? "✕ Cancel" : "+ Add"}</button>}
+                      </div>
+
+                      {progPresShowAdd && (
+                        <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, padding: 12, marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                          <input placeholder="Category (e.g. KOSGEB)" value={progPresDraft.category} onChange={e => setProgPresDraft(p => ({ ...p, category: e.target.value }))} style={{ ...inputStyle }} />
+                          <input placeholder="Name (e.g. Fiyat Teklifi_DDX)" value={progPresDraft.name} onChange={e => setProgPresDraft(p => ({ ...p, name: e.target.value }))} style={{ ...inputStyle }} />
+                          <input placeholder="canva.link/… or canva.com/design/…" value={progPresDraft.canva_link} onChange={e => setProgPresDraft(p => ({ ...p, canva_link: e.target.value }))} style={{ ...inputStyle }} />
+                          <button onClick={handleAddPres} disabled={progPresAdding} style={{ padding: "8px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                            {progPresAdding ? "Resolving link…" : "Add"}
+                          </button>
+                        </div>
+                      )}
+
+                      {progPresLoading ? (
+                        <div style={{ fontSize: 12, color: colors.textMuted }}>Loading…</div>
+                      ) : progPresEntations.length === 0 ? (
+                        <div style={{ fontSize: 12, color: colors.textMuted }}>No presentations yet. {isAdmin ? "Click + Add to add one." : ""}</div>
+                      ) : (
+                        <div style={{ maxHeight: 300, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+                          {Object.entries(grouped).map(([cat, items]) => (
+                            <div key={cat}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>{cat}</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                {items.map(p => {
+                                  const selected = pricingData.design_id === p.design_id;
+                                  return (
+                                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <div onClick={() => pd("design_id", selected ? "" : p.design_id)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderRadius: 7, cursor: "pointer", border: `2px solid ${selected ? colors.primary : colors.border}`, background: selected ? `${colors.primary}14` : "transparent", transition: "all .15s" }}>
+                                        <span style={{ fontSize: 12, fontWeight: selected ? 700 : 500, color: selected ? colors.primaryLight : colors.text }}>{p.name}</span>
+                                        {selected && <span style={{ fontSize: 11, fontWeight: 700, color: colors.primaryLight }}>✓</span>}
+                                      </div>
+                                      {isAdmin && <button onClick={() => handleDeletePres(p.id)} style={{ padding: "4px 7px", background: "rgba(229,115,115,0.1)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>✕</button>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Layout selector */}
+                <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                  <div style={{ ...labelStyle, marginBottom: 12 }}>Layout</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[1, 2, 3].map(n => (
+                      <button key={n} onClick={() => pd("num_options", n)}
+                        style={{ flex: 1, padding: "10px 0", border: `2px solid ${pricingData.num_options === n ? colors.primary : colors.border}`, borderRadius: 8, background: pricingData.num_options === n ? `${colors.primary}18` : "transparent", color: pricingData.num_options === n ? colors.primaryLight : colors.textMuted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                        {n === 1 ? "1 Option" : n === 2 ? "2 Options" : "3 Options"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Option cards — inlined to avoid component remount on every keystroke */}
+                {Array.from({ length: pricingData.num_options }, (_, i) => {
+                  const o = pricingData.opt[i];
+                  return (
+                    <div key={i} style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 20, marginBottom: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: "50%", background: BADGE_COLORS[i], flexShrink: 0 }} />
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Option {i + 1}</div>
+                      </div>
+                      <div style={labelStyle}>Option Title</div>
+                      <input value={o.title} onChange={e => pdOpt(i, "title", e.target.value)}
+                        placeholder={`e.g. Package ${String.fromCharCode(65 + i)}`} style={{ ...inputStyle, marginBottom: 14 }} />
+                      <div style={labelStyle}>Down Payment</div>
+                      <input value={o.dp} onChange={e => pdOpt(i, "dp", e.target.value)}
+                        placeholder="e.g. 50.000 TRY + KDV" style={{ ...inputStyle, marginBottom: 14 }} />
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                        <div>
+                          <div style={labelStyle}>Success Fee 1</div>
+                          <select value={o.succ_fee_1} onChange={e => pdOpt(i, "succ_fee_1", e.target.value)} style={inputStyle}>
+                            <option value="">— select —</option>
+                            {FEE_OPTIONS.map(n => <option key={n} value={n}>{n}% + KDV</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Note 1</div>
+                          <select value={o.note1} onChange={e => pdOpt(i, "note1", e.target.value)} style={inputStyle}>
+                            <option value="">— none —</option>
+                            {NOTE_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <div style={labelStyle}>Success Fee 2 <span style={{ fontWeight: 400, textTransform: "none" }}>(optional)</span></div>
+                          <select value={o.succ_fee_2} onChange={e => pdOpt(i, "succ_fee_2", e.target.value)} style={inputStyle}>
+                            <option value="">— none —</option>
+                            {FEE_OPTIONS.map(n => <option key={n} value={n}>{n}% + KDV</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Note 2</div>
+                          <select value={o.note2} onChange={e => pdOpt(i, "note2", e.target.value)} style={inputStyle} disabled={!o.succ_fee_2}>
+                            <option value="">— none —</option>
+                            {NOTE_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* General note */}
+                <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
+                  <div style={labelStyle}>General Note <span style={{ fontWeight: 400, textTransform: "none" }}>(optional)</span></div>
+                  <textarea value={pricingData.gen_note} onChange={e => pd("gen_note", e.target.value)}
+                    rows={3} placeholder="e.g. This proposal is valid until 15.05.2026."
+                    style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }} />
+                </div>
+
+                <button onClick={handleGenerate} disabled={pricingGenerating}
+                  style={{ width: "100%", padding: "13px", background: pricingGenerating ? colors.border : colors.primary, border: "none", borderRadius: 9, color: "#fff", fontSize: 14, fontWeight: 700, cursor: pricingGenerating ? "not-allowed" : "pointer" }}>
+                  {pricingGenerating ? "⏳ Building PDF…" : "⬇ Download PDF"}
+                </button>
+              </>}
+              </div>
             </div>
           );
         })()}

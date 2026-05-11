@@ -4,34 +4,44 @@
 <meta charset="UTF-8">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Arial', sans-serif; background: #fff; color: #1B2E5E; width: 338.67mm; min-height: 190.5mm; }
-  .page { display: flex; flex-direction: column; min-height: 190.5mm; }
+  body { font-family: 'Arial', sans-serif; color: #1B2E5E; width: 338.67mm; height: 190.5mm; overflow: hidden; }
+  .page { display: flex; flex-direction: column; height: 190.5mm; position: relative; }
 
-  .top { padding: 36px 80px 0; background: #fff; text-align: center; }
-  .title { font-size: 40px; font-weight: 900; color: #1B2E5E; letter-spacing: 4px; margin-bottom: 10px; }
-  .client { font-size: 16px; font-weight: 700; color: #4B6428; margin-bottom: 24px; }
-  .badge { display: inline-block; background: #4B6428; color: #fff; font-size: 15px; font-weight: 700; padding: 13px 60px; border-radius: 6px; margin-bottom: 0; }
+  .top { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 80px 80px 0; background: #fff; position: relative; overflow: hidden; }
+  .deco-tr { position: absolute; width: 90px; height: 90px; border-radius: 50%; background: #4B6428; top: -30px; right: -25px; }
+  .title { font-size: 40px; font-weight: 900; color: #1B2E5E; letter-spacing: 4px; }
+  .client { font-size: 16px; font-weight: 700; color: #4B6428; margin-top: 10px; }
 
-  .dark-section { background: linear-gradient(135deg, #2D5016 0%, #1B2E5E 100%); padding: 30px 100px 36px; flex: 1; display: flex; flex-direction: column; align-items: center; }
-  .card { background: #fff; border-radius: 14px; padding: 30px 60px; width: 100%; max-width: 640px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+  .dark-section { flex: 1; background: linear-gradient(135deg, #2D5016 0%, #1B2E5E 100%); position: relative; overflow: hidden; }
+  .deco-left { position: absolute; width: 36px; height: 36px; border-radius: 50%; background: #1B2E5E; left: 24px; top: 42%; }
+  .deco-br { position: absolute; width: 150px; height: 150px; border-radius: 50%; background: #4B6428; right: -50px; bottom: -55px; opacity: 0.85; }
+  .deco-bl { position: absolute; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, #2D5016 0%, transparent 70%); left: -30px; bottom: -30px; opacity: 0.7; }
+
+  .card-group { position: absolute; left: 50%; transform: translateX(-50%); top: calc(50% - 120px); z-index: 10; display: flex; flex-direction: column; align-items: center; }
+  .badge { display: block; width: 320px; background: #4B6428; color: #fff; font-size: 15px; font-weight: 700; padding: 11px 14px; text-align: center; border-radius: 6px 6px 0 0; word-break: break-word; overflow: hidden; box-sizing: border-box; }
+  .card { width: 320px; background: #fff; border-radius: 0 0 12px 12px; padding: 22px 60px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
   .price-label { text-align: center; font-size: 14px; color: #1B5EA8; font-weight: 700; margin-bottom: 6px; }
   .price-value { text-align: center; font-size: 28px; font-weight: 900; color: #1B2E5E; margin-bottom: 20px; }
   .divider { border: none; border-top: 1px solid #E0EAF4; margin: 4px 0 16px; }
-
-  .notes-area { background: rgba(255,255,255,0.12); border-radius: 10px; padding: 12px 24px; margin-top: 18px; width: 100%; text-align: center; }
-  .notes-text { font-size: 11px; color: rgba(255,255,255,0.85); font-style: italic; line-height: 1.6; text-align: center; }
-  .date { text-align: right; font-size: 10px; color: rgba(255,255,255,0.55); margin-top: 10px; width: 100%; }
+  .notes-wrap { margin-top: 10px; text-align: center; width: 320px; }
+  .notes-text { font-size: 11px; color: rgba(255,255,255,0.85); font-style: italic; line-height: 1.6; }
+  .date { text-align: right; font-size: 10px; color: rgba(255,255,255,0.55); margin-top: 8px; width: 320px; }
 </style>
 </head>
 <body>
 <div class="page">
   <div class="top">
+    <div class="deco-tr"></div>
     <div class="title">ÜCRETLENDİRME</div>
     <div class="client">@@party2_name@@</div>
-    <div class="badge">@@program_name@@</div>
   </div>
-
   <div class="dark-section">
+    <div class="deco-left"></div>
+    <div class="deco-br"></div>
+    <div class="deco-bl"></div>
+  </div>
+  <div class="card-group">
+    <div class="badge">@@program_name@@</div>
     <div class="card">
       <div class="price-label">Hizmet Bedeli</div>
       <div class="price-value">@@down_payment@@ TL + KDV</div>
@@ -39,9 +49,7 @@
       <div class="price-label">Başarı Primi</div>
       <div class="price-value">%@@success_bonus@@ + KDV</div>
     </div>
-    <div class="notes-area">
-      <div class="notes-text" style="text-align:center;">@@notes@@</div>
-    </div>
+    <div class="notes-wrap"><div class="notes-text">@@notes@@</div></div>
     <div class="date">@@contract_date@@</div>
   </div>
 </div>

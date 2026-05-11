@@ -13,7 +13,11 @@ class EmailClassifier:
     def __init__(self):
         self.pipe       = None
         self.model_type = None
-        self._load()
+        # Lazy-load: don't download model at startup, only on first classify call
+
+    def _ensure_loaded(self):
+        if self.pipe is None:
+            self._load()
 
     def _load(self):
         if os.path.isdir(FINE_TUNED_PATH) and os.listdir(FINE_TUNED_PATH):
@@ -29,6 +33,7 @@ class EmailClassifier:
         print(f"Model ready: {self.model_type}")
 
     def classify(self, text: str) -> dict:
+        self._ensure_loaded()
         if self.model_type == "zero-shot":
             result     = self.pipe(text, candidate_labels=[POSITIVE_LABEL, NEGATIVE_LABEL], hypothesis_template=HYPOTHESIS)
             top_label  = result["labels"][0]
@@ -43,4 +48,5 @@ class EmailClassifier:
         return {"label": label, "confidence": round(confidence, 4), "model_type": self.model_type}
 
     def reload(self):
+        self.pipe = None
         self._load()

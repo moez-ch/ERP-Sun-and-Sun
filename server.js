@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import Database from "better-sqlite3";
 import bcrypt from "bcryptjs";
@@ -10,6 +11,8 @@ import { execSync } from "child_process";
 import multer from "multer";
 import PizZip from "pizzip";
 import puppeteer from "puppeteer-core";
+import { PDFDocument } from "pdf-lib";
+import { randomBytes, createHash } from "node:crypto";
 
 const EDGE_PATH = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
 
@@ -134,6 +137,100 @@ if (companyCount === 0) {
   ins.run("Sun Proje Tercüme Danışmanlık Eğt. İth. İhr. ve San. Tic. Ltd. Şti.","Sun Proje","Doğanbey Vergi Dairesi","782 053 6086","Ümit Mah. 2545. Sok. No:11 Çankaya ANKARA","TR10 0010 0068 1460 8882 1500 1",1);
   ins.run("Analiz Kariyer Danışmanlık Eğt. Özel İstih. ve İns. Kay. Turz. Bil. Yaz. Tic. Ltd. Şti.","Analiz Kariyer","Doğanbey Vergi Dairesi","068 083 9717","Aşağı Öveçler Mah. 1324. Cad. 37/4 Çankaya ANKARA","TR18 0010 0068 1690 9836 9500 1",2);
   ins.run("Sun ve Sun Danışmanlık Bilişim San. ve Tic. A.Ş.","Sun ve Sun A.Ş.","","","","",3);
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS canva_config (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS canva_designs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    label       TEXT NOT NULL,
+    design_id   TEXT NOT NULL,
+    slide_index INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT DEFAULT (datetime('now'))
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS program_presentations (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    category   TEXT NOT NULL DEFAULT '',
+    name       TEXT NOT NULL,
+    canva_link TEXT NOT NULL DEFAULT '',
+    design_id  TEXT NOT NULL DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+
+// Seed program presentations on first run
+if (db.prepare("SELECT COUNT(*) as c FROM program_presentations").get().c === 0) {
+  const SEED = [
+    // 1 - Genel İmalat & Bilişim
+    ["Genel İmalat & Bilişim", "Fiyat Teklifi_Yıllık Danışmanlık",                                 "https://canva.link/h6vfz4blji341lh"],
+    // 2 - KOSGEB
+    ["KOSGEB", "Fiyat Teklifi_DDX",                                                                  "https://canva.link/kl1nd04h9tnvuil"],
+    ["KOSGEB", "Fiyat Teklifi_Girişimci Destek Programı",                                            "https://canva.link/ge0arh0lm1ubo1o"],
+    ["KOSGEB", "Fiyat Teklifi_İş Geliştirme Desteği",                                               "https://canva.link/alco513lxup9o1r"],
+    ["KOSGEB", "Fiyat Teklifi_Kapasite Geliştirme Destek Programı",                                  "https://canva.link/2xo7evg16s1nplz"],
+    ["KOSGEB", "Fiyat Teklifi_Küresel Rekabetçilik Destek Programı",                                 "https://canva.link/vu9t9z77lb8z56l"],
+    // 3 - TÜBİTAK
+    ["TÜBİTAK", "Fiyat Teklifi_Ar-Ge Destekleri",                                                   "https://canva.link/syqk2j761fo24hv"],
+    ["TÜBİTAK", "Fiyat Teklifi_1832 Sanayide Yeşil Dönüşüm",                                        "https://canva.link/8i4k12ixl03at8s"],
+    ["TÜBİTAK", "Fiyat Teklifi_1507",                                                                "https://canva.link/y7avs8zx8xnm0qr"],
+    // 4 - Ticaret Bakanlığı
+    ["Ticaret Bakanlığı", "Fiyat Teklifi_Bilişim Sektörü",                                           "https://canva.link/be58dthymdvebid"],
+    ["Ticaret Bakanlığı", "Fiyat Teklifi_İmalat Sektörü",                                            "https://canva.link/9w37thw9klwsrtg"],
+    ["Ticaret Bakanlığı", "Fiyat Teklifi_Küresel Tedarik Zinciri",                                   "https://canva.link/80h3sngoyg6xg90"],
+    ["Ticaret Bakanlığı", "Fiyat Teklifi_Turquality",                                                "https://canva.link/5gsr2os02use11o"],
+    // 5 - Kalkınma Ajansı
+    ["Kalkınma Ajansı", "Fiyat Teklifi_SoGreen",                                                     "https://canva.link/o3k40ciyf7fk8kv"],
+    ["Kalkınma Ajansı", "Fiyat Teklifi_SoGreen & 1831 & YTB",                                        "https://canva.link/ntfighndbng4ulm"],
+    ["Kalkınma Ajansı", "Fiyat Teklifi_SoGreen & 1831",                                              "https://canva.link/8tn9u9pz2pev1mv"],
+    // 6 - Yatırım Teşvik Sistemi
+    ["Yatırım Teşvik Sistemi", "Fiyat Teklifi_Türkiye Yüzyılı Hamlesi",                              "https://canva.link/7s5kh1zponovcku"],
+    ["Yatırım Teşvik Sistemi", "Fiyat Teklifi_Yeni YTB (Kısa)",                                      "https://canva.link/07m6yydxc1lx0a6"],
+    // 7 - Dış Ticaret
+    ["Dış Ticaret", "Fiyat Teklifi (Veri Dahil)_Yurt Dışı Pazar Araştırması Raporu",                 "https://canva.link/vnu7ze6lt9hkwc2"],
+    ["Dış Ticaret", "Fiyat Teklifi_Yurt Dışı Pazar Araştırması Raporu",                              "https://canva.link/8tae6gvrpmdwf0a"],
+    ["Dış Ticaret", "Fiyat Teklifi_Data Analytics",                                                  "https://canva.link/4njhc52fg5r65e8"],
+    ["Dış Ticaret", "Fiyat Teklifi_Dış Ticaret Ofisiniz",                                            "https://canva.link/iyid0b4guwys7k7"],
+    ["Dış Ticaret", "Fiyat Teklifi_Dış Ticaret Sistem Kurulumu",                                     "https://canva.link/zbubuqfekhqryo2"],
+    ["Dış Ticaret", "Fiyat Teklifi_Uluslararası İş Geliştirme",                                      "https://canva.link/gmrxdcs6hwa5lxj"],
+    // 8 - Sürdürülebilirlik
+    ["Sürdürülebilirlik", "Fiyat Teklifi_1831 Yeşil İnovasyon Teknoloji Mentörlük Çağrısı",          "https://canva.link/s8hcrr5vj36zhnb"],
+    ["Sürdürülebilirlik", "Fiyat Teklifi_Karbon Ayak İzi_Sürdürülebilirlik Danışmanlığı",            "https://canva.link/jyqgprbytdb5zjb"],
+    ["Sürdürülebilirlik", "Fiyat Teklifi_Sürdürülebilirlik Danışmanlığı",                            "https://canva.link/g1cm034ici5n5lz"],
+    ["Sürdürülebilirlik", "Fiyat Teklifi_Sürdürülebilirlik ve 1831",                                 "https://canva.link/yfazdkfu1israco"],
+    // 9 - Vergi/SGK
+    ["Vergi/SGK", "Fiyat Teklifi_Vergi/SGK",                                                         "https://canva.link/f3u8uurwzv72e4m"],
+    // Ar-Ge ve Tasarım Merkezi
+    ["Ar-Ge ve Tasarım Merkezi", "Fiyat Teklifi_Ar-Ge Merkezi Yürütme Teknik Destek Danışmanlığı",   "https://canva.link/4sqmv72narwekks"],
+    ["Ar-Ge ve Tasarım Merkezi", "Fiyat Teklifi_Ar-Ge Ve Tasarım Merkezi Kurulumu",                  "https://canva.link/y6e24xxhu8bfkc9"],
+    // Diğer
+    ["Diğer", "Fiyat Teklifi_Patent ve Faydalı Model Danışmanlığı",                                  "https://canva.link/eh06utmbe8v0946"],
+    // Teknokent
+    ["Teknokent", "Fiyat Teklifi_Teknokent Projesi",                                                 "https://canva.link/lk25nco878c7ler"],
+  ];
+  const ins = db.prepare("INSERT INTO program_presentations (category, name, canva_link, design_id) VALUES (?,?,?,?)");
+  for (const [cat, name, link] of SEED) ins.run(cat, name, link, "");
+
+  // Resolve design IDs in the background
+  (async () => {
+    const upd = db.prepare("UPDATE program_presentations SET design_id=? WHERE canva_link=?");
+    for (const [, , link] of SEED) {
+      try {
+        const r = await fetch(link, { redirect: "follow", signal: AbortSignal.timeout(10000) });
+        const match = r.url.match(/canva\.com\/design\/([A-Za-z0-9_-]+)/);
+        if (match) { upd.run(match[1], link); console.log("[presentations] resolved", link, "→", match[1]); }
+      } catch { /* skip failed */ }
+    }
+    console.log("[presentations] all design IDs resolved");
+  })();
 }
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -1047,6 +1144,694 @@ function escapeXml(s) {
 }
 
 
+
+// ── CANVA HELPERS ─────────────────────────────────────────────────
+
+function getCanvaConfig() {
+  const rows = db.prepare("SELECT key, value FROM canva_config").all();
+  const db_cfg = Object.fromEntries(rows.map(r => [r.key, r.value]));
+  return {
+    ...db_cfg,
+    client_id:     process.env.CANVA_CLIENT_ID     || db_cfg.client_id     || "",
+    client_secret: process.env.CANVA_CLIENT_SECRET || db_cfg.client_secret || "",
+  };
+}
+
+async function refreshCanvaToken(cfg) {
+  const resp = await fetch("https://api.canva.com/rest/v1/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: cfg.refresh_token,
+      client_id: cfg.client_id,
+      client_secret: cfg.client_secret,
+    })
+  });
+  const data = await resp.json();
+  if (!data.access_token) throw new Error("Canva token refresh failed: " + JSON.stringify(data));
+  const set = db.prepare("INSERT OR REPLACE INTO canva_config (key, value) VALUES (?, ?)");
+  set.run("access_token", data.access_token);
+  set.run("token_expires_at", String(Date.now() + (data.expires_in || 3600) * 1000));
+  if (data.refresh_token) set.run("refresh_token", data.refresh_token);
+  return data.access_token;
+}
+
+async function getValidCanvaToken() {
+  const cfg = getCanvaConfig();
+  if (!cfg.access_token) throw new Error("Canva not connected. Please authorize via Settings → Canva.");
+  const expires = parseInt(cfg.token_expires_at || "0");
+  if (Date.now() > expires - 60000) return await refreshCanvaToken(cfg);
+  return cfg.access_token;
+}
+
+async function exportCanvaDesignAsPdf(canvaDesignId, token) {
+  const createResp = await fetch("https://api.canva.com/rest/v1/exports", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ design_id: canvaDesignId, format: { type: "pdf", export_quality: "regular" } })
+  });
+  if (!createResp.ok) throw new Error("Canva export request failed: " + createResp.status);
+  const createData = await createResp.json();
+  const exportId = createData.job?.id;
+  if (!exportId) throw new Error("No export job ID from Canva: " + JSON.stringify(createData));
+
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    const pollResp = await fetch(`https://api.canva.com/rest/v1/exports/${exportId}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const pollData = await pollResp.json();
+    const job = pollData.job;
+    if (job?.status === "success") {
+      const url = job.urls?.[0];
+      if (!url) throw new Error("No download URL in Canva export result");
+      const fileResp = await fetch(url);
+      return Buffer.from(await fileResp.arrayBuffer());
+    }
+    if (job?.status === "failed") throw new Error("Canva export job failed");
+  }
+  throw new Error("Canva export timed out after 60 seconds");
+}
+
+function buildContractSlideHtml(data, theme = {}) {
+  const accent = theme.accent_color || "#2563eb";
+  const dark   = theme.dark_color   || "#1a2e47";
+  // derive a slightly lighter shade for the gradient end
+  const esc = s => String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const programs = [
+    data.program_name  ? { name: data.program_name,  fee: data.down_payment, bonus: data.success_bonus } : null,
+    data.program2_name ? { name: data.program2_name, fee: data.program2_fee,  bonus: data.program2_bonus } : null,
+    data.program3_name ? { name: data.program3_name, fee: data.program3_fee,  bonus: data.program3_bonus } : null,
+  ].filter(Boolean);
+  const progCards = programs.map(p => `
+    <div class="card">
+      <div class="card-title">${esc(p.name)}</div>
+      ${p.fee   ? `<div class="card-row"><span class="card-label">Service Fee</span><span class="card-val">${esc(p.fee)}</span></div>` : ""}
+      ${p.bonus ? `<div class="card-row"><span class="card-label">Success Bonus</span><span class="card-val">${esc(p.bonus)}%</span></div>` : ""}
+    </div>`).join("");
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{width:338.67mm;height:190.5mm;font-family:'Segoe UI',Arial,sans-serif;display:flex;flex-direction:column;background:#fff;overflow:hidden}
+  .top{padding:32px 44px 24px;flex:1}
+  .subtitle{font-size:10px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+  .client{font-size:26px;font-weight:800;color:${dark};margin-bottom:4px}
+  .date{font-size:12px;color:#8899b0;margin-bottom:24px}
+  .bottom{background:linear-gradient(135deg,${dark} 0%,${accent} 100%);padding:26px 44px;display:flex;gap:20px;align-items:stretch}
+  .card{flex:1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:16px 18px}
+  .card-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.2);padding-bottom:8px}
+  .card-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+  .card-label{font-size:10px;color:rgba(255,255,255,.65);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .card-val{font-size:13px;font-weight:700;color:#fff}
+  .notes-box{flex:1;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:16px 18px}
+  .notes-label{font-size:10px;font-weight:700;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+  .notes-text{font-size:12px;color:rgba(255,255,255,.85);line-height:1.5}
+</style></head><body>
+  <div class="top">
+    <div class="subtitle">Fiyat Teklifi</div>
+    <div class="client">${esc(data.party2_name || "—")}</div>
+    <div class="date">${esc(data.contract_date || "")}</div>
+  </div>
+  <div class="bottom">
+    ${progCards || '<div class="card"><div class="card-title">No program specified</div></div>'}
+    ${data.notes ? `<div class="notes-box"><div class="notes-label">Notlar</div><div class="notes-text">${esc(data.notes)}</div></div>` : ""}
+  </div>
+</body></html>`;
+}
+
+async function generateContractSlide(contractData, theme = {}) {
+  const html = buildContractSlideHtml(contractData, theme);
+  const htmlPath = path.join(TMP_DIR, `canva_slide_${Date.now()}.html`);
+  fs.writeFileSync(htmlPath, html, "utf-8");
+  const browser = await puppeteer.launch({ executablePath: EDGE_PATH, headless: true, args: ["--no-sandbox","--disable-setuid-sandbox"] });
+  const page = await browser.newPage();
+  await page.goto("file:///" + htmlPath.replaceAll("\\", "/"), { waitUntil: "networkidle0" });
+  const pdfBytes = await page.pdf({ width: "338.67mm", height: "190.5mm", printBackground: true, margin: { top:"0mm", bottom:"0mm", left:"0mm", right:"0mm" } });
+  await browser.close();
+  fs.unlinkSync(htmlPath);
+  return Buffer.from(pdfBytes);
+}
+
+async function mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex) {
+  const canvaDoc = await PDFDocument.load(canvaPdfBytes);
+  const slideDoc = await PDFDocument.load(slidePdfBytes);
+  const idx = Math.max(0, slideIndex - 1);
+
+  // Get Canva's page dimensions so we can match them exactly
+  const refIdx = Math.min(idx, canvaDoc.getPageCount() - 1);
+  const { width: targetW, height: targetH } = canvaDoc.getPage(refIdx).getSize();
+
+  // Remove the original slide at that position
+  if (idx < canvaDoc.getPageCount()) canvaDoc.removePage(idx);
+
+  // Create a new page at Canva's exact dimensions and draw our slide scaled to fill it
+  const [embedded] = await canvaDoc.embedPages([slideDoc.getPage(0)]);
+  const newPage = canvaDoc.insertPage(Math.min(idx, canvaDoc.getPageCount()));
+  newPage.setSize(targetW, targetH);
+  newPage.drawPage(embedded, { x: 0, y: 0, width: targetW, height: targetH });
+
+  return Buffer.from(await canvaDoc.save());
+}
+
+// ── CANVA ROUTES ─────────────────────────────────────────────────
+
+// GET /canva/config
+app.get("/canva/config", authenticate, (req, res) => {
+  const cfg = getCanvaConfig();
+  res.json({ connected: !!cfg.access_token, has_credentials: !!(cfg.client_id && cfg.client_secret), client_id: cfg.client_id || "" });
+});
+
+// POST /canva/config — save client credentials (admin only)
+app.post("/canva/config", authenticate, requireAdmin, (req, res) => {
+  const { client_id, client_secret } = req.body || {};
+  if (!client_id || !client_secret) return res.status(400).json({ error: "client_id and client_secret required" });
+  const set = db.prepare("INSERT OR REPLACE INTO canva_config (key, value) VALUES (?, ?)");
+  set.run("client_id", client_id.trim());
+  set.run("client_secret", client_secret.trim());
+  res.json({ ok: true });
+});
+
+// GET /canva/auth — start OAuth (opens in browser, no auth required)
+app.get("/canva/auth", (req, res) => {
+  const cfg = getCanvaConfig();
+  if (!cfg.client_id) return res.status(400).send("<h2>Canva client_id not configured. Save credentials first.</h2>");
+  const verifier = randomBytes(32).toString("base64url");
+  db.prepare("INSERT OR REPLACE INTO canva_config (key, value) VALUES (?, ?)").run("oauth_verifier", verifier);
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: cfg.client_id,
+    redirect_uri: "http://127.0.0.1:3001/canva/callback",
+    scope: "design:content:read design:meta:read",
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    state: "sns_erp"
+  });
+  res.redirect(`https://www.canva.com/api/oauth/authorize?${params}`);
+});
+
+// GET /canva/callback — OAuth callback
+app.get("/canva/callback", async (req, res) => {
+  const { code } = req.query;
+  if (!code) return res.status(400).send("<h2>No authorization code received.</h2>");
+  const cfg = getCanvaConfig();
+  try {
+    const tokenResp = await fetch("https://api.canva.com/rest/v1/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        client_id: cfg.client_id,
+        client_secret: cfg.client_secret,
+        redirect_uri: "http://127.0.0.1:3001/canva/callback",
+        code_verifier: cfg.oauth_verifier || ""
+      })
+    });
+    const tokenData = await tokenResp.json();
+    if (!tokenData.access_token) return res.status(400).send("Token exchange failed: " + JSON.stringify(tokenData));
+    const set = db.prepare("INSERT OR REPLACE INTO canva_config (key, value) VALUES (?, ?)");
+    set.run("access_token", tokenData.access_token);
+    set.run("refresh_token", tokenData.refresh_token || "");
+    set.run("token_expires_at", String(Date.now() + (tokenData.expires_in || 3600) * 1000));
+    res.send(`<html><body style="font-family:'Segoe UI',sans-serif;text-align:center;padding:80px;background:#0f172a;color:#fff">
+      <h2 style="font-size:28px;margin-bottom:12px">✓ Canva Connected!</h2>
+      <p style="color:#8899b0">You can close this tab and return to the ERP.</p>
+      <script>setTimeout(()=>window.close(),2000)</script>
+    </body></html>`);
+  } catch (e) {
+    res.status(500).send("Error: " + e.message);
+  }
+});
+
+// POST /canva/exchange — frontend sends the code received from Canva redirect
+app.post("/canva/exchange", authenticate, async (req, res) => {
+  const { code } = req.body || {};
+  if (!code) return res.status(400).json({ error: "No code provided" });
+  const cfg = getCanvaConfig();
+  try {
+    const tokenResp = await fetch("https://api.canva.com/rest/v1/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        client_id: cfg.client_id,
+        client_secret: cfg.client_secret,
+        redirect_uri: "http://127.0.0.1:3001/canva/callback",
+        code_verifier: cfg.oauth_verifier || ""
+      })
+    });
+    const tokenData = await tokenResp.json();
+    if (!tokenData.access_token) return res.status(400).json({ error: "Token exchange failed: " + JSON.stringify(tokenData) });
+    const set = db.prepare("INSERT OR REPLACE INTO canva_config (key, value) VALUES (?, ?)");
+    set.run("access_token", tokenData.access_token);
+    set.run("refresh_token", tokenData.refresh_token || "");
+    set.run("token_expires_at", String(Date.now() + (tokenData.expires_in || 3600) * 1000));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /canva/designs
+app.get("/canva/designs", authenticate, (req, res) => {
+  res.json(db.prepare("SELECT * FROM canva_designs ORDER BY created_at DESC").all());
+});
+
+// POST /canva/designs
+app.post("/canva/designs", authenticate, requireAdmin, (req, res) => {
+  const { label, design_id, slide_index } = req.body || {};
+  if (!label?.trim() || !design_id?.trim()) return res.status(400).json({ error: "label and design_id required" });
+  const r = db.prepare("INSERT INTO canva_designs (label, design_id, slide_index) VALUES (?,?,?)").run(label.trim(), design_id.trim(), parseInt(slide_index) || 1);
+  res.json(db.prepare("SELECT * FROM canva_designs WHERE id=?").get(r.lastInsertRowid));
+});
+
+// PUT /canva/designs/:id
+app.put("/canva/designs/:id", authenticate, requireAdmin, (req, res) => {
+  const { label, design_id, slide_index, accent_color, dark_color } = req.body || {};
+  db.prepare("UPDATE canva_designs SET label=?, design_id=?, slide_index=?, accent_color=?, dark_color=? WHERE id=?")
+    .run(label, design_id, parseInt(slide_index) || 1, accent_color || "#2563eb", dark_color || "#1a2e47", req.params.id);
+  res.json(db.prepare("SELECT * FROM canva_designs WHERE id=?").get(req.params.id));
+});
+
+// GET /canva/my-presentations — list all Canva presentations from the user's account
+app.get("/canva/my-presentations", authenticate, async (req, res) => {
+  try {
+    const token = await getValidCanvaToken();
+    let designs = [], continuation = null;
+    do {
+      const url = new URL("https://api.canva.com/rest/v1/designs");
+      url.searchParams.set("type", "presentation");
+      url.searchParams.set("ownership", "owned");
+      if (continuation) url.searchParams.set("continuation", continuation);
+      const r = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) throw new Error("Canva API error: " + r.status);
+      const data = await r.json();
+      designs = designs.concat(data.items || []);
+      continuation = data.continuation || null;
+    } while (continuation && designs.length < 200);
+    res.json(designs.map(d => ({ id: d.id, title: d.title || "Untitled", thumbnail: d.thumbnail?.url || null, updated_at: d.updated_at })));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /canva/designs/:id/thumbnail — returns a fresh thumbnail URL for slide 1
+app.get("/canva/designs/:id/thumbnail", authenticate, async (req, res) => {
+  const design = db.prepare("SELECT * FROM canva_designs WHERE id=?").get(req.params.id);
+  if (!design) return res.status(404).json({ error: "Not found" });
+  try {
+    const token = await getValidCanvaToken();
+    const r = await fetch(`https://api.canva.com/rest/v1/designs/${design.design_id}/pages?limit=1`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await r.json();
+    const thumb = data?.items?.[0]?.thumbnail?.url;
+    if (!thumb) return res.status(404).json({ error: "No thumbnail" });
+    res.json({ url: thumb });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /canva/designs/:id
+app.delete("/canva/designs/:id", authenticate, requireAdmin, (req, res) => {
+  db.prepare("DELETE FROM canva_designs WHERE id=?").run(req.params.id);
+  res.json({ ok: true });
+});
+
+// POST /canva/generate — export Canva PDF, inject dynamic slide, return merged PDF
+app.post("/canva/generate", authenticate, async (req, res) => {
+  const { designDbId, contractData } = req.body || {};
+  const design = db.prepare("SELECT * FROM canva_designs WHERE id=?").get(designDbId);
+  if (!design) return res.status(404).json({ error: "Design not found" });
+  try {
+    const token = await getValidCanvaToken();
+    const [canvaPdfBytes, slidePdfBytes] = await Promise.all([
+      exportCanvaDesignAsPdf(design.design_id, token),
+      generateContractSlide(contractData || {}, { accent_color: design.accent_color, dark_color: design.dark_color })
+    ]);
+    const mergedPdfBytes = await mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, design.slide_index);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="presentation_${Date.now()}.pdf"`);
+    res.send(mergedPdfBytes);
+  } catch (e) {
+    console.error("[canva/generate]", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── PRICING (PPTX substitution) ─────────────────────────────────
+
+const PRICING_DESIGN_ID = "DAHIU8eLrYs";
+
+async function exportCanvaDesignAsPptx(designId, token, pages = null) {
+  const format = pages
+    ? { type: "pptx", export_quality: "regular", pages }
+    : { type: "pptx", export_quality: "regular" };
+  const createResp = await fetch("https://api.canva.com/rest/v1/exports", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ design_id: designId, format })
+  });
+  if (!createResp.ok) throw new Error("Canva PPTX export failed: " + createResp.status);
+  const createData = await createResp.json();
+  const exportId = createData.job?.id;
+  if (!exportId) throw new Error("No export job ID: " + JSON.stringify(createData));
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    const pollData = await fetch(`https://api.canva.com/rest/v1/exports/${exportId}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    }).then(r => r.json());
+    const job = pollData.job;
+    if (job?.status === "success") {
+      const url = job.urls?.[0];
+      if (!url) throw new Error("No download URL in PPTX export");
+      return Buffer.from(await (await fetch(url)).arrayBuffer());
+    }
+    if (job?.status === "failed") throw new Error("Canva PPTX export job failed");
+  }
+  throw new Error("Canva PPTX export timed out");
+}
+
+function replacePptxPlaceholders(pptxBuffer, replacements) {
+  const zip = new PizZip(pptxBuffer);
+  // Font substitution map — replaces fonts LibreOffice doesn't have with system equivalents
+  const FONT_SUBS = {
+    "Montserrat Bold":    "Calibri",
+    "Montserrat":         "Calibri",
+    "Raleway":            "Calibri",
+    "Lato":               "Calibri",
+    "Poppins":            "Calibri",
+    "Nunito":             "Calibri",
+  };
+
+  // Consolidate split runs in a paragraph then replace — handles Canva's XML fragmentation
+  function processXml(xml) {
+    // Step 1: consolidate placeholder text split across <a:r> runs within each <a:p>
+    xml = xml.replace(/(<a:p\b[^>]*>)([\s\S]*?)(<\/a:p>)/g, (full, open, inner, close) => {
+      // collect all run texts in this paragraph
+      const texts = [];
+      const runRe = /(<a:r\b[^>]*>)([\s\S]*?)(<\/a:r>)/g;
+      let m;
+      while ((m = runRe.exec(inner)) !== null) {
+        const tMatch = m[2].match(/<a:t[^>]*>([\s\S]*?)<\/a:t>/);
+        texts.push({ full: m[0], text: tMatch ? tMatch[1] : "" });
+      }
+      const combined = texts.map(t => t.text).join("");
+      const hasPlaceholder = Object.keys(replacements).some(k => combined.includes(k));
+      if (!hasPlaceholder) return full;
+      // rebuild: keep first run's properties, put combined (replaced) text in it, drop other runs
+      if (texts.length === 0) return full;
+      let replaced = combined;
+      for (const [k, v] of Object.entries(replacements)) {
+        replaced = replaced.replaceAll(k, v);
+      }
+      const firstRun = texts[0].full;
+      const rPropsMatch = firstRun.match(/<a:rPr[\s\S]*?\/>/)?.[0] || firstRun.match(/<a:rPr[\s\S]*?<\/a:rPr>/)?.[0] || "";
+      const newRun = `<a:r>${rPropsMatch}<a:t>${escapeXml(replaced)}</a:t></a:r>`;
+      // replace all runs in inner with single new run
+      const newInner = inner.replace(/(<a:r\b[^>]*>[\s\S]*?<\/a:r>)+/, newRun);
+      return `${open}${newInner}${close}`;
+    });
+
+    // Step 2: catch any remaining placeholders that survived as single runs
+    for (const [k, v] of Object.entries(replacements)) {
+      xml = xml.replaceAll(k, escapeXml(v));
+    }
+    // Step 3: substitute fonts LibreOffice can't render
+    for (const [from, to] of Object.entries(FONT_SUBS)) {
+      xml = xml.replaceAll(`typeface="${from}"`, `typeface="${to}"`);
+    }
+    return xml;
+  }
+
+  for (const name of Object.keys(zip.files)) {
+    if (!/^ppt\/slides\/slide\d+\.xml$/.test(name)) continue;
+    let xml = zip.files[name].asText();
+    // Apply font subs to ALL slides regardless of placeholders
+    for (const [from, to] of Object.entries(FONT_SUBS)) {
+      xml = xml.replaceAll(`typeface="${from}"`, `typeface="${to}"`);
+    }
+    const hasAny = Object.keys(replacements).some(k => xml.includes(k));
+    if (!hasAny) { zip.file(name, xml); continue; }
+    zip.file(name, processXml(xml));
+  }
+
+  return zip.generate({ type: "nodebuffer" });
+}
+
+function buildPricingSlideHtml(d) {
+  const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const n = Math.min(Math.max(parseInt(d.num_options) || 1, 1), 3);
+  const opts = (d.opt || []).slice(0, n);
+  while (opts.length < n) opts.push({});
+
+  const BADGE_COLORS = ["#ad3125", "#0b3e64", "#1B5EA8"];
+
+  const cardHtml = (o, valSize) => {
+    const fee2 = o.succ_fee_2;
+    return `<div class="card">
+      <div class="price-label">Peşinat / Down Payment</div>
+      <div class="price-value" style="font-size:${valSize}px">${esc(o.dp ? o.dp+" TL + KDV" : "")}</div>
+      <hr class="divider">
+      <div class="price-label">Başarı Primi 1 / Success Fee 1</div>
+      <div class="price-value" style="font-size:${valSize}px;margin-bottom:4px">${esc(o.succ_fee_1 ? "%"+o.succ_fee_1+" + KDV" : "")}</div>
+      ${o.note1 ? `<div class="price-note">${esc(o.note1)}</div>` : `<div style="margin-bottom:10px"></div>`}
+      ${fee2 ? `<hr class="divider">
+      <div class="price-label">Başarı Primi 2 / Success Fee 2</div>
+      <div class="price-value" style="font-size:${valSize}px;margin-bottom:4px">${esc("%"+fee2+" + KDV")}</div>
+      ${o.note2 ? `<div class="price-note" style="margin-bottom:0">${esc(o.note2)}</div>` : ""}` : ""}
+    </div>`;
+  };
+
+  const is1 = n === 1, is3 = n === 3;
+  const gap       = is3 ? "14px" : "18px";
+  const topPad    = is1 ? "26px 80px 0" : is3 ? "20px 16px 0" : "22px 20px 0";
+  const valSize   = is3 ? 20 : is1 ? 26 : 22;
+  const labelSize = is3 ? 11 : 13;
+  const noteSize  = is3 ? 10 : 11;
+  const cardPad   = "22px 40px";
+  const cardW     = "350px";
+  const notesW    = is1 ? cardW : `calc(${n} * ${cardW} + ${n-1} * ${gap})`;
+
+  const badgesHtml = is1
+    ? `<div class="badge" style="background:${BADGE_COLORS[0]}">${esc(opts[0]?.title || "FİYATLANDIRMA")}</div>`
+    : `<div class="badges">${opts.map((o, i) =>
+        `<div class="badge" style="background:${BADGE_COLORS[i]}">${esc(o.title || `Seçenek ${i+1}`)}</div>`
+      ).join("")}</div>`;
+
+  const cardsHtml = is1
+    ? cardHtml(opts[0], valSize)
+    : `<div class="cols">${opts.map(o => cardHtml(o, valSize)).join("")}</div>`;
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Arial', sans-serif; color: #0b3e64; width: 338.67mm; height: 190.5mm; overflow: hidden; }
+.page { display: flex; flex-direction: column; height: 190.5mm; position: relative; }
+
+/* White top half */
+.top { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 80px 80px 0; background: #fff; position: relative; overflow: hidden; }
+.deco-tr { position: absolute; width: 90px; height: 90px; border-radius: 50%; background: #ad3125; top: -30px; right: -25px; }
+.title { font-size: ${is3 ? 36 : 40}px; font-weight: 900; color: #ad3125; letter-spacing: 4px; }
+
+/* Dark bottom half — overflow:hidden so decos are clipped cleanly */
+.dark-section { flex: 1; background: #081828; position: relative; overflow: hidden; }
+.deco-left { position: absolute; width: 36px; height: 36px; border-radius: 50%; background: #0b3e64; left: 24px; top: 42%; }
+.deco-br { position: absolute; width: 150px; height: 150px; border-radius: 50%; background: #ad3125; right: -50px; bottom: -55px; opacity: 0.85; }
+.deco-bl { position: absolute; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, #ad3125 0%, transparent 70%); left: -30px; bottom: -30px; opacity: 0.7; }
+.notes-wrap { margin-top: 10px; text-align: center; width: ${notesW}; }
+.notes-text { font-size: 11px; color: rgba(255,255,255,0.75); font-style: italic; line-height: 1.6; }
+
+/* Badge+card group: absolutely positioned on the page, straddling the boundary */
+.card-group { position: absolute; left: 50%; transform: translateX(-50%); top: calc(50% - 120px); z-index: 10; display: flex; flex-direction: column; align-items: center; }
+.badge { display: block; width: ${cardW}; color: #fff; font-size: 14px; font-weight: 700; padding: 11px 14px; text-align: center; border-radius: 6px 6px 0 0; word-break: break-word; overflow: hidden; box-sizing: border-box; }
+.badges { display: flex; gap: ${gap}; justify-content: center; }
+.badges .badge { flex: 0 0 ${cardW}; width: ${cardW}; border-radius: 6px 6px 0 0; }
+.cols { display: flex; gap: ${gap}; }
+.card { width: ${cardW}; flex: 0 0 ${cardW}; background: #fff; border-radius: 0 0 12px 12px; padding: ${cardPad}; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.price-label { text-align: center; font-size: ${labelSize}px; color: #ad3125; font-weight: 700; margin-bottom: 3px; }
+.price-value { text-align: center; font-weight: 900; color: #0b3e64; margin-bottom: 10px; white-space: nowrap; }
+.price-note { text-align: center; font-size: ${noteSize}px; color: #555; font-style: italic; margin-bottom: 10px; }
+.divider { border: none; border-top: 1px solid #dde4f0; margin: 8px 0 12px; }
+</style></head><body>
+<div class="page">
+  <div class="top">
+    <div class="deco-tr"></div>
+    <div class="title">ÜCRETLENDİRME</div>
+  </div>
+  <div class="dark-section">
+    <div class="deco-left"></div>
+    <div class="deco-br"></div>
+    <div class="deco-bl"></div>
+  </div>
+  <div class="card-group">
+    ${badgesHtml}
+    ${cardsHtml}
+    ${d.gen_note ? `<div class="notes-wrap"><div class="notes-text">${esc(d.gen_note)}</div></div>` : ""}
+  </div>
+</div>
+</body></html>`;
+}
+
+function buildGreenPricingSlideHtml(d) {
+  // Same structure as buildPricingSlideHtml but with green/navy color scheme
+  const src = buildPricingSlideHtml(d);
+  return src
+    .replaceAll("#ad3125", "#4B6428")   // red → green
+    .replaceAll("#0b3e64", "#1B2E5E")   // blue → navy
+    .replaceAll("#081828", "linear-gradient(135deg, #2D5016 0%, #1B2E5E 100%)") // won't work on background shorthand
+    // Handle background separately
+    .replace("background: #081828", "background: linear-gradient(135deg, #2D5016 0%, #1B2E5E 100%)")
+    .replaceAll("color: #0b3e64", "color: #1B2E5E")
+    .replaceAll("#dde4f0", "#E0EAF4");
+}
+
+async function generatePricingSlide(data) {
+  const html = data.theme === "green" ? buildGreenPricingSlideHtml(data) : buildPricingSlideHtml(data);
+  const htmlPath = path.join(TMP_DIR, `pricing_slide_${Date.now()}.html`);
+  fs.writeFileSync(htmlPath, html, "utf-8");
+  const browser = await puppeteer.launch({ executablePath: EDGE_PATH, headless: true, args: ["--no-sandbox","--disable-setuid-sandbox"] });
+  const page = await browser.newPage();
+  await page.goto("file:///" + htmlPath.replaceAll("\\", "/"), { waitUntil: "networkidle0" });
+  const pdfBytes = await page.pdf({ width: "338.67mm", height: "190.5mm", printBackground: true, margin: { top:"0mm", bottom:"0mm", left:"0mm", right:"0mm" } });
+  await browser.close();
+  fs.unlinkSync(htmlPath);
+  return Buffer.from(pdfBytes);
+}
+
+async function pricingSlideToPdf(pptxBuffer) {
+  const dir = path.join(TMP_DIR, `pricing_${Date.now()}`);
+  fs.mkdirSync(dir, { recursive: true });
+  const pptxPath = path.join(dir, "slide.pptx");
+  fs.writeFileSync(pptxPath, pptxBuffer);
+  execSync(`"${LIBREOFFICE}" --headless --convert-to pdf --outdir "${dir}" "${pptxPath}"`, { timeout: 90000 });
+  const pdfPath = path.join(dir, "slide.pdf");
+  if (!fs.existsSync(pdfPath)) throw new Error("LibreOffice did not produce a PDF");
+  const pdfBytes = fs.readFileSync(pdfPath);
+  fs.rmSync(dir, { recursive: true, force: true });
+  return pdfBytes;
+}
+
+// ── PROGRAM PRESENTATIONS ────────────────────────────────────────
+
+app.get("/presentations", authenticate, (req, res) => {
+  res.json(db.prepare("SELECT * FROM program_presentations ORDER BY category, name").all());
+});
+
+app.post("/presentations", authenticate, requireAdmin, async (req, res) => {
+  const { category, name, canva_link } = req.body || {};
+  if (!name || !canva_link) return res.status(400).json({ error: "name and canva_link required" });
+  // Resolve canva.link short URL → extract design ID
+  let design_id = "";
+  try {
+    const r = await fetch(canva_link.trim(), { redirect: "follow", signal: AbortSignal.timeout(10000) });
+    const match = r.url.match(/canva\.com\/design\/([A-Za-z0-9_-]+)/);
+    if (match) design_id = match[1];
+  } catch (e) { /* leave empty, user can fix manually */ }
+  const row = db.prepare("INSERT INTO program_presentations (category, name, canva_link, design_id) VALUES (?,?,?,?)").run(category || "", name.trim(), canva_link.trim(), design_id);
+  res.json(db.prepare("SELECT * FROM program_presentations WHERE id=?").get(row.lastInsertRowid));
+});
+
+app.put("/presentations/:id", authenticate, requireAdmin, (req, res) => {
+  const { category, name, canva_link, design_id } = req.body || {};
+  db.prepare("UPDATE program_presentations SET category=?, name=?, canva_link=?, design_id=? WHERE id=?").run(category || "", name || "", canva_link || "", design_id || "", req.params.id);
+  res.json(db.prepare("SELECT * FROM program_presentations WHERE id=?").get(req.params.id));
+});
+
+app.delete("/presentations/:id", authenticate, requireAdmin, (req, res) => {
+  db.prepare("DELETE FROM program_presentations WHERE id=?").run(req.params.id);
+  res.json({ ok: true });
+});
+
+// POST /pricing/generate-program — renders pricing_Xprogram.html and merges into Canva presentation
+app.post("/pricing/generate-program", authenticate, async (req, res) => {
+  const { num_programs, party2_name, contract_date, notes, programs, design_id } = req.body || {};
+  const n = Math.min(Math.max(parseInt(num_programs) || 1, 1), 3);
+  const file = n === 1 ? "pricing_1program.html" : n === 2 ? "pricing_2programs.html" : "pricing_3programs.html";
+  const p = programs || [];
+  const replacements = {
+    "@@party2_name@@":    party2_name   || "",
+    "@@contract_date@@":  contract_date || "",
+    "@@notes@@":          notes         || "",
+    "@@program_name@@":   p[0]?.name    || "",
+    "@@down_payment@@":   p[0]?.fee     || "",
+    "@@success_bonus@@":  p[0]?.bonus   || "",
+    "@@program2_name@@":  p[1]?.name    || "",
+    "@@program2_fee@@":   p[1]?.fee     || "",
+    "@@program2_bonus@@": p[1]?.bonus   || "",
+    "@@program3_name@@":  p[2]?.name    || "",
+    "@@program3_fee@@":   p[2]?.fee     || "",
+    "@@program3_bonus@@": p[2]?.bonus   || "",
+  };
+  try {
+    // Render the HTML template with Puppeteer
+    let html = fs.readFileSync(path.join(__dirname, file), "utf-8");
+    for (const [k, v] of Object.entries(replacements)) html = html.replaceAll(k, v);
+    const htmlPath = path.join(TMP_DIR, `prog_pricing_${Date.now()}.html`);
+    fs.writeFileSync(htmlPath, html, "utf-8");
+    const browser = await puppeteer.launch({ executablePath: EDGE_PATH, headless: true, args: ["--no-sandbox","--disable-setuid-sandbox"] });
+    const pg = await browser.newPage();
+    await pg.goto("file:///" + htmlPath.replaceAll("\\", "/"), { waitUntil: "networkidle0" });
+    const slidePdfBytes = Buffer.from(await pg.pdf({ width: "338.67mm", height: "190.5mm", printBackground: true, margin: { top:"0mm", bottom:"0mm", left:"0mm", right:"0mm" } }));
+    await browser.close();
+    fs.unlinkSync(htmlPath);
+
+    // Try to merge into Canva presentation (second to last slide)
+    let finalPdfBytes;
+    const targetDesignId = (design_id || "").trim() || PRICING_DESIGN_ID;
+    try {
+      const token = await getValidCanvaToken();
+      const canvaPdfBytes = await exportCanvaDesignAsPdf(targetDesignId, token);
+      const canvaDoc = await PDFDocument.load(canvaPdfBytes);
+      const slideIndex = canvaDoc.getPageCount() - 1;
+      finalPdfBytes = await mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex);
+    } catch (canvaErr) {
+      console.warn("[pricing/generate-program] Canva unavailable — returning slide only:", canvaErr.message);
+      finalPdfBytes = slidePdfBytes;
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="pricing_${Date.now()}.pdf"`);
+    res.send(finalPdfBytes);
+  } catch (e) {
+    console.error("[pricing/generate-program]", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /pricing/generate
+app.post("/pricing/generate", authenticate, async (req, res) => {
+  const { num_options, opt, gen_note, design_id, theme } = req.body || {};
+  const data = { num_options: num_options || 1, opt: opt || [], gen_note: gen_note || "", theme: theme || "blue" };
+  const targetDesignId = (design_id || "").trim() || PRICING_DESIGN_ID;
+  try {
+    const slidePdfBytes = await generatePricingSlide(data);
+
+    let finalPdfBytes;
+    try {
+      const token = await getValidCanvaToken();
+      const canvaPdfBytes = await exportCanvaDesignAsPdf(targetDesignId, token);
+      // Pricing page is always second to last — compute dynamically
+      const canvaDoc = await PDFDocument.load(canvaPdfBytes);
+      const slideIndex = canvaDoc.getPageCount() - 1; // 1-indexed: second to last
+      finalPdfBytes = await mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex);
+    } catch (canvaErr) {
+      console.warn("[pricing/generate] Canva unavailable — returning slide only:", canvaErr.message);
+      finalPdfBytes = slidePdfBytes;
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="pricing_${Date.now()}.pdf"`);
+    res.send(finalPdfBytes);
+  } catch (e) {
+    console.error("[pricing/generate]", e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`🔐 Sun & Sun ERP Auth Server → http://localhost:${PORT}`);
