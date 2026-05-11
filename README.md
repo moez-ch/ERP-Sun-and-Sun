@@ -187,17 +187,6 @@ ERP-Sun-and-Sun/
 
 ---
 
-## Pending Items
-
-- Upload social media images (Instagram, LinkedIn logos) to WordPress so email signatures display correctly
-- Connect a Tally form to Google Sheets for lead capture
-- Provide shared inbox credentials so the Inbox tab can fetch emails automatically
-- Add labelled training samples to `ml_service/data/` to improve OCR classifier accuracy
-- Register remaining Sun Group company tax certificates in Settings
-- Upload tagged contract templates through the Contracts → Manage Templates screen
-
----
-
 ## Troubleshooting
 
 | Problem                       | Fix                                                                    |
