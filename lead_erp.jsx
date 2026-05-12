@@ -4403,73 +4403,91 @@ Kurallar:
                   </div>
                 );
               })() : contractView === "templates" ? (
-                <div>
-                  {/* Upload new template */}
-                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 18, marginBottom: 20 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{t("contract_uploadTitle")}</div>
-                    <div style={{ fontSize: 12, color: colors.textMuted, marginBottom: 12 }}>
-                      {t("contract_uploadHint", "@@variable_name@@")}<br/>
-                      e.g. <code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>@@party2_name@@</code>, <code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>@@program_name@@</code>, <code style={{ background: colors.bg, padding: "1px 5px", borderRadius: 3 }}>@@iban@@</code>
-                    </div>
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-                      <div style={{ flex: 1, minWidth: 180 }}>
+                <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+                  {/* Left — upload + list */}
+                  <div style={{ width: 340, flexShrink: 0 }}>
+                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>{t("contract_uploadTitle")}</div>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 10 }}>{t("contract_uploadHint", "@@variable_name@@")}</div>
+                      <div style={{ marginBottom: 8 }}>
                         <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{t("contract_templateName")}</div>
-                        <input value={contractUploadName} onChange={e => setContractUploadName(e.target.value)}
-                          placeholder="Örn: Yıllık Danışmanlık"
-                          style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                        <input value={contractUploadName} onChange={e => setContractUploadName(e.target.value)} placeholder="Örn: Yıllık Danışmanlık" style={{ width: "100%", padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} />
                       </div>
-                      <div style={{ flex: 1, minWidth: 180 }}>
+                      <div style={{ marginBottom: 10 }}>
                         <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{t("contract_fileDocx")}</div>
-                        <input type="file" accept=".docx,.html" onChange={e => setContractUploadFile(e.target.files[0])}
-                          style={{ width: "100%", padding: "6px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                        <input type="file" accept=".docx,.html" onChange={e => setContractUploadFile(e.target.files[0])} style={{ width: "100%", padding: "5px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 11, outline: "none", boxSizing: "border-box" }} />
                       </div>
-                      <button onClick={handleUpload} disabled={contractUploading || !contractUploadFile}
-                        style={{ padding: "8px 18px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: contractUploading ? 0.6 : 1, whiteSpace: "nowrap" }}>
+                      <button onClick={handleUpload} disabled={contractUploading || !contractUploadFile} style={{ width: "100%", padding: "8px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: contractUploading ? 0.6 : 1 }}>
                         {contractUploading ? t("contract_uploading") : t("contract_upload")}
                       </button>
                     </div>
-                  </div>
-
-                  {/* Template list */}
-                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
-                    <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>{t("contract_loadedTemplates", contractTemplates.length)}</div>
-                    {contractTemplates.length === 0 ? (
-                      <div style={{ padding: 30, textAlign: "center", color: colors.textMuted, fontSize: 13 }}>{t("contract_noTemplates")}</div>
-                    ) : contractTemplates.map(tpl => (
-                      <div key={tpl.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
-                          <FileTextIcon size={16} color={colors.primary} />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
-                              {tpl.name}
-                              <span style={{ fontSize: 9, fontWeight: 700, background: tpl.template_type === "html" ? "#e8f5e9" : `${colors.primary}18`, color: tpl.template_type === "html" ? "#2e7d32" : colors.primaryLight, border: `1px solid ${tpl.template_type === "html" ? "#a5d6a7" : colors.primary+"44"}`, borderRadius: 4, padding: "1px 5px" }}>{tpl.template_type?.toUpperCase()}</span>
+                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
+                      <div style={{ padding: "11px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>{t("contract_loadedTemplates", contractTemplates.length)}</div>
+                      {contractTemplates.length === 0 ? (
+                        <div style={{ padding: 24, textAlign: "center", color: colors.textMuted, fontSize: 13 }}>{t("contract_noTemplates")}</div>
+                      ) : contractTemplates.map(tpl => (
+                        <div key={tpl.id} onClick={async () => {
+                          setContractPreviewTpl(tpl);
+                          if (tpl.template_type === "html") {
+                            setContractPreviewHtml("loading");
+                            const token = localStorage.getItem("sns_token");
+                            const r = await fetch(`/contracts/templates/${tpl.id}/content`, { headers: { Authorization: `Bearer ${token}` } });
+                            const d = await r.json();
+                            setContractPreviewHtml(d.content || "");
+                          } else { setContractPreviewHtml(""); }
+                        }} style={{ borderBottom: `1px solid ${colors.border}`, padding: "11px 14px", cursor: "pointer", background: contractPreviewTpl?.id === tpl.id ? `${colors.primary}10` : "transparent", borderLeft: contractPreviewTpl?.id === tpl.id ? `3px solid ${colors.primary}` : "3px solid transparent", transition: "all .15s" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tpl.name}</span>
+                                <span style={{ fontSize: 9, fontWeight: 700, background: tpl.template_type === "html" ? "#e8f5e9" : `${colors.primary}18`, color: tpl.template_type === "html" ? "#2e7d32" : colors.primaryLight, border: `1px solid ${tpl.template_type === "html" ? "#a5d6a7" : colors.primary+"44"}`, borderRadius: 4, padding: "1px 5px", flexShrink: 0 }}>{tpl.template_type?.toUpperCase()}</span>
+                              </div>
+                              <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{new Date(tpl.created_at).toLocaleDateString("tr-TR")} · {tpl.variables.length} variables</div>
                             </div>
-                            <div style={{ fontSize: 11, color: colors.textMuted }}>
-                              {t("contract_variables")}: {tpl.variables.length > 0 ? tpl.variables.map(v => `@@${v}@@`).join(", ") : "—"} · {new Date(tpl.created_at).toLocaleDateString("tr-TR")}
+                            <div style={{ display: "flex", gap: 5, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                              <button onClick={() => { setContractTemplate(tpl); setContractView("form"); }} style={{ padding: "4px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{t("contract_select")}</button>
+                              <button onClick={() => deleteTemplate(tpl.id)} style={{ padding: "4px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>✕</button>
                             </div>
                           </div>
-                          <button onClick={async () => {
-                            setContractPreviewTpl(tpl);
-                            if (tpl.template_type === "html") {
-                              const token = localStorage.getItem("sns_token");
-                              const r = await fetch(`/contracts/templates/${tpl.id}/content`, { headers: { Authorization: `Bearer ${token}` } });
-                              const d = await r.json();
-                              setContractPreviewHtml(d.content || "");
-                            } else { setContractPreviewHtml(""); }
-                          }} style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 12, cursor: "pointer" }}>
-                            Preview
-                          </button>
-                          <button onClick={() => { setContractTemplate(tpl); setContractView("form"); }}
-                            style={{ padding: "5px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                            {t("contract_select")}
-                          </button>
-                          <button onClick={() => deleteTemplate(tpl.id)}
-                            style={{ padding: "5px 10px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 6, color: "#e57373", fontSize: 12, cursor: "pointer" }}>
-                            {t("contract_delete")}
-                          </button>
                         </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Right — live preview */}
+                  <div style={{ flex: 1, position: "sticky", top: 0 }}>
+                    {!contractPreviewTpl ? (
+                      <div style={{ background: colors.surface, border: `1px dashed ${colors.border}`, borderRadius: 10, height: 480, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: colors.textMuted }}>
+                        <FileTextIcon size={36} color={colors.border} />
+                        <div style={{ marginTop: 12, fontSize: 13 }}>Click a template to preview</div>
                       </div>
-                    ))}
+                    ) : (
+                      <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: `1px solid ${colors.border}` }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>{contractPreviewTpl.name}</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{contractPreviewTpl.variables.length} variables detected</div>
+                          </div>
+                          <button onClick={() => { setContractTemplate(contractPreviewTpl); setContractView("form"); }} style={{ padding: "6px 14px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Use this template →</button>
+                        </div>
+                        {contractPreviewTpl.template_type === "html" ? (
+                          contractPreviewHtml === "loading" ? (
+                            <div style={{ height: 420, display: "flex", alignItems: "center", justifyContent: "center", color: colors.textMuted, fontSize: 13 }}>Loading preview…</div>
+                          ) : (
+                            <iframe srcDoc={contractPreviewHtml} style={{ width: "100%", height: 480, border: "none", display: "block" }} title="Template Preview" sandbox="allow-same-origin" />
+                          )
+                        ) : (
+                          <div style={{ padding: 16 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 10 }}>Variables in this template</div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                              {contractPreviewTpl.variables.map(v => (
+                                <span key={v} style={{ fontSize: 12, fontFamily: "monospace", background: `${colors.primary}18`, color: colors.primaryLight, border: `1px solid ${colors.primary}33`, borderRadius: 5, padding: "3px 10px" }}>@@{v}@@</span>
+                              ))}
+                              {contractPreviewTpl.variables.length === 0 && <span style={{ color: colors.textMuted, fontSize: 13 }}>No variables detected.</span>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : contractView === "canva" ? (
@@ -4953,44 +4971,6 @@ Kurallar:
                 </div>
               )}
 
-              {/* Template preview modal */}
-              {contractPreviewTpl && (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-                  onClick={() => setContractPreviewTpl(null)}>
-                  <div style={{ background: colors.surface, borderRadius: 12, border: `1px solid ${colors.border}`, maxWidth: 720, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
-                    onClick={e => e.stopPropagation()}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${colors.border}` }}>
-                      <div>
-                        <div style={{ fontSize: 15, fontWeight: 700 }}>{contractPreviewTpl.name}</div>
-                        <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{contractPreviewTpl.template_type?.toUpperCase()} · {new Date(contractPreviewTpl.created_at).toLocaleDateString("tr-TR")}</div>
-                      </div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={() => { setContractTemplate(contractPreviewTpl); setContractView("form"); setContractPreviewTpl(null); }}
-                          style={{ padding: "7px 16px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                          Select this template
-                        </button>
-                        <button onClick={() => setContractPreviewTpl(null)}
-                          style={{ padding: "7px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 13, cursor: "pointer" }}>✕</button>
-                      </div>
-                    </div>
-                    <div style={{ flex: 1, overflow: "auto", padding: 20 }}>
-                      {contractPreviewTpl.template_type === "html" && contractPreviewHtml ? (
-                        <iframe srcDoc={contractPreviewHtml} style={{ width: "100%", height: 420, border: `1px solid ${colors.border}`, borderRadius: 8 }} title="Template Preview" sandbox="allow-same-origin" />
-                      ) : (
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 12 }}>Variables in this template</div>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                            {contractPreviewTpl.variables.map(v => (
-                              <span key={v} style={{ fontSize: 12, fontFamily: "monospace", background: `${colors.primary}18`, color: colors.primaryLight, border: `1px solid ${colors.primary}33`, borderRadius: 5, padding: "3px 10px" }}>@@{v}@@</span>
-                            ))}
-                          </div>
-                          {contractPreviewTpl.variables.length === 0 && <div style={{ color: colors.textMuted, fontSize: 13 }}>No variables detected.</div>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           );
         })()}
