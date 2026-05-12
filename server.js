@@ -1093,7 +1093,8 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     {
       const docFile = zip.file("word/document.xml");
       if (docFile) {
-        let docXml = mergeRuns(docFile.asText());
+        // Use raw XML — cleaned templates already have merged runs
+        let docXml = docFile.asText();
         docXml = docXml.replace(/<w:proofErr\b[^>]*\/>/g, "");
         if (/@@payment_date\d+@@/.test(docXml)) {
           const schedule = data.payment_schedule || [];
