@@ -1106,6 +1106,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
               return schedule.map(row => match
                 .replace(/@@payment_date\d+@@/g, escapeXml(row.date || ""))
                 .replace(/@@down_payment\d+@@/g, escapeXml(row.amount || ""))
+                .replace(/\s+w:rsid\w+="[^"]*"/g, "")
               ).join("");
             }
             return ""; // remove remaining template rows
