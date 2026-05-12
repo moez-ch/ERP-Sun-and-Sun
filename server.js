@@ -1028,15 +1028,24 @@ app.post("/contracts/templates", authenticate, upload.single("file"), (req, res)
   res.json({ ok: true, variables });
 });
 
+// GET /contracts/templates/:id/content — returns HTML content for preview
+app.get("/contracts/templates/:id/content", authenticate, (req, res) => {
+  const row = db.prepare("SELECT file, template_type FROM contract_templates WHERE id=?").get(req.params.id);
+  if (!row) return res.status(404).json({ error: "Not found" });
+  if (row.template_type !== "html") return res.json({ content: null });
+  res.json({ content: row.file.toString("utf-8") });
+});
+
 // DELETE /contracts/templates/:id
 app.delete("/contracts/templates/:id", authenticate, (req, res) => {
   db.prepare("DELETE FROM contract_templates WHERE id=?").run(req.params.id);
   res.json({ ok: true });
 });
 
-// POST /contracts/generate — fill template and return PDF
+// POST /contracts/generate — fill template and return PDF or Word
 app.post("/contracts/generate", authenticate, async (req, res) => {
-  const { templateId, data } = req.body || {};
+  const { templateId, data, format } = req.body || {};
+  const returnWord = format === "word";
   const row = db.prepare("SELECT * FROM contract_templates WHERE id=?").get(templateId);
   if (!row) return res.status(404).json({ error: "Template not found" });
 
@@ -1110,6 +1119,18 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     const docxPath = path.join(TMP_DIR, tmpId + ".docx");
     fs.writeFileSync(docxPath, docxBuf);
 
+    // Save contract record
+    db.prepare("INSERT INTO contracts (template_id, template_name, data, created_by, created_by_name) VALUES (?,?,?,?,?)")
+      .run(templateId, row.name, JSON.stringify(data), req.user.id, req.user.name || req.user.email);
+
+    if (returnWord) {
+      const buf = fs.readFileSync(docxPath);
+      fs.unlinkSync(docxPath);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.docx"`);
+      return res.send(buf);
+    }
+
     // Convert to PDF with LibreOffice headless
     execSync(`"${LIBREOFFICE}" --headless --convert-to pdf --outdir "${TMP_DIR}" "${docxPath}"`, { timeout: 60000 });
 
@@ -1118,10 +1139,6 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     const pdfBuf = fs.readFileSync(pdfPath);
     fs.unlinkSync(docxPath);
     fs.unlinkSync(pdfPath);
-
-    // Save contract record
-    db.prepare("INSERT INTO contracts (template_id, template_name, data, created_by, created_by_name) VALUES (?,?,?,?,?)")
-      .run(templateId, row.name, JSON.stringify(data), req.user.id, req.user.name || req.user.email);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.pdf"`);

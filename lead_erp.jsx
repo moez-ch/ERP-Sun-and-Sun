@@ -677,15 +677,17 @@ Kurallar:
   const [contractData, setContractData] = useState({
     party1_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
     party2_address: "", party3_name: "",
-    program_name: "", down_payment: "", success_bonus: "",
-    program2_name: "", program2_fee: "", program2_bonus: "",
-    program3_name: "", program3_fee: "", program3_bonus: "",
+    program_name: "", down_payment: "", down_payment_2: "", success_bonus: "", success_bonus_2: "",
+    program2_name: "", program2_fee: "", program2_fee_2: "", program2_bonus: "", program2_bonus_2: "",
+    program3_name: "", program3_fee: "", program3_fee_2: "", program3_bonus: "", program3_bonus_2: "",
     notes: "",
     contract_date: new Date().toLocaleDateString("tr-TR"),
     payment_schedule: [],
   });
   const [contractProgramCount, setContractProgramCount] = useState(1);
   const [contractGenerating, setContractGenerating] = useState(false);
+  const [contractPreviewTpl, setContractPreviewTpl] = useState(null);
+  const [contractPreviewHtml, setContractPreviewHtml] = useState("");
   const [contractOcrLoading, setContractOcrLoading] = useState(false);
   const [contractUploadName, setContractUploadName] = useState("");
   const [contractUploadFile, setContractUploadFile] = useState(null);
@@ -4118,7 +4120,7 @@ Kurallar:
             finally { setContractOcrLoading(false); }
           };
 
-          const handleGenerate = async () => {
+          const handleGenerate = async (format = "pdf") => {
             if (!contractTemplate) { alert("Lütfen bir sözleşme şablonu seçin."); return; }
             setContractGenerating(true);
             try {
@@ -4126,13 +4128,14 @@ Kurallar:
               const r = await fetch("/contracts/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ templateId: contractTemplate.id, data: dataWithCompany }),
+                body: JSON.stringify({ templateId: contractTemplate.id, data: dataWithCompany, format }),
               });
               if (!r.ok) { const e = await r.json(); alert("Hata: " + e.error); return; }
               const blob = await r.blob();
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
-              a.href = url; a.download = `sozlesme_${contractTemplate.name}_${new Date().toLocaleDateString("tr-TR").replace(/\./g,"-")}.pdf`;
+              const ext = format === "word" ? "docx" : "pdf";
+              a.href = url; a.download = `sozlesme_${contractTemplate.name}_${new Date().toLocaleDateString("tr-TR").replace(/\./g,"-")}.${ext}`;
               a.click(); URL.revokeObjectURL(url);
             } catch (e) { alert("Hata: " + e.message); }
             finally { setContractGenerating(false); }
@@ -4433,25 +4436,38 @@ Kurallar:
                     {contractTemplates.length === 0 ? (
                       <div style={{ padding: 30, textAlign: "center", color: colors.textMuted, fontSize: 13 }}>{t("contract_noTemplates")}</div>
                     ) : contractTemplates.map(tpl => (
-                      <div key={tpl.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: `1px solid ${colors.border}` }}>
-                        <FileTextIcon size={16} color={colors.primary} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
-                            {tpl.name}
-                            {tpl.template_type === "html" && <span style={{ fontSize: 9, fontWeight: 700, background: "#e8f5e9", color: "#2e7d32", border: "1px solid #a5d6a7", borderRadius: 4, padding: "1px 5px" }}>HTML</span>}
+                      <div key={tpl.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
+                          <FileTextIcon size={16} color={colors.primary} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                              {tpl.name}
+                              <span style={{ fontSize: 9, fontWeight: 700, background: tpl.template_type === "html" ? "#e8f5e9" : `${colors.primary}18`, color: tpl.template_type === "html" ? "#2e7d32" : colors.primaryLight, border: `1px solid ${tpl.template_type === "html" ? "#a5d6a7" : colors.primary+"44"}`, borderRadius: 4, padding: "1px 5px" }}>{tpl.template_type?.toUpperCase()}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: colors.textMuted }}>
+                              {t("contract_variables")}: {tpl.variables.length > 0 ? tpl.variables.map(v => `@@${v}@@`).join(", ") : "—"} · {new Date(tpl.created_at).toLocaleDateString("tr-TR")}
+                            </div>
                           </div>
-                          <div style={{ fontSize: 11, color: colors.textMuted }}>
-                            {t("contract_variables")}: {tpl.variables.length > 0 ? tpl.variables.map(v => `@@${v}@@`).join(", ") : "—"} · {new Date(tpl.created_at).toLocaleDateString("tr-TR")}
-                          </div>
+                          <button onClick={async () => {
+                            setContractPreviewTpl(tpl);
+                            if (tpl.template_type === "html") {
+                              const token = localStorage.getItem("sns_token");
+                              const r = await fetch(`/contracts/templates/${tpl.id}/content`, { headers: { Authorization: `Bearer ${token}` } });
+                              const d = await r.json();
+                              setContractPreviewHtml(d.content || "");
+                            } else { setContractPreviewHtml(""); }
+                          }} style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 12, cursor: "pointer" }}>
+                            Preview
+                          </button>
+                          <button onClick={() => { setContractTemplate(tpl); setContractView("form"); }}
+                            style={{ padding: "5px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                            {t("contract_select")}
+                          </button>
+                          <button onClick={() => deleteTemplate(tpl.id)}
+                            style={{ padding: "5px 10px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 6, color: "#e57373", fontSize: 12, cursor: "pointer" }}>
+                            {t("contract_delete")}
+                          </button>
                         </div>
-                        <button onClick={() => { setContractTemplate(tpl); setContractView("form"); }}
-                          style={{ padding: "5px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                          {t("contract_select")}
-                        </button>
-                        <button onClick={() => deleteTemplate(tpl.id)}
-                          style={{ padding: "5px 10px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 6, color: "#e57373", fontSize: 12, cursor: "pointer" }}>
-                          {t("contract_delete")}
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -4772,31 +4788,51 @@ Kurallar:
 
                       {/* Program 1 */}
                       {[
-                        { label: "Program 1", nameKey: "program_name", feeKey: "down_payment", bonusKey: "success_bonus" },
-                        { label: "Program 2", nameKey: "program2_name", feeKey: "program2_fee", bonusKey: "program2_bonus" },
-                        { label: "Program 3", nameKey: "program3_name", feeKey: "program3_fee", bonusKey: "program3_bonus" },
+                        { label: "Program 1", nameKey: "program_name", feeKey: "down_payment", fee2Key: "down_payment_2", bonusKey: "success_bonus", bonus2Key: "success_bonus_2" },
+                        { label: "Program 2", nameKey: "program2_name", feeKey: "program2_fee", fee2Key: "program2_fee_2", bonusKey: "program2_bonus", bonus2Key: "program2_bonus_2" },
+                        { label: "Program 3", nameKey: "program3_name", feeKey: "program3_fee", fee2Key: "program3_fee_2", bonusKey: "program3_bonus", bonus2Key: "program3_bonus_2" },
                       ].slice(0, contractProgramCount).map((prog, idx) => (
                         <div key={prog.label} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: idx < contractProgramCount - 1 ? `1px dashed ${colors.border}` : "none" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: colors.primary, textTransform: "uppercase", letterSpacing: 0.5 }}>{prog.label}</div>
                             {idx > 0 && (
-                              <button onClick={() => { setContractProgramCount(p => p - 1); setContractData(p => ({ ...p, [prog.nameKey]: "", [prog.feeKey]: "", [prog.bonusKey]: "" })); }}
+                              <button onClick={() => { setContractProgramCount(p => p - 1); setContractData(p => ({ ...p, [prog.nameKey]: "", [prog.feeKey]: "", [prog.fee2Key]: "", [prog.bonusKey]: "", [prog.bonus2Key]: "" })); }}
                                 style={{ fontSize: 11, color: "#e57373", background: "none", border: "none", cursor: "pointer", padding: "0 4px" }}>✕ Remove</button>
                             )}
                           </div>
                           {field("Program Name", prog.nameKey, { placeholder: "e.g. SoGreen" })}
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          {/* Service Fees */}
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                             <div>
-                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Service Fee (TL + VAT)</div>
-                              <input value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))}
-                                placeholder="e.g. 50.000"
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Service Fee 1 (TL)</div>
+                              <input type="number" min="0" value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))}
+                                placeholder="e.g. 50000"
                                 style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                             </div>
                             <div>
-                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Success Bonus (%)</div>
-                              <input value={contractData[prog.bonusKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusKey]: e.target.value }))}
-                                placeholder="e.g. 5"
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Service Fee 2 (TL)</div>
+                              <input type="number" min="0" value={contractData[prog.fee2Key] || ""} onChange={e => setContractData(p => ({ ...p, [prog.fee2Key]: e.target.value }))}
+                                placeholder="e.g. 25000"
                                 style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                            </div>
+                          </div>
+                          {/* Success Bonuses */}
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                            <div>
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Success Bonus 1 (%)</div>
+                              <select value={contractData[prog.bonusKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusKey]: e.target.value }))}
+                                style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
+                                <option value="">—</option>
+                                {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Success Bonus 2 (%)</div>
+                              <select value={contractData[prog.bonus2Key] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2Key]: e.target.value }))}
+                                style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
+                                <option value="">—</option>
+                                {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
+                              </select>
                             </div>
                           </div>
                         </div>
@@ -4878,27 +4914,80 @@ Kurallar:
                       </div>
                       {contractData.payment_schedule.length === 0 ? (
                         <div style={{ fontSize: 12, color: colors.textMuted, textAlign: "center", padding: "10px 0" }}>{t("contract_scheduleEmpty")}</div>
-                      ) : contractData.payment_schedule.map((row, i) => (
-                        <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
-                          <input value={row.date} onChange={e => setContractData(p => { const s = [...p.payment_schedule]; s[i] = { ...s[i], date: e.target.value }; return { ...p, payment_schedule: s }; })}
-                            placeholder={t("contract_datePh")}
-                            style={{ flex: 1, padding: "7px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none" }} />
-                          <input value={row.amount} onChange={e => setContractData(p => { const s = [...p.payment_schedule]; s[i] = { ...s[i], amount: e.target.value }; return { ...p, payment_schedule: s }; })}
-                            placeholder={t("contract_amountPh")}
-                            style={{ flex: 1, padding: "7px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none" }} />
-                          <button onClick={() => setContractData(p => ({ ...p, payment_schedule: p.payment_schedule.filter((_, j) => j !== i) }))}
-                            style={{ padding: "5px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 12, cursor: "pointer" }}>✕</button>
-                        </div>
-                      ))}
+                      ) : contractData.payment_schedule.map((row, i) => {
+                        const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+                        const dayLabel = row.date ? days[new Date(row.date).getDay()] : null;
+                        return (
+                          <div key={i} style={{ marginBottom: 8 }}>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <div style={{ flex: 1 }}>
+                                <input type="date" value={row.date} onChange={e => setContractData(p => { const s = [...p.payment_schedule]; s[i] = { ...s[i], date: e.target.value }; return { ...p, payment_schedule: s }; })}
+                                  style={{ width: "100%", padding: "7px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                                {dayLabel && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 2, paddingLeft: 2 }}>{dayLabel}</div>}
+                              </div>
+                              <input type="number" min="0" value={row.amount} onChange={e => setContractData(p => { const s = [...p.payment_schedule]; s[i] = { ...s[i], amount: e.target.value }; return { ...p, payment_schedule: s }; })}
+                                placeholder={t("contract_amountPh")}
+                                style={{ flex: 1, padding: "7px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none" }} />
+                              <button onClick={() => setContractData(p => ({ ...p, payment_schedule: p.payment_schedule.filter((_, j) => j !== i) }))}
+                                style={{ padding: "5px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 12, cursor: "pointer" }}>✕</button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Generate button — full width */}
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <button onClick={handleGenerate} disabled={contractGenerating || !contractTemplate || !contractData.party1_id}
-                      style={{ width: "100%", padding: "13px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: (contractGenerating || !contractTemplate || !contractData.party1_id) ? 0.6 : 1 }}>
-                      {contractGenerating ? t("contract_generating") : t("contract_generate")}
+                  {/* Download buttons — full width */}
+                  <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10 }}>
+                    <button onClick={() => handleGenerate("pdf")} disabled={contractGenerating || !contractTemplate || !contractData.party1_id}
+                      style={{ flex: 1, padding: "13px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (contractGenerating || !contractTemplate || !contractData.party1_id) ? 0.6 : 1 }}>
+                      {contractGenerating ? t("contract_generating") : "⬇ Download PDF"}
                     </button>
+                    {contractTemplate?.template_type === "docx" && (
+                      <button onClick={() => handleGenerate("word")} disabled={contractGenerating || !contractTemplate || !contractData.party1_id}
+                        style={{ flex: 1, padding: "13px", background: "transparent", border: `2px solid ${colors.primary}`, borderRadius: 8, color: colors.primaryLight, fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (contractGenerating || !contractTemplate || !contractData.party1_id) ? 0.6 : 1 }}>
+                        ⬇ Download Word
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Template preview modal */}
+              {contractPreviewTpl && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+                  onClick={() => setContractPreviewTpl(null)}>
+                  <div style={{ background: colors.surface, borderRadius: 12, border: `1px solid ${colors.border}`, maxWidth: 720, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+                    onClick={e => e.stopPropagation()}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${colors.border}` }}>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 700 }}>{contractPreviewTpl.name}</div>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{contractPreviewTpl.template_type?.toUpperCase()} · {new Date(contractPreviewTpl.created_at).toLocaleDateString("tr-TR")}</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={() => { setContractTemplate(contractPreviewTpl); setContractView("form"); setContractPreviewTpl(null); }}
+                          style={{ padding: "7px 16px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                          Select this template
+                        </button>
+                        <button onClick={() => setContractPreviewTpl(null)}
+                          style={{ padding: "7px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 13, cursor: "pointer" }}>✕</button>
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, overflow: "auto", padding: 20 }}>
+                      {contractPreviewTpl.template_type === "html" && contractPreviewHtml ? (
+                        <iframe srcDoc={contractPreviewHtml} style={{ width: "100%", height: 420, border: `1px solid ${colors.border}`, borderRadius: 8 }} title="Template Preview" sandbox="allow-same-origin" />
+                      ) : (
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 12 }}>Variables in this template</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                            {contractPreviewTpl.variables.map(v => (
+                              <span key={v} style={{ fontSize: 12, fontFamily: "monospace", background: `${colors.primary}18`, color: colors.primaryLight, border: `1px solid ${colors.primary}33`, borderRadius: 5, padding: "3px 10px" }}>@@{v}@@</span>
+                            ))}
+                          </div>
+                          {contractPreviewTpl.variables.length === 0 && <div style={{ color: colors.textMuted, fontSize: 13 }}>No variables detected.</div>}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
