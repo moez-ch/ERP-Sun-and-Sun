@@ -926,10 +926,12 @@ app.post("/contracts/companies", authenticate, (req, res) => {
 
 // PUT /contracts/companies/:id
 app.put("/contracts/companies/:id", authenticate, (req, res) => {
-  const { name, short, tax_office, tax_no, address, iban } = req.body || {};
+  const { name, short, tax_office, tax_no, address } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: "Name required" });
-  db.prepare("UPDATE contract_companies SET name=?,short=?,tax_office=?,tax_no=?,address=?,iban=? WHERE id=?").run(name.trim(), short||"", tax_office||"", tax_no||"", address||"", iban||"", req.params.id);
-  res.json(db.prepare("SELECT * FROM contract_companies WHERE id=?").get(req.params.id));
+  db.prepare("UPDATE contract_companies SET name=?,short=?,tax_office=?,tax_no=?,address=? WHERE id=?").run(name.trim(), short||"", tax_office||"", tax_no||"", address||"", req.params.id);
+  const company = db.prepare("SELECT * FROM contract_companies WHERE id=?").get(req.params.id);
+  const ibans = db.prepare("SELECT * FROM company_ibans WHERE company_id=? ORDER BY is_default DESC, id").all(req.params.id);
+  res.json({ ...company, ibans });
 });
 
 // DELETE /contracts/companies/:id
