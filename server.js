@@ -1090,13 +1090,13 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
   try {
     const zipCheck = new PizZip(row.file);
     const xmlCheck = zipCheck.file("word/document.xml")?.asText() || "";
-    isDocxtemplater = xmlCheck.includes("{#") || xmlCheck.includes("{party1_name}");
+    isDocxtemplater = xmlCheck.includes("[[party1_name") || xmlCheck.includes("[[#");
   } catch {}
 
   if (isDocxtemplater) {
     try {
       const zip = new PizZip(row.file);
-      const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+      const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, delimiters: { start: "[[", end: "]]" } });
       const schedule = (data.payment_schedule || []).map(r => ({
         payment_date: r.date || "",
         down_payment: r.amount || "",
