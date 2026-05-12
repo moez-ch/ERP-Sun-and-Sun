@@ -10,6 +10,7 @@ import fs from "fs";
 import { execSync } from "child_process";
 import multer from "multer";
 import PizZip from "pizzip";
+import Docxtemplater from "docxtemplater";
 import puppeteer from "puppeteer-core";
 import { PDFDocument } from "pdf-lib";
 import { randomBytes, createHash } from "node:crypto";
@@ -1084,7 +1085,49 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     }
   }
 
-  // ── DOCX template path ────────────────────────────────────────────
+  // ── docxtemplater path (templates using {variable} syntax) ───────
+  let isDocxtemplater = false;
+  try {
+    const zipCheck = new PizZip(row.file);
+    const xmlCheck = zipCheck.file("word/document.xml")?.asText() || "";
+    isDocxtemplater = xmlCheck.includes("{#") || xmlCheck.includes("{party1_name}");
+  } catch {}
+
+  if (isDocxtemplater) {
+    try {
+      const zip = new PizZip(row.file);
+      const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+      const schedule = (data.payment_schedule || []).map(r => ({
+        payment_date: r.date || "",
+        down_payment: r.amount || "",
+      }));
+      doc.render({ ...data, payment_schedule: schedule });
+      const docxBuf = doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" });
+      const docxPath = path.join(TMP_DIR, tmpId + ".docx");
+      fs.writeFileSync(docxPath, docxBuf);
+      db.prepare("INSERT INTO contracts (template_id, template_name, data, created_by, created_by_name) VALUES (?,?,?,?,?)")
+        .run(templateId, row.name, JSON.stringify(data), req.user.id, req.user.name || req.user.email);
+      if (returnWord) {
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.docx"`);
+        return res.send(docxBuf);
+      }
+      execSync(`"${LIBREOFFICE}" --headless --convert-to pdf --outdir "${TMP_DIR}" "${docxPath}"`, { timeout: 60000 });
+      const pdfPath = path.join(TMP_DIR, tmpId + ".pdf");
+      if (!fs.existsSync(pdfPath)) throw new Error("PDF conversion failed");
+      const pdfBuf = fs.readFileSync(pdfPath);
+      fs.unlinkSync(docxPath);
+      fs.unlinkSync(pdfPath);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.pdf"`);
+      return res.send(pdfBuf);
+    } catch (e) {
+      console.error("[contracts/generate docxtemplater]", e);
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // ── DOCX template path (legacy @@variable@@ templates) ────────────
   try {
     const zip = new PizZip(row.file);
     const xmlFiles = Object.keys(zip.files).filter(f => f.startsWith("word/") && f.endsWith(".xml") && !f.includes("theme") && !f.includes("settings"));
