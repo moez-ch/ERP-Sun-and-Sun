@@ -4736,7 +4736,12 @@ Kurallar:
                         + Add Program
                       </button>
                     )}
-                    {field(t("contract_contractDate"), "contract_date", { placeholder: t("contract_datePlaceholder") })}
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}</div>
+                      <input type="date" value={contractData.contract_date || ""} onChange={e => setContractData(p => ({ ...p, contract_date: e.target.value }))}
+                        style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                      {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(contractData.contract_date + "T12:00:00").getDay()]}</div>}
+                    </div>
                     <div style={{ marginTop: 6 }}>
                       <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Notes</div>
                       <textarea value={contractData.notes || ""} onChange={e => setContractData(p => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Additional notes..." style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
@@ -4887,7 +4892,7 @@ Kurallar:
                         <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}</div>
                         <input type="date" value={contractData.contract_date || ""} onChange={e => setContractData(p => ({ ...p, contract_date: e.target.value }))}
                           style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                        {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(contractData.contract_date).getDay()]}</div>}
+                        {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(contractData.contract_date + "T12:00:00").getDay()]}</div>}
                       </div>
 
                       {/* Notes */}
