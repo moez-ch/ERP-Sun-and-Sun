@@ -1089,30 +1089,17 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     const zip = new PizZip(row.file);
     const xmlFiles = Object.keys(zip.files).filter(f => f.startsWith("word/") && f.endsWith(".xml") && !f.includes("theme") && !f.includes("settings"));
 
-    // Dynamic payment schedule rows — clone row 1 of the template table for each entry
+    // Expand payment_schedule array → named variables (payment_date1, down_payment1, ...)
     {
-      const docFile = zip.file("word/document.xml");
-      if (docFile) {
-        // Use raw XML — cleaned templates already have merged runs
-        let docXml = docFile.asText();
-        docXml = docXml.replace(/<w:proofErr\b[^>]*\/>/g, "");
-        if (/@@payment_date\d+@@/.test(docXml)) {
-          const schedule = data.payment_schedule || [];
-          let firstDone = false;
-          docXml = docXml.replace(/<w:tr\b[\s\S]*?@@payment_date\d+@@[\s\S]*?<\/w:tr>/g, match => {
-            if (!firstDone) {
-              firstDone = true;
-              if (schedule.length === 0) return "";
-              return schedule.map(row => match
-                .replace(/@@payment_date\d+@@/g, escapeXml(row.date || ""))
-                .replace(/@@down_payment\d+@@/g, escapeXml(row.amount || ""))
-                .replace(/\s+w:rsid\w+="[^"]*"/g, "")
-              ).join("");
-            }
-            return ""; // remove remaining template rows
-          });
-          zip.file("word/document.xml", docXml);
-        }
+      const schedule = data.payment_schedule || [];
+      schedule.forEach((row, i) => {
+        data[`payment_date${i + 1}`] = row.date || "";
+        data[`down_payment${i + 1}`] = row.amount || "";
+      });
+      // Clear unused slots up to 20
+      for (let i = schedule.length + 1; i <= 20; i++) {
+        data[`payment_date${i}`] = "";
+        data[`down_payment${i}`] = "";
       }
     }
 
