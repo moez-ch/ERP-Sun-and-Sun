@@ -1089,6 +1089,18 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     const zip = new PizZip(row.file);
     const xmlFiles = Object.keys(zip.files).filter(f => f.startsWith("word/") && f.endsWith(".xml") && !f.includes("theme") && !f.includes("settings"));
 
+    // Expand payment_schedule array → named variables (payment_date1, down_payment1, ...)
+    const schedule = data.payment_schedule || [];
+    schedule.forEach((row, i) => {
+      data[`payment_date${i + 1}`] = row.date || "";
+      data[`down_payment${i + 1}`] = row.amount || "";
+    });
+    // Clear any slots beyond what was filled (up to 20)
+    for (let i = schedule.length + 1; i <= 20; i++) {
+      data[`payment_date${i}`] = "";
+      data[`down_payment${i}`] = "";
+    }
+
     // If Party 3 data provided, clone Party 2 blocks → Party 3 before variable replacement
     const hasParty3 = data.party3_name && String(data.party3_name).trim();
     if (hasParty3) {

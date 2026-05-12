@@ -678,7 +678,7 @@ Kurallar:
     party1_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
     party2_address: "", party3_name: "", party3_tax_office: "", party3_tax_no: "", party3_address: "",
     program_name: "", down_payment: "", down_payment_2: "", success_bonus: "", success_bonus_2: "",
-    down_payment_deadline: "", success_bonus_deadline: "", success_bonus_2_deadline: "",
+    down_payment_deadline: "", sb1ddl: "", success_bonus_2_deadline: "",
     program2_name: "", program2_fee: "", program2_fee_2: "", program2_bonus: "", program2_bonus_2: "",
     program2_fee_deadline: "", program2_bonus_deadline: "", program2_bonus_2_deadline: "",
     program3_name: "", program3_fee: "", program3_fee_2: "", program3_bonus: "", program3_bonus_2: "",
@@ -4826,7 +4826,7 @@ Kurallar:
 
                       {/* Program 1 */}
                       {[
-                        { label: "Program 1", nameKey: "program_name", feeKey: "down_payment", fee2Key: "down_payment_2", bonusKey: "success_bonus", bonus2Key: "success_bonus_2", feeDeadlineKey: "down_payment_deadline", bonusDeadlineKey: "success_bonus_deadline", bonus2DeadlineKey: "success_bonus_2_deadline" },
+                        { label: "Program 1", nameKey: "program_name", feeKey: "down_payment", fee2Key: "down_payment_2", bonusKey: "success_bonus", bonus2Key: "success_bonus_2", feeDeadlineKey: "down_payment_deadline", bonusDeadlineKey: "sb1ddl", bonus2DeadlineKey: "success_bonus_2_deadline" },
                         { label: "Program 2", nameKey: "program2_name", feeKey: "program2_fee", fee2Key: "program2_fee_2", bonusKey: "program2_bonus", bonus2Key: "program2_bonus_2", feeDeadlineKey: "program2_fee_deadline", bonusDeadlineKey: "program2_bonus_deadline", bonus2DeadlineKey: "program2_bonus_2_deadline" },
                         { label: "Program 3", nameKey: "program3_name", feeKey: "program3_fee", fee2Key: "program3_fee_2", bonusKey: "program3_bonus", bonus2Key: "program3_bonus_2", feeDeadlineKey: "program3_fee_deadline", bonusDeadlineKey: "program3_bonus_deadline", bonus2DeadlineKey: "program3_bonus_2_deadline" },
                       ].slice(0, contractProgramCount).map((prog, idx) => {
