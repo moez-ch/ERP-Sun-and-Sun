@@ -676,7 +676,7 @@ Kurallar:
   const [contractTemplate, setContractTemplate] = useState(null);
   const [contractData, setContractData] = useState({
     party1_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
-    party2_address: "", party3_name: "",
+    party2_address: "", party3_name: "", party3_tax_office: "", party3_tax_no: "", party3_address: "",
     program_name: "", down_payment: "", down_payment_2: "", success_bonus: "", success_bonus_2: "",
     program2_name: "", program2_fee: "", program2_fee_2: "", program2_bonus: "", program2_bonus_2: "",
     program3_name: "", program3_fee: "", program3_fee_2: "", program3_bonus: "", program3_bonus_2: "",
@@ -685,6 +685,7 @@ Kurallar:
     payment_schedule: [],
   });
   const [contractProgramCount, setContractProgramCount] = useState(1);
+  const [showParty3, setShowParty3] = useState(false);
   const [contractGenerating, setContractGenerating] = useState(false);
   const [contractPreviewTpl, setContractPreviewTpl] = useState(null);
   const [contractPreviewHtml, setContractPreviewHtml] = useState("");
@@ -4104,7 +4105,7 @@ Kurallar:
             iban: contractData.iban || selectedCompany.iban,
           } : contractData;
 
-          const handleOcr = async (file) => {
+          const handleOcr = async (file, target = "party2") => {
             setContractOcrLoading(true);
             try {
               const token = localStorage.getItem("sns_token");
@@ -4113,7 +4114,11 @@ Kurallar:
               const r = await fetch("/contracts/ocr", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
               const d = await r.json();
               if (d.ok && d.fields) {
-                setContractData(prev => ({ ...prev, ...d.fields }));
+                // Remap party2_ fields to party3_ if target is party3
+                const fields = target === "party3"
+                  ? Object.fromEntries(Object.entries(d.fields).map(([k, v]) => [k.replace(/^party2_/, "party3_"), v]))
+                  : d.fields;
+                setContractData(prev => ({ ...prev, ...fields }));
                 alert(t("contract_ocrDone"));
               } else { alert(t("contract_ocrError", d.error || "Unknown")); }
             } catch (e) { alert(t("contract_ocrError", e.message)); }
@@ -4916,10 +4921,46 @@ Kurallar:
                     </div>
 
                     {/* Party 3 (optional) */}
-                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionParty3")}</div>
-                      {field(t("contract_party3Name"), "party3_name", { placeholder: "..." })}
-                    </div>
+                    {!showParty3 ? (
+                      <button onClick={() => setShowParty3(true)}
+                        style={{ width: "100%", marginBottom: 16, padding: "10px", background: "transparent", border: `1px dashed ${colors.border}`, borderRadius: 10, color: colors.textMuted, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        + Add Third Party
+                      </button>
+                    ) : (
+                      <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Party 3</div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6 }}>
+                              <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleOcr(e.target.files[0], "party3"); }} />
+                              <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{contractOcrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
+                            </label>
+                            <button onClick={() => { setShowParty3(false); setContractData(p => ({ ...p, party3_name: "", party3_tax_office: "", party3_tax_no: "", party3_address: "" })); }}
+                              style={{ padding: "5px 10px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 6, color: "#e57373", fontSize: 11, cursor: "pointer" }}>
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                        {field("Full Name", "party3_name", { placeholder: "Company or person name" })}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          <div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_taxOffice")}</div>
+                            <input value={contractData.party3_tax_office || ""} onChange={e => setContractData(p => ({ ...p, party3_tax_office: e.target.value }))}
+                              placeholder="Örn: Çankaya"
+                              style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_taxNo")}</div>
+                            <input value={contractData.party3_tax_no || ""} onChange={e => setContractData(p => ({ ...p, party3_tax_no: e.target.value }))}
+                              placeholder="10 digits"
+                              style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                          </div>
+                        </div>
+                        <div style={{ marginTop: 10 }}>
+                          {field(t("contract_address"), "party3_address", { placeholder: "...", textarea: true })}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Payment schedule */}
                     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>

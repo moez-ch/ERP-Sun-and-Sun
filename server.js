@@ -1089,6 +1089,27 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     const zip = new PizZip(row.file);
     const xmlFiles = Object.keys(zip.files).filter(f => f.startsWith("word/") && f.endsWith(".xml") && !f.includes("theme") && !f.includes("settings"));
 
+    // If Party 3 data provided, clone Party 2 blocks → Party 3 before variable replacement
+    const hasParty3 = data.party3_name && String(data.party3_name).trim();
+    if (hasParty3) {
+      const docFile = zip.file("word/document.xml");
+      if (docFile) {
+        let docXml = mergeRuns(docFile.asText());
+        // Try table rows first (party2 in a table)
+        const hasTableParty2 = /<w:tr[ >][\s\S]*?@@party2_[\s\S]*?<\/w:tr>/.test(docXml);
+        if (hasTableParty2) {
+          docXml = docXml.replace(/<w:tr[ >][\s\S]*?<\/w:tr>/g, match =>
+            match.includes("@@party2_") ? match + match.replace(/@@party2_/g, "@@party3_") : match
+          );
+        } else {
+          docXml = docXml.replace(/<w:p[ >][\s\S]*?<\/w:p>/g, match =>
+            match.includes("@@party2_") ? match + match.replace(/@@party2_/g, "@@party3_") : match
+          );
+        }
+        zip.file("word/document.xml", docXml);
+      }
+    }
+
     // Build payment schedule table XML if needed
     const scheduleRows = (data.payment_schedule || []);
     const scheduleTableXml = scheduleRows.length > 0 ? buildScheduleTable(scheduleRows) : "";
