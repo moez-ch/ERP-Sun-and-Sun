@@ -4824,20 +4824,12 @@ Kurallar:
                             )}
                           </div>
                           {field("Program Name", prog.nameKey, { placeholder: "e.g. SoGreen" })}
-                          {/* Service Fees */}
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-                            <div>
-                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Service Fee 1 (TL)</div>
-                              <input type="number" min="0" value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))}
-                                placeholder="e.g. 50000"
-                                style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Service Fee 2 (TL)</div>
-                              <input type="number" min="0" value={contractData[prog.fee2Key] || ""} onChange={e => setContractData(p => ({ ...p, [prog.fee2Key]: e.target.value }))}
-                                placeholder="e.g. 25000"
-                                style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                            </div>
+                          {/* Service Fee */}
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Service Fee (TL)</div>
+                            <input type="number" min="0" value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))}
+                              placeholder="e.g. 50000"
+                              style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                           </div>
                           {/* Success Bonuses */}
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
