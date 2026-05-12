@@ -4740,8 +4740,7 @@ Kurallar:
                       <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}</div>
                       <input type="date" value={contractData.contract_date || ""} onChange={e => setContractData(p => ({ ...p, contract_date: e.target.value }))}
                         onClick={e => { try { e.target.showPicker(); } catch {} }}
-                        onKeyDown={e => e.preventDefault()}
-                        style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box", cursor: "pointer" }} />
+                        style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box", cursor: "pointer", colorScheme: "dark" }} />
                       {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(contractData.contract_date + "T12:00:00").getDay()]}</div>}
                     </div>
                     <div style={{ marginTop: 6 }}>
@@ -5008,8 +5007,7 @@ Kurallar:
                               <div style={{ flex: 1 }}>
                                 <input type="date" value={row.date} onChange={e => setContractData(p => { const s = [...p.payment_schedule]; s[i] = { ...s[i], date: e.target.value }; return { ...p, payment_schedule: s }; })}
                                   onClick={e => { try { e.target.showPicker(); } catch {} }}
-                                  onKeyDown={e => e.preventDefault()}
-                                  style={{ width: "100%", padding: "7px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box", cursor: "pointer" }} />
+                                  style={{ width: "100%", padding: "7px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box", cursor: "pointer", colorScheme: "dark" }} />
                                 {dayLabel && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 2, paddingLeft: 2 }}>{dayLabel}</div>}
                               </div>
                               <input type="number" min="0" value={row.amount} onChange={e => setContractData(p => { const s = [...p.payment_schedule]; s[i] = { ...s[i], amount: e.target.value }; return { ...p, payment_schedule: s }; })}
