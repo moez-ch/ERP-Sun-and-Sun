@@ -4825,17 +4825,17 @@ Kurallar:
                       <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionDetails")}</div>
 
                       {/* Program 1 */}
-                      {[
-                        { label: "Program 1", nameKey: "program_name", feeKey: "down_payment", fee2Key: "down_payment_2", bonusKey: "success_bonus", bonus2Key: "success_bonus_2", feeDeadlineKey: "down_payment_deadline", bonusDeadlineKey: "sb1ddl", bonus2DeadlineKey: "success_bonus_2_deadline" },
-                        { label: "Program 2", nameKey: "program2_name", feeKey: "program2_fee", fee2Key: "program2_fee_2", bonusKey: "program2_bonus", bonus2Key: "program2_bonus_2", feeDeadlineKey: "program2_fee_deadline", bonusDeadlineKey: "program2_bonus_deadline", bonus2DeadlineKey: "program2_bonus_2_deadline" },
-                        { label: "Program 3", nameKey: "program3_name", feeKey: "program3_fee", fee2Key: "program3_fee_2", bonusKey: "program3_bonus", bonus2Key: "program3_bonus_2", feeDeadlineKey: "program3_fee_deadline", bonusDeadlineKey: "program3_bonus_deadline", bonus2DeadlineKey: "program3_bonus_2_deadline" },
-                      ].slice(0, contractProgramCount).map((prog, idx) => {
+                      {(() => {
                         const DeadlineBox = ({ k }) => (
                           <input value={contractData[k] || ""} onChange={e => setContractData(p => ({ ...p, [k]: e.target.value }))}
                             placeholder="e.g. 60 days"
                             style={{ marginTop: 5, width: "100%", padding: "6px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 11, outline: "none", boxSizing: "border-box" }} />
                         );
-                        return (
+                        return [
+                        { label: "Program 1", nameKey: "program_name", feeKey: "down_payment", fee2Key: "down_payment_2", bonusKey: "success_bonus", bonus2Key: "success_bonus_2", feeDeadlineKey: "down_payment_deadline", bonusDeadlineKey: "sb1ddl", bonus2DeadlineKey: "success_bonus_2_deadline" },
+                        { label: "Program 2", nameKey: "program2_name", feeKey: "program2_fee", fee2Key: "program2_fee_2", bonusKey: "program2_bonus", bonus2Key: "program2_bonus_2", feeDeadlineKey: "program2_fee_deadline", bonusDeadlineKey: "program2_bonus_deadline", bonus2DeadlineKey: "program2_bonus_2_deadline" },
+                        { label: "Program 3", nameKey: "program3_name", feeKey: "program3_fee", fee2Key: "program3_fee_2", bonusKey: "program3_bonus", bonus2Key: "program3_bonus_2", feeDeadlineKey: "program3_fee_deadline", bonusDeadlineKey: "program3_bonus_deadline", bonus2DeadlineKey: "program3_bonus_2_deadline" },
+                      ].slice(0, contractProgramCount).map((prog, idx) => (
                         <div key={prog.label} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: idx < contractProgramCount - 1 ? `1px dashed ${colors.border}` : "none" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: colors.primary, textTransform: "uppercase", letterSpacing: 0.5 }}>{prog.label}</div>
@@ -4878,8 +4878,8 @@ Kurallar:
                             </div>
                           </div>
                         </div>
-                        );
-                      })}
+                      ));
+                      })()}
 
                       {/* Add program button */}
                       {contractProgramCount < 3 && (
@@ -4892,7 +4892,9 @@ Kurallar:
                       <div style={{ marginBottom: 10 }}>
                         <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}</div>
                         <input type="date" value={contractData.contract_date || ""} onChange={e => setContractData(p => ({ ...p, contract_date: e.target.value }))}
-                          style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                          onClick={e => { try { e.target.showPicker(); } catch {} }}
+                          style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box", cursor: "pointer", colorScheme: "dark" }} />
+                        {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(contractData.contract_date + "T12:00:00").getDay()]}</div>}
                         {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(contractData.contract_date + "T12:00:00").getDay()]}</div>}
                       </div>
 

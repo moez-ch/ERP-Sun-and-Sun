@@ -1085,24 +1085,177 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     }
   }
 
-  // ── docxtemplater path (templates using {variable} syntax) ───────
+  // ── docxtemplater path (templates using [[ ]] syntax) ───────
   let isDocxtemplater = false;
   try {
     const zipCheck = new PizZip(row.file);
-    const xmlCheck = zipCheck.file("word/document.xml")?.asText() || "";
-    isDocxtemplater = xmlCheck.includes("[[party1_name") || xmlCheck.includes("[[#");
+    const xmlCheck = mergeRuns(zipCheck.file("word/document.xml")?.asText() || "");
+    isDocxtemplater = xmlCheck.includes("[[");
   } catch {}
 
   if (isDocxtemplater) {
     try {
       const zip = new PizZip(row.file);
-      const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, delimiters: { start: "[[", end: "]]" } });
+      // Pre-process: add bold to runs containing template tags for fields that should be bold
+      {
+        const boldFields = [
+          ...["down_payment","down_payment_2","program2_fee","program2_fee_2","program3_fee","program3_fee_2"],
+          ...["success_bonus","success_bonus_2","program2_bonus","program2_bonus_2","program3_bonus","program3_bonus_2"],
+          "contract_date","sb1ddl","down_payment_deadline","payment_date","down_payment",
+        ];
+        const addBoldToTag = (xml, tag) => {
+          if (!xml.includes(tag)) return xml;
+          let out = xml, from = 0;
+          while (true) {
+            const idx = out.indexOf(tag, from);
+            if (idx < 0) break;
+            const rStart = Math.max(out.lastIndexOf("<w:r>", idx), out.lastIndexOf("<w:r ", idx));
+            const rEnd = out.indexOf("</w:r>", idx) + "</w:r>".length;
+            if (rStart < 0 || rEnd <= rStart) { from = idx + 1; continue; }
+            const run = out.slice(rStart, rEnd);
+
+            // Find <w:t> boundaries within this run
+            const tOpenIdx = run.indexOf("<w:t");
+            const tOpenEnd = run.indexOf(">", tOpenIdx) + 1;
+            const tCloseIdx = run.indexOf("</w:t>");
+            if (tOpenIdx < 0 || tCloseIdx < 0) { from = idx + 1; continue; }
+
+            const tContent = run.slice(tOpenEnd, tCloseIdx);
+            const tagPosInT = idx - rStart - tOpenEnd;
+            const before = tContent.slice(0, tagPosInT);
+            const after = tContent.slice(tagPosInT + tag.length);
+
+            // Extract rPr and run opening tag
+            const rTagMatch = run.match(/^(<w:r(?:\s[^>]*)?>)/);
+            const rOpenTag = rTagMatch ? rTagMatch[1] : "<w:r>";
+            const rPrMatch = run.match(/(<w:rPr(?:\s[^>]*)?>)([\s\S]*?)(<\/w:rPr>)/);
+            const rPr = rPrMatch ? rPrMatch[0] : "";
+
+            // Build bold rPr: strip b/bCs, add fresh
+            const boldRPr = rPr
+              ? rPr.replace(/<w:b(?:\s[^>]*)?\/>/g, "").replace(/<w:bCs(?:\s[^>]*)?\/>/g, "")
+                   .replace(/<w:rPr(?:\s[^>]*)?>/, m => m + "<w:b/><w:bCs/>")
+              : "<w:rPr><w:b/><w:bCs/></w:rPr>";
+
+            const sp = ' xml:space="preserve"';
+            let newContent = "";
+            if (before) newContent += `${rOpenTag}${rPr}<w:t${sp}>${before}</w:t></w:r>`;
+            newContent += `${rOpenTag}${boldRPr}<w:t>${tag}</w:t></w:r>`;
+            if (after) newContent += `${rOpenTag}${rPr}<w:t${sp}>${after}</w:t></w:r>`;
+
+            out = out.slice(0, rStart) + newContent + out.slice(rEnd);
+            from = rStart + newContent.length;
+          }
+          return out;
+        };
+        for (const fname of ["word/document.xml"]) {
+          const f = zip.file(fname);
+          if (!f) continue;
+          let xml = f.asText();
+          for (const field of boldFields) xml = addBoldToTag(xml, `[[${field}]]`);
+          zip.file(fname, xml);
+        }
+      }
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true, linebreaks: true, delimiters: { start: "[[", end: "]]" },
+        nullGetter: () => "",
+      });
+      const fmtTL = v => {
+        const n = parseFloat(String(v ?? "").replace(/[^\d.]/g, ""));
+        if (!v || isNaN(n)) return String(v ?? "");
+        return n.toLocaleString("tr-TR", { maximumFractionDigits: 0 }) + " TL + KDV";
+      };
+      const fmtPct = v => v ? `%${v} + KDV` : "";
+      const fmtDate = v => {
+        const m = String(v ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+        return m ? `${m[3]}/${m[2]}/${m[1]}` : String(v ?? "");
+      };
+      const feeFields = ["down_payment","down_payment_2","program2_fee","program2_fee_2","program3_fee","program3_fee_2"];
+      const pctFields = ["success_bonus","success_bonus_2","program2_bonus","program2_bonus_2","program3_bonus","program3_bonus_2"];
+      const renderData = { ...data };
+      for (const f of feeFields) { if (renderData[f]) renderData[f] = fmtTL(renderData[f]); }
+      for (const f of pctFields) { if (renderData[f]) renderData[f] = fmtPct(renderData[f]); }
+      if (renderData.contract_date) renderData.contract_date = fmtDate(renderData.contract_date);
       const schedule = (data.payment_schedule || []).map(r => ({
-        payment_date: r.date || "",
-        down_payment: r.amount || "",
+        payment_date: fmtDate(r.date || ""),
+        down_payment: fmtTL(r.amount || ""),
       }));
-      doc.render({ ...data, payment_schedule: schedule });
-      const docxBuf = doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" });
+      doc.render({ ...renderData, payment_schedule: schedule });
+      let docxBuf = doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" });
+
+      // Second pass: replace any {variable} tags left in the template (legacy syntax)
+      {
+        const zip2 = new PizZip(docxBuf);
+        const xmlFiles2 = Object.keys(zip2.files).filter(f => f.startsWith("word/") && f.endsWith(".xml"));
+        let changed = false;
+        for (const fname of xmlFiles2) {
+          const f = zip2.file(fname);
+          if (!f) continue;
+          let xml = f.asText();
+          if (!xml.includes("{")) continue;
+          for (const [key, val] of Object.entries(renderData)) {
+            if (key === "payment_schedule") continue;
+            const tag = `{${key}}`;
+            if (xml.includes(tag)) {
+              xml = xml.split(tag).join(String(val ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"));
+              changed = true;
+            }
+          }
+          if (changed) zip2.file(fname, xml);
+        }
+        if (changed) docxBuf = zip2.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      }
+
+      // Fix font for contract_date: walk to the <w:r> containing the date and replace its rPr
+      if (renderData.contract_date) {
+        const zip4 = new PizZip(docxBuf);
+        let docXml = zip4.file("word/document.xml")?.asText();
+        if (docXml) {
+          const dateVal = renderData.contract_date;
+          const TNR = '<w:b/><w:bCs/><w:rFonts w:ascii="Times New Roman" w:eastAsia="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="22"/><w:szCs w:val="22"/>';
+          const needle = docXml.includes(`<w:t>${dateVal}</w:t>`) ? `<w:t>${dateVal}</w:t>`
+                       : docXml.includes(`<w:t xml:space="preserve">${dateVal}</w:t>`) ? `<w:t xml:space="preserve">${dateVal}</w:t>`
+                       : null;
+          if (needle) {
+            const tIdx = docXml.indexOf(needle);
+            const rStart = docXml.lastIndexOf("<w:r>", tIdx);
+            const rEnd = docXml.indexOf("</w:r>", tIdx) + "</w:r>".length;
+            if (rStart >= 0 && rEnd > rStart) {
+              const newRun = `<w:r><w:rPr>${TNR}</w:rPr>${needle}</w:r>`;
+              docXml = docXml.slice(0, rStart) + newRun + docXml.slice(rEnd);
+              zip4.file("word/document.xml", docXml);
+              docxBuf = zip4.generate({ type: "nodebuffer", compression: "DEFLATE" });
+            }
+          }
+        }
+      }
+
+      // Add cantSplit + pageBreakBefore + bold on values
+      {
+        const zip3 = new PizZip(docxBuf);
+        let docXml = zip3.file("word/document.xml")?.asText();
+        if (docXml) {
+          // cantSplit on all table rows
+          docXml = docXml.replace(/<w:trPr>/g, "<w:trPr><w:cantSplit/>");
+          // Force page break before the EK-1 heading paragraph
+          const marker = "EK-1";
+          const mIdx = docXml.indexOf(marker);
+          if (mIdx >= 0) {
+            const pStart = Math.max(docXml.lastIndexOf("<w:p>", mIdx), docXml.lastIndexOf("<w:p ", mIdx));
+            const pPrStart = docXml.indexOf("<w:pPr>", pStart);
+            const pPrEnd = docXml.indexOf("</w:pPr>", pStart);
+            if (pPrStart >= 0 && pPrEnd >= 0 && pPrStart < mIdx) {
+              docXml = docXml.slice(0, pPrEnd) + "<w:pageBreakBefore/>" + docXml.slice(pPrEnd);
+            } else {
+              const pOpen = docXml.indexOf(">", pStart) + 1;
+              docXml = docXml.slice(0, pOpen) + "<w:pPr><w:pageBreakBefore/></w:pPr>" + docXml.slice(pOpen);
+            }
+          }
+          zip3.file("word/document.xml", docXml);
+          docxBuf = zip3.generate({ type: "nodebuffer", compression: "DEFLATE" });
+        }
+      }
+
       const docxPath = path.join(TMP_DIR, tmpId + ".docx");
       fs.writeFileSync(docxPath, docxBuf);
       db.prepare("INSERT INTO contracts (template_id, template_name, data, created_by, created_by_name) VALUES (?,?,?,?,?)")
@@ -1112,7 +1265,13 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
         res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.docx"`);
         return res.send(docxBuf);
       }
-      execSync(`"${LIBREOFFICE}" --headless --convert-to pdf --outdir "${TMP_DIR}" "${docxPath}"`, { timeout: 60000 });
+      const loProfile1 = path.join(TMP_DIR, `lo_profile_${tmpId}`);
+      fs.mkdirSync(loProfile1, { recursive: true });
+      try {
+        execSync(`"${LIBREOFFICE}" --headless --norestore -env:UserInstallation="file:///${loProfile1.replace(/\\/g, "/")}" --convert-to pdf --outdir "${TMP_DIR}" "${docxPath}"`, { timeout: 60000 });
+      } finally {
+        fs.rmSync(loProfile1, { recursive: true, force: true });
+      }
       const pdfPath = path.join(TMP_DIR, tmpId + ".pdf");
       if (!fs.existsSync(pdfPath)) throw new Error("PDF conversion failed");
       const pdfBuf = fs.readFileSync(pdfPath);
@@ -1131,6 +1290,12 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
   try {
     const zip = new PizZip(row.file);
     const xmlFiles = Object.keys(zip.files).filter(f => f.startsWith("word/") && f.endsWith(".xml") && !f.includes("theme") && !f.includes("settings"));
+
+    // Format values for legacy templates
+    const fmtLegacyDate = v => { const m = String(v ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(v ?? ""); };
+    const fmtLegacyNum = v => { const n = parseFloat(String(v ?? "").replace(/[^\d.]/g, "")); return (!v || isNaN(n)) ? String(v ?? "") : n.toLocaleString("tr-TR", { maximumFractionDigits: 0 }); };
+    if (data.contract_date) data.contract_date = fmtLegacyDate(data.contract_date);
+    for (const f of ["down_payment","down_payment_2","program2_fee","program2_fee_2","program3_fee","program3_fee_2"]) { if (data[f]) data[f] = fmtLegacyNum(data[f]); }
 
     // Expand payment_schedule array → named variables (payment_date1, down_payment1, ...)
     {
@@ -1174,14 +1339,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     for (const fname of xmlFiles) {
       const xmlFile = zip.file(fname);
       if (!xmlFile) continue;
-      let xml = xmlFile.asText();
-
-      // Replace each @@var@@ with its value
-      for (const [key, val] of Object.entries(data)) {
-        if (key === "payment_schedule") continue;
-        const escaped = String(val ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-        xml = xml.split(`@@${key}@@`).join(escaped);
-      }
+      let xml = replaceLegacyTagsAcrossRuns(xmlFile.asText(), data);
 
       // Replace @@payment_schedule@@ with table XML
       if (scheduleTableXml) {
@@ -1210,7 +1368,13 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     }
 
     // Convert to PDF with LibreOffice headless
-    execSync(`"${LIBREOFFICE}" --headless --convert-to pdf --outdir "${TMP_DIR}" "${docxPath}"`, { timeout: 60000 });
+    const loProfile2 = path.join(TMP_DIR, `lo_profile_${tmpId}`);
+    fs.mkdirSync(loProfile2, { recursive: true });
+    try {
+      execSync(`"${LIBREOFFICE}" --headless --norestore -env:UserInstallation="file:///${loProfile2.replace(/\\/g, "/")}" --convert-to pdf --outdir "${TMP_DIR}" "${docxPath}"`, { timeout: 60000 });
+    } finally {
+      fs.rmSync(loProfile2, { recursive: true, force: true });
+    }
 
     if (!fs.existsSync(pdfPath)) throw new Error("PDF conversion failed");
 
@@ -1293,6 +1457,51 @@ function mergeRuns(xml) {
   return xml.replace(/(<\/w:t>)(<\/w:r>)(<w:r(?:\s[^>]*)?>(?:<w:rPr>[^]*?<\/w:rPr>)?<w:t(?:\s[^>]*)?>)/g, (_, close_t, close_r, open_next) => {
     return close_t.replace("</w:t>", "") + close_r + open_next;
   }).replace(/<\/w:t><w:t[^>]*>/g, "");
+}
+
+// Replace @@var@@ tags in XML even when split across multiple runs / proofErr markers
+function replaceLegacyTagsAcrossRuns(xml, data) {
+  // Remove spell-check markers — safe, they only affect UI not content
+  xml = xml.replace(/<w:proofErr[^>]*\/>/g, "");
+
+  for (const [key, val] of Object.entries(data)) {
+    if (key === "payment_schedule") continue;
+    const escaped = String(val ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+    let found = true;
+    while (found) {
+      found = false;
+      // Re-extract <w:t> regions each pass (XML changes each iteration)
+      const regions = [];
+      const tRe = /<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g;
+      let m;
+      while ((m = tRe.exec(xml)) !== null) {
+        const openEnd = xml.indexOf(">", m.index) + 1;
+        regions.push({ xmlTextStart: openEnd, xmlTextEnd: m.index + m[0].length - 6, text: m[1] });
+      }
+
+      const plain = regions.map(r => r.text).join("");
+      const re = new RegExp(`@@\\s*${key}\\s*@@`);
+      const hit = re.exec(plain);
+      if (!hit) break;
+
+      const patStart = hit.index, patEnd = hit.index + hit[0].length;
+      let cum = 0, startR = -1, endR = -1, startOff = 0, endOff = 0;
+      for (let i = 0; i < regions.length; i++) {
+        const next = cum + regions[i].text.length;
+        if (startR < 0 && patStart < next) { startR = i; startOff = patStart - cum; }
+        if (endR < 0 && patEnd <= next)    { endR = i;   endOff = patEnd - cum; break; }
+        cum = next;
+      }
+      if (startR < 0 || endR < 0) break;
+
+      const xmlStart = regions[startR].xmlTextStart + startOff;
+      const xmlEnd   = regions[endR].xmlTextStart   + endOff;
+      xml = xml.slice(0, xmlStart) + escaped + xml.slice(xmlEnd);
+      found = true;
+    }
+  }
+  return xml;
 }
 
 function buildScheduleTable(rows) {
@@ -1878,7 +2087,13 @@ async function pricingSlideToPdf(pptxBuffer) {
   fs.mkdirSync(dir, { recursive: true });
   const pptxPath = path.join(dir, "slide.pptx");
   fs.writeFileSync(pptxPath, pptxBuffer);
-  execSync(`"${LIBREOFFICE}" --headless --convert-to pdf --outdir "${dir}" "${pptxPath}"`, { timeout: 90000 });
+  const loProfile = path.join(dir, "lo_profile");
+  fs.mkdirSync(loProfile, { recursive: true });
+  try {
+    execSync(`"${LIBREOFFICE}" --headless --norestore -env:UserInstallation="file:///${loProfile.replace(/\\/g, "/")}" --convert-to pdf --outdir "${dir}" "${pptxPath}"`, { timeout: 90000 });
+  } finally {
+    fs.rmSync(loProfile, { recursive: true, force: true });
+  }
   const pdfPath = path.join(dir, "slide.pdf");
   if (!fs.existsSync(pdfPath)) throw new Error("LibreOffice did not produce a PDF");
   const pdfBytes = fs.readFileSync(pdfPath);
