@@ -2252,7 +2252,8 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
 const distPath = path.join(__dirname, "dist");
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.get("*", (req, res, next) => {
+  app.use((req, res, next) => {
+    if (req.method !== "GET") return next();
     if (req.path.startsWith("/auth") || req.path.startsWith("/email") || req.path.startsWith("/contracts") || req.path.startsWith("/ml") || req.path.startsWith("/canva") || req.path.startsWith("/pricing") || req.path.startsWith("/presentations") || req.path.startsWith("/monday") || req.path.startsWith("/companies")) return next();
     res.sendFile(path.join(distPath, "index.html"));
   });
