@@ -708,6 +708,15 @@ Kurallar:
     contract_date: new Date().toISOString().slice(0, 10),
     payment_schedule: [],
   });
+  const resetContractData = (tpl) => {
+    const base = EMPTY_CONTRACT_DATA();
+    if (tpl?.default_party1_id) {
+      const company = contractCompanies.find(c => c.id === tpl.default_party1_id);
+      base.party1_id = String(tpl.default_party1_id);
+      base.iban = company?.ibans?.find(i => i.is_default)?.iban || company?.iban || "";
+    }
+    setContractData(base);
+  };
   const [contractData, setContractData] = useState(EMPTY_CONTRACT_DATA());
   const [contractProgramCount, setContractProgramCount] = useState(1);
   const [showParty3, setShowParty3] = useState(false);
@@ -4495,7 +4504,7 @@ Kurallar:
                             </div>
                             <div style={{ display: "flex", gap: 5, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                               <button onClick={() => { setRenamingTplId(tpl.id); setRenamingValue(tpl.name); }} style={{ padding: "4px 8px", background: `${colors.primary}15`, border: `1px solid ${colors.primary}33`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, cursor: "pointer" }}>✏</button>
-                              <button onClick={() => { setContractTemplate(tpl); setContractData(EMPTY_CONTRACT_DATA()); setContractProgramCount(1); setShowParty3(false); setContractView("form"); }} style={{ padding: "4px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{t("contract_select")}</button>
+                              <button onClick={() => { setContractTemplate(tpl); resetContractData(tpl); setContractProgramCount(1); setShowParty3(false); setContractView("form"); }} style={{ padding: "4px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{t("contract_select")}</button>
                               <button onClick={() => deleteTemplate(tpl.id)} style={{ padding: "4px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>✕</button>
                             </div>
                           </div>
@@ -4517,7 +4526,7 @@ Kurallar:
                             <div style={{ fontSize: 13, fontWeight: 700 }}>{contractPreviewTpl.name}</div>
                             <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{contractPreviewTpl.variables.length} variables detected</div>
                           </div>
-                          <button onClick={() => { setContractTemplate(contractPreviewTpl); setContractData(EMPTY_CONTRACT_DATA()); setContractProgramCount(1); setShowParty3(false); setContractView("form"); }} style={{ padding: "6px 14px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Use this template →</button>
+                          <button onClick={() => { setContractTemplate(contractPreviewTpl); resetContractData(contractPreviewTpl); setContractProgramCount(1); setShowParty3(false); setContractView("form"); }} style={{ padding: "6px 14px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Use this template →</button>
                         </div>
                         {contractPreviewTpl.template_type === "html" ? (
                           contractPreviewHtml === "loading" ? (
@@ -4536,6 +4545,24 @@ Kurallar:
                             </div>
                           </div>
                         )}
+                        {/* Default Party 1 */}
+                        <div style={{ padding: 16, borderTop: `1px solid ${colors.border}` }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8 }}>Default Party 1</div>
+                          <select
+                            value={contractPreviewTpl.default_party1_id || ""}
+                            onChange={async e => {
+                              const val = e.target.value ? parseInt(e.target.value) : null;
+                              const token = localStorage.getItem("sns_token");
+                              await fetch(`/contracts/templates/${contractPreviewTpl.id}/party1`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ default_party1_id: val }) });
+                              setContractTemplates(p => p.map(t => t.id === contractPreviewTpl.id ? { ...t, default_party1_id: val } : t));
+                              setContractPreviewTpl(p => ({ ...p, default_party1_id: val }));
+                            }}
+                            style={{ width: "100%", padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none" }}>
+                            <option value="">— No default —</option>
+                            {contractCompanies.map(c => <option key={c.id} value={c.id}>{c.name || c.short}</option>)}
+                          </select>
+                        </div>
+
                         {/* Field visibility config */}
                         {(() => {
                           const cfg = editingFieldConfig?.tplId === contractPreviewTpl.id ? editingFieldConfig.fields : (contractPreviewTpl.visible_fields || {});
@@ -4767,7 +4794,7 @@ Kurallar:
                     <select value={contractTemplate?.id || ""} onChange={e => {
                       const tpl = contractTemplates.find(t => String(t.id) === e.target.value) || null;
                       setContractTemplate(tpl);
-                      setContractData(EMPTY_CONTRACT_DATA());
+                      resetContractData(tpl);
                       setShowParty3(false);
                       if (tpl) {
                         const v = tpl.variables || [];
