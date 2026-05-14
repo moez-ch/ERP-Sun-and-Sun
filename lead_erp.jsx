@@ -4857,7 +4857,7 @@ Kurallar:
                     </div>
                   </div>
 
-                  <button onClick={handleGenerate} disabled={contractGenerating || !contractTemplate}
+                  <button onClick={() => handleGenerate("pdf")} disabled={contractGenerating || !contractTemplate}
                     style={{ width: "100%", padding: "13px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: (contractGenerating || !contractTemplate) ? 0.6 : 1 }}>
                     {contractGenerating ? t("contract_generating") : "⬇ Download Pricing Proposal"}
                   </button>
@@ -5018,7 +5018,7 @@ Kurallar:
 
                       {/* Download button */}
                       {contractTemplate && (
-                        <button onClick={handleGenerate} disabled={contractGenerating}
+                        <button onClick={() => handleGenerate("pdf")} disabled={contractGenerating}
                           style={{ marginTop: 14, width: "100%", padding: "10px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: contractGenerating ? 0.6 : 1 }}>
                           {contractGenerating ? t("contract_generating") : "⬇ " + t("contract_generate")}
                         </button>
