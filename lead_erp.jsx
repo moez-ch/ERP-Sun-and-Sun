@@ -720,6 +720,17 @@ Kurallar:
   const [contractData, setContractData] = useState(EMPTY_CONTRACT_DATA());
   const [contractProgramCount, setContractProgramCount] = useState(1);
   const [showParty3, setShowParty3] = useState(false);
+
+  // Whenever a template with a default Party 1 is selected (or companies finish loading), apply the default
+  useEffect(() => {
+    if (!contractTemplate?.default_party1_id || !contractCompanies.length) return;
+    const id = String(contractTemplate.default_party1_id);
+    setContractData(p => {
+      if (p.party1_id === id) return p;
+      const company = contractCompanies.find(c => String(c.id) === id);
+      return { ...p, party1_id: id, iban: company?.ibans?.find(i => i.is_default)?.iban || company?.iban || "" };
+    });
+  }, [contractTemplate?.id, contractTemplate?.default_party1_id, contractCompanies.length]);
   const [contractGenerating, setContractGenerating] = useState(false);
   const [contractPreviewTpl, setContractPreviewTpl] = useState(null);
   const [contractPreviewHtml, setContractPreviewHtml] = useState("");
