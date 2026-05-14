@@ -1038,6 +1038,14 @@ app.get("/contracts/templates/:id/content", authenticate, (req, res) => {
   res.json({ content: row.file.toString("utf-8") });
 });
 
+// PUT /contracts/templates/:id/name
+app.put("/contracts/templates/:id/name", authenticate, (req, res) => {
+  const { name } = req.body || {};
+  if (!name?.trim()) return res.status(400).json({ error: "Name required" });
+  db.prepare("UPDATE contract_templates SET name=? WHERE id=?").run(name.trim(), req.params.id);
+  res.json({ ok: true });
+});
+
 // PUT /contracts/templates/:id/fields
 app.put("/contracts/templates/:id/fields", authenticate, (req, res) => {
   db.prepare("UPDATE contract_templates SET visible_fields=? WHERE id=?").run(JSON.stringify(req.body.visible_fields ?? null), req.params.id);

@@ -675,6 +675,8 @@ Kurallar:
   const [contractReportFilters, setContractReportFilters] = useState({ date_from: "", date_to: "", prepared_by: "" });
   const [contractTemplate, setContractTemplate] = useState(null);
   const [editingFieldConfig, setEditingFieldConfig] = useState(null); // { tplId, fields: {key: bool} }
+  const [renamingTplId, setRenamingTplId] = useState(null);
+  const [renamingValue, setRenamingValue] = useState("");
   const ALL_CONTRACT_FIELDS = [
     { key: "party2_name",              label: "Client Title",                group: "Party 2" },
     { key: "party2_tax_office",        label: "Tax Office",                  group: "Party 2" },
@@ -4469,12 +4471,29 @@ Kurallar:
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tpl.name}</span>
+                                {renamingTplId === tpl.id ? (
+                                  <input autoFocus value={renamingValue} onChange={e => setRenamingValue(e.target.value)}
+                                    onKeyDown={async e => {
+                                      if (e.key === "Enter") {
+                                        const token = localStorage.getItem("sns_token");
+                                        await fetch(`/contracts/templates/${tpl.id}/name`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: renamingValue }) });
+                                        setContractTemplates(p => p.map(t => t.id === tpl.id ? { ...t, name: renamingValue } : t));
+                                        if (contractPreviewTpl?.id === tpl.id) setContractPreviewTpl(p => ({ ...p, name: renamingValue }));
+                                        setRenamingTplId(null);
+                                      } else if (e.key === "Escape") { setRenamingTplId(null); }
+                                    }}
+                                    onBlur={() => setRenamingTplId(null)}
+                                    onClick={e => e.stopPropagation()}
+                                    style={{ fontSize: 13, fontWeight: 600, background: colors.bg, border: `1px solid ${colors.primary}`, borderRadius: 4, color: colors.text, padding: "1px 6px", outline: "none", width: 160 }} />
+                                ) : (
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tpl.name}</span>
+                                )}
                                 <span style={{ fontSize: 9, fontWeight: 700, background: tpl.template_type === "html" ? "#e8f5e9" : `${colors.primary}18`, color: tpl.template_type === "html" ? "#2e7d32" : colors.primaryLight, border: `1px solid ${tpl.template_type === "html" ? "#a5d6a7" : colors.primary+"44"}`, borderRadius: 4, padding: "1px 5px", flexShrink: 0 }}>{tpl.template_type?.toUpperCase()}</span>
                               </div>
                               <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{new Date(tpl.created_at).toLocaleDateString("tr-TR")} · {tpl.variables.length} variables</div>
                             </div>
                             <div style={{ display: "flex", gap: 5, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                              <button onClick={() => { setRenamingTplId(tpl.id); setRenamingValue(tpl.name); }} style={{ padding: "4px 8px", background: `${colors.primary}15`, border: `1px solid ${colors.primary}33`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, cursor: "pointer" }}>✏</button>
                               <button onClick={() => { setContractTemplate(tpl); setContractView("form"); }} style={{ padding: "4px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{t("contract_select")}</button>
                               <button onClick={() => deleteTemplate(tpl.id)} style={{ padding: "4px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>✕</button>
                             </div>
