@@ -2248,6 +2248,17 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🔐 Sun & Sun ERP Auth Server → http://localhost:${PORT}`);
+// Serve built frontend
+const distPath = path.join(__dirname, "dist");
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/auth") || req.path.startsWith("/email") || req.path.startsWith("/contracts") || req.path.startsWith("/ml") || req.path.startsWith("/canva") || req.path.startsWith("/pricing") || req.path.startsWith("/presentations") || req.path.startsWith("/monday") || req.path.startsWith("/companies")) return next();
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🔐 Sun & Sun ERP → http://localhost:${PORT}`);
+  console.log(`🌐 Local network  → http://192.168.1.196:${PORT}`);
 });
