@@ -695,7 +695,7 @@ Kurallar:
     { key: "notes",                    label: "Notes",                       group: "Other" },
     { key: "payment_schedule",         label: "Payment Schedule (Annex-1)", group: "Other" },
   ];
-  const [contractData, setContractData] = useState({
+  const EMPTY_CONTRACT_DATA = () => ({
     party1_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
     party2_address: "", party3_name: "", party3_tax_office: "", party3_tax_no: "", party3_address: "",
     program_name: "", down_payment: "", down_payment_2: "", success_bonus: "", success_bonus_2: "",
@@ -708,6 +708,7 @@ Kurallar:
     contract_date: new Date().toISOString().slice(0, 10),
     payment_schedule: [],
   });
+  const [contractData, setContractData] = useState(EMPTY_CONTRACT_DATA());
   const [contractProgramCount, setContractProgramCount] = useState(1);
   const [showParty3, setShowParty3] = useState(false);
   const [contractGenerating, setContractGenerating] = useState(false);
@@ -4494,7 +4495,7 @@ Kurallar:
                             </div>
                             <div style={{ display: "flex", gap: 5, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                               <button onClick={() => { setRenamingTplId(tpl.id); setRenamingValue(tpl.name); }} style={{ padding: "4px 8px", background: `${colors.primary}15`, border: `1px solid ${colors.primary}33`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, cursor: "pointer" }}>✏</button>
-                              <button onClick={() => { setContractTemplate(tpl); setContractView("form"); }} style={{ padding: "4px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{t("contract_select")}</button>
+                              <button onClick={() => { setContractTemplate(tpl); setContractData(EMPTY_CONTRACT_DATA()); setContractProgramCount(1); setShowParty3(false); setContractView("form"); }} style={{ padding: "4px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{t("contract_select")}</button>
                               <button onClick={() => deleteTemplate(tpl.id)} style={{ padding: "4px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>✕</button>
                             </div>
                           </div>
@@ -4516,7 +4517,7 @@ Kurallar:
                             <div style={{ fontSize: 13, fontWeight: 700 }}>{contractPreviewTpl.name}</div>
                             <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{contractPreviewTpl.variables.length} variables detected</div>
                           </div>
-                          <button onClick={() => { setContractTemplate(contractPreviewTpl); setContractView("form"); }} style={{ padding: "6px 14px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Use this template →</button>
+                          <button onClick={() => { setContractTemplate(contractPreviewTpl); setContractData(EMPTY_CONTRACT_DATA()); setContractProgramCount(1); setShowParty3(false); setContractView("form"); }} style={{ padding: "6px 14px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Use this template →</button>
                         </div>
                         {contractPreviewTpl.template_type === "html" ? (
                           contractPreviewHtml === "loading" ? (
@@ -4766,10 +4767,12 @@ Kurallar:
                     <select value={contractTemplate?.id || ""} onChange={e => {
                       const tpl = contractTemplates.find(t => String(t.id) === e.target.value) || null;
                       setContractTemplate(tpl);
+                      setContractData(EMPTY_CONTRACT_DATA());
+                      setShowParty3(false);
                       if (tpl) {
                         const v = tpl.variables || [];
                         setContractProgramCount(v.includes("program3_name") ? 3 : v.includes("program2_name") ? 2 : 1);
-                      }
+                      } else { setContractProgramCount(1); }
                     }}
                       style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" }}>
                       <option value="">{t("contract_selectTemplate")}</option>
@@ -4842,10 +4845,12 @@ Kurallar:
                       <select value={contractTemplate?.id || ""} onChange={e => {
                         const tpl = contractTemplates.find(t => String(t.id) === e.target.value) || null;
                         setContractTemplate(tpl);
+                        setContractData(EMPTY_CONTRACT_DATA());
+                        setShowParty3(false);
                         if (tpl) {
                           const v = tpl.variables || [];
                           setContractProgramCount(v.includes("program3_name") ? 3 : v.includes("program2_name") ? 2 : 1);
-                        }
+                        } else { setContractProgramCount(1); }
                       }}
                         style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" }}>
                         <option value="">{ t("contract_selectTemplate")}</option>
