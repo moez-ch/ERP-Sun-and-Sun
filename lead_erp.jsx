@@ -721,16 +721,17 @@ Kurallar:
   const [contractProgramCount, setContractProgramCount] = useState(1);
   const [showParty3, setShowParty3] = useState(false);
 
-  // Whenever a template with a default Party 1 is selected (or companies finish loading), apply the default
+  // Whenever a template with a default Party 1 is selected (or companies finish loading), apply the defaults
   useEffect(() => {
     if (!contractTemplate?.default_party1_id || !contractCompanies.length) return;
     const id = String(contractTemplate.default_party1_id);
     setContractData(p => {
-      if (p.party1_id === id) return p;
+      if (p.party1_id === id && (!contractTemplate.default_iban || p.iban === contractTemplate.default_iban)) return p;
       const company = contractCompanies.find(c => String(c.id) === id);
-      return { ...p, party1_id: id, iban: company?.ibans?.find(i => i.is_default)?.iban || company?.iban || "" };
+      const iban = contractTemplate.default_iban || company?.ibans?.find(i => i.is_default)?.iban || company?.iban || "";
+      return { ...p, party1_id: id, iban };
     });
-  }, [contractTemplate?.id, contractTemplate?.default_party1_id, contractCompanies.length]);
+  }, [contractTemplate?.id, contractTemplate?.default_party1_id, contractTemplate?.default_iban, contractCompanies.length]);
   const [contractGenerating, setContractGenerating] = useState(false);
   const [contractPreviewTpl, setContractPreviewTpl] = useState(null);
   const [contractPreviewHtml, setContractPreviewHtml] = useState("");
@@ -4576,6 +4577,32 @@ Kurallar:
                           </select>
                         </div>
 
+                        {/* Default IBAN — shown when selected company has multiple IBANs */}
+                        {contractPreviewTpl.default_party1_id && (() => {
+                          const company = contractCompanies.find(c => String(c.id) === String(contractPreviewTpl.default_party1_id));
+                          const ibans = company?.ibans || [];
+                          if (ibans.length <= 1) return null;
+                          return (
+                            <div style={{ padding: 16, borderTop: `1px solid ${colors.border}` }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8 }}>Default IBAN</div>
+                              <select
+                                value={contractPreviewTpl.default_iban || ""}
+                                onChange={async e => {
+                                  const val = e.target.value || null;
+                                  const token = localStorage.getItem("sns_token");
+                                  await fetch(`/contracts/templates/${contractPreviewTpl.id}/iban`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ default_iban: val }) });
+                                  setContractTemplates(p => p.map(t => t.id === contractPreviewTpl.id ? { ...t, default_iban: val } : t));
+                                  setContractPreviewTpl(p => ({ ...p, default_iban: val }));
+                                  if (contractTemplate?.id === contractPreviewTpl.id) setContractTemplate(p => ({ ...p, default_iban: val }));
+                                }}
+                                style={{ width: "100%", padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", fontFamily: "monospace" }}>
+                                <option value="">— Use default IBAN —</option>
+                                {ibans.map(ib => <option key={ib.iban} value={ib.iban}>{ib.iban}{ib.label ? ` (${ib.label})` : ""}{ib.is_default ? " ★" : ""}</option>)}
+                              </select>
+                            </div>
+                          );
+                        })()}
+
                         {/* Field visibility config */}
                         {(() => {
                           const cfg = editingFieldConfig?.tplId === contractPreviewTpl.id ? editingFieldConfig.fields : (contractPreviewTpl.visible_fields || {});
@@ -4929,12 +4956,9 @@ Kurallar:
                           {(selectedCompany.ibans||[]).length > 1 ? (
                             <div style={{ marginTop: 6 }}>
                               <div style={{ fontSize: 11, marginBottom: 4, color: colors.textMuted }}>IBAN</div>
-                              <select value={contractData.iban || ""} onChange={e => setContractData(p => ({ ...p, iban: e.target.value }))}
-                                style={{ width: "100%", padding: "6px 8px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.primary, fontSize: 12, fontWeight: 600, outline: "none", fontFamily: "monospace" }}>
-                                {(selectedCompany.ibans||[]).map(ib => (
-                                  <option key={ib.id} value={ib.iban}>{ib.iban}{ib.label ? ` (${ib.label})` : ""}{ib.is_default ? " ★" : ""}</option>
-                                ))}
-                              </select>
+                              <div style={{ padding: "6px 8px", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.primary, fontSize: 12, fontWeight: 600, fontFamily: "monospace" }}>
+                                {contractData.iban || contractTemplate?.default_iban || (selectedCompany.ibans?.find(i => i.is_default)?.iban) || ""}
+                              </div>
                             </div>
                           ) : (
                             <div style={{ color: colors.primary, fontWeight: 600, fontFamily: "monospace" }}>IBAN: {contractData.iban || selectedCompany.iban}</div>

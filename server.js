@@ -105,6 +105,7 @@ db.exec(`
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN template_type TEXT NOT NULL DEFAULT 'docx'`); } catch {}
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN visible_fields TEXT`); } catch {}
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN default_party1_id INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE contract_templates ADD COLUMN default_iban TEXT`); } catch {}
 db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIKE '%.html' AND template_type = 'docx'`);
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
@@ -994,7 +995,7 @@ app.put("/contracts/companies/ibans/:ibanId/set-default", authenticate, (req, re
 
 // GET /contracts/templates
 app.get("/contracts/templates", authenticate, (req, res) => {
-  const rows = db.prepare("SELECT id, name, filename, variables, template_type, visible_fields, default_party1_id, created_at FROM contract_templates ORDER BY created_at DESC").all();
+  const rows = db.prepare("SELECT id, name, filename, variables, template_type, visible_fields, default_party1_id, default_iban, created_at FROM contract_templates ORDER BY created_at DESC").all();
   res.json(rows.map(r => ({ ...r, variables: JSON.parse(r.variables), visible_fields: r.visible_fields ? JSON.parse(r.visible_fields) : null })));
 });
 
@@ -1044,6 +1045,12 @@ app.put("/contracts/templates/:id/name", authenticate, (req, res) => {
   const { name } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: "Name required" });
   db.prepare("UPDATE contract_templates SET name=? WHERE id=?").run(name.trim(), req.params.id);
+  res.json({ ok: true });
+});
+
+// PUT /contracts/templates/:id/iban
+app.put("/contracts/templates/:id/iban", authenticate, (req, res) => {
+  db.prepare("UPDATE contract_templates SET default_iban=? WHERE id=?").run(req.body.default_iban || null, req.params.id);
   res.json({ ok: true });
 });
 
