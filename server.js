@@ -992,8 +992,8 @@ app.put("/contracts/companies/ibans/:ibanId/set-default", authenticate, (req, re
 
 // GET /contracts/templates
 app.get("/contracts/templates", authenticate, (req, res) => {
-  const rows = db.prepare("SELECT id, name, filename, variables, template_type, created_at FROM contract_templates ORDER BY created_at DESC").all();
-  res.json(rows.map(r => ({ ...r, variables: JSON.parse(r.variables) })));
+  const rows = db.prepare("SELECT id, name, filename, variables, template_type, visible_fields, created_at FROM contract_templates ORDER BY created_at DESC").all();
+  res.json(rows.map(r => ({ ...r, variables: JSON.parse(r.variables), visible_fields: r.visible_fields ? JSON.parse(r.visible_fields) : null })));
 });
 
 // POST /contracts/templates — upload .docx or .html, detect @@var@@ tags
@@ -1035,6 +1035,12 @@ app.get("/contracts/templates/:id/content", authenticate, (req, res) => {
   if (!row) return res.status(404).json({ error: "Not found" });
   if (row.template_type !== "html") return res.json({ content: null });
   res.json({ content: row.file.toString("utf-8") });
+});
+
+// PUT /contracts/templates/:id/fields
+app.put("/contracts/templates/:id/fields", authenticate, (req, res) => {
+  db.prepare("UPDATE contract_templates SET visible_fields=? WHERE id=?").run(JSON.stringify(req.body.visible_fields ?? null), req.params.id);
+  res.json({ ok: true });
 });
 
 // DELETE /contracts/templates/:id

@@ -674,6 +674,25 @@ Kurallar:
   const [contractReportLoading, setContractReportLoading] = useState(false);
   const [contractReportFilters, setContractReportFilters] = useState({ date_from: "", date_to: "", prepared_by: "" });
   const [contractTemplate, setContractTemplate] = useState(null);
+  const [editingFieldConfig, setEditingFieldConfig] = useState(null); // { tplId, fields: {key: bool} }
+  const ALL_CONTRACT_FIELDS = [
+    { key: "party2_name",              label: "Client Title",                group: "Party 2" },
+    { key: "party2_tax_office",        label: "Tax Office",                  group: "Party 2" },
+    { key: "party2_tax_no",            label: "Tax Number",                  group: "Party 2" },
+    { key: "party2_address",           label: "Address",                     group: "Party 2" },
+    { key: "party3",                   label: "Third Party (Party 3)",       group: "Party 3" },
+    { key: "program_name",             label: "Program Name",                group: "Contract Details" },
+    { key: "down_payment",             label: "Service Fee",                 group: "Contract Details" },
+    { key: "down_payment_deadline",    label: "Service Fee Deadline",        group: "Contract Details" },
+    { key: "success_bonus",            label: "Success Bonus 1 (%)",         group: "Contract Details" },
+    { key: "sb1ddl",                   label: "Success Bonus 1 Deadline",    group: "Contract Details" },
+    { key: "success_bonus_2",          label: "Success Bonus 2 (%)",         group: "Contract Details" },
+    { key: "success_bonus_2_deadline", label: "Success Bonus 2 Deadline",    group: "Contract Details" },
+    { key: "multi_program",            label: "Add Program (2nd / 3rd)",     group: "Contract Details" },
+    { key: "contract_date",            label: "Contract Date",               group: "Other" },
+    { key: "notes",                    label: "Notes",                       group: "Other" },
+    { key: "payment_schedule",         label: "Payment Schedule (Annex-1)", group: "Other" },
+  ];
   const [contractData, setContractData] = useState({
     party1_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
     party2_address: "", party3_name: "", party3_tax_office: "", party3_tax_no: "", party3_address: "",
@@ -4128,6 +4147,9 @@ Kurallar:
             finally { setContractOcrLoading(false); }
           };
 
+          const fv = contractTemplate?.visible_fields || {};
+          const fieldVisible = k => fv[k] !== false;
+
           const handleGenerate = async (format = "pdf") => {
             if (!contractTemplate) { alert("Lütfen bir sözleşme şablonu seçin."); return; }
             setContractGenerating(true);
@@ -4494,6 +4516,43 @@ Kurallar:
                             </div>
                           </div>
                         )}
+                        {/* Field visibility config */}
+                        {(() => {
+                          const cfg = editingFieldConfig?.tplId === contractPreviewTpl.id ? editingFieldConfig.fields : (contractPreviewTpl.visible_fields || {});
+                          const isVis = k => cfg[k] !== false;
+                          const groups = [...new Set(ALL_CONTRACT_FIELDS.map(f => f.group))];
+                          return (
+                            <div style={{ padding: 16, borderTop: `1px solid ${colors.border}` }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 12 }}>Form Field Visibility</div>
+                              {groups.map(group => (
+                                <div key={group} style={{ marginBottom: 12 }}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: colors.primary, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>{group}</div>
+                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px" }}>
+                                    {ALL_CONTRACT_FIELDS.filter(f => f.group === group).map(f => (
+                                      <label key={f.key} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: colors.text }}>
+                                        <input type="checkbox" checked={isVis(f.key)} onChange={e => {
+                                          const base = editingFieldConfig?.tplId === contractPreviewTpl.id ? editingFieldConfig.fields : (contractPreviewTpl.visible_fields || {});
+                                          setEditingFieldConfig({ tplId: contractPreviewTpl.id, fields: { ...base, [f.key]: e.target.checked } });
+                                        }} style={{ accentColor: colors.primary, width: 13, height: 13 }} />
+                                        {f.label}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                              <button onClick={async () => {
+                                const fields = editingFieldConfig?.tplId === contractPreviewTpl.id ? editingFieldConfig.fields : (contractPreviewTpl.visible_fields || {});
+                                const token = localStorage.getItem("sns_token");
+                                await fetch(`/contracts/templates/${contractPreviewTpl.id}/fields`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ visible_fields: fields }) });
+                                setContractTemplates(p => p.map(t => t.id === contractPreviewTpl.id ? { ...t, visible_fields: fields } : t));
+                                setContractPreviewTpl(p => ({ ...p, visible_fields: fields }));
+                                setEditingFieldConfig(null);
+                              }} style={{ marginTop: 8, width: "100%", padding: "7px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                                Save Field Settings
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -4844,67 +4903,67 @@ Kurallar:
                                 style={{ fontSize: 11, color: "#e57373", background: "none", border: "none", cursor: "pointer", padding: "0 4px" }}>✕ Remove</button>
                             )}
                           </div>
-                          {field("Program Name", prog.nameKey, { placeholder: "e.g. SoGreen" })}
+                          {fieldVisible('program_name') && field("Program Name", prog.nameKey, { placeholder: "e.g. SoGreen" })}
                           {/* Service Fee */}
+                          {fieldVisible('down_payment') && (
                           <div style={{ marginBottom: 10 }}>
                             <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Service Fee (TL)</div>
                             <input type="number" min="0" value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))}
                               placeholder="e.g. 50000"
                               style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                            <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, marginBottom: 2 }}>Deadline</div>
-                            <DeadlineBox k={prog.feeDeadlineKey} />
+                            {fieldVisible('down_payment_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, marginBottom: 2 }}>Deadline</div><DeadlineBox k={prog.feeDeadlineKey} /></>}
                           </div>
+                          )}
                           {/* Success Bonuses */}
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                            <div>
+                          {(fieldVisible('success_bonus') || fieldVisible('success_bonus_2')) && (
+                          <div style={{ display: "grid", gridTemplateColumns: fieldVisible('success_bonus') && fieldVisible('success_bonus_2') ? "1fr 1fr" : "1fr", gap: 10 }}>
+                            {fieldVisible('success_bonus') && <div>
                               <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Success Bonus 1 (%)</div>
                               <select value={contractData[prog.bonusKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusKey]: e.target.value }))}
                                 style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline</div>
-                              <DeadlineBox k={prog.bonusDeadlineKey} />
-                            </div>
-                            <div>
+                              {fieldVisible('sb1ddl') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline</div><DeadlineBox k={prog.bonusDeadlineKey} /></>}
+                            </div>}
+                            {fieldVisible('success_bonus_2') && <div>
                               <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Success Bonus 2 (%)</div>
                               <select value={contractData[prog.bonus2Key] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2Key]: e.target.value }))}
                                 style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline</div>
-                              <DeadlineBox k={prog.bonus2DeadlineKey} />
-                            </div>
+                              {fieldVisible('success_bonus_2_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline</div><DeadlineBox k={prog.bonus2DeadlineKey} /></>}
+                            </div>}
                           </div>
+                          )}
                         </div>
                       ));
                       })()}
 
                       {/* Add program button */}
-                      {contractProgramCount < 3 && (
+                      {fieldVisible('multi_program') && contractProgramCount < 3 && (
                         <button onClick={() => setContractProgramCount(p => p + 1)}
                           style={{ fontSize: 12, fontWeight: 600, color: colors.primary, background: `${colors.primary}15`, border: `1px dashed ${colors.primary}55`, borderRadius: 7, padding: "6px 14px", cursor: "pointer", width: "100%", marginBottom: 14 }}>
                           + Add Program
                         </button>
                       )}
 
-                      <div style={{ marginBottom: 10 }}>
+                      {fieldVisible('contract_date') && <div style={{ marginBottom: 10 }}>
                         <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}</div>
                         <input type="date" value={contractData.contract_date || ""} onChange={e => setContractData(p => ({ ...p, contract_date: e.target.value }))}
                           onClick={e => { try { e.target.showPicker(); } catch {} }}
                           style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box", cursor: "pointer", colorScheme: "dark" }} />
                         {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(contractData.contract_date + "T12:00:00").getDay()]}</div>}
-                        {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(contractData.contract_date + "T12:00:00").getDay()]}</div>}
-                      </div>
+                      </div>}
 
                       {/* Notes */}
-                      <div style={{ marginTop: 6 }}>
+                      {fieldVisible('notes') && <div style={{ marginTop: 6 }}>
                         <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Notes</div>
                         <textarea value={contractData.notes || ""} onChange={e => setContractData(p => ({ ...p, notes: e.target.value }))}
                           rows={3} placeholder="Additional notes, conditions, or observations..."
                           style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
-                      </div>
+                      </div>}
 
                       {/* Download button */}
                       {contractTemplate && (
@@ -4927,28 +4986,30 @@ Kurallar:
                           <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{contractOcrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
                         </label>
                       </div>
-                      {field(t("contract_party2Name"), "party2_name", { placeholder: t("contract_party2NamePh") })}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                        <div>
+                      {fieldVisible('party2_name') && field(t("contract_party2Name"), "party2_name", { placeholder: t("contract_party2NamePh") })}
+                      {(fieldVisible('party2_tax_office') || fieldVisible('party2_tax_no')) && (
+                      <div style={{ display: "grid", gridTemplateColumns: fieldVisible('party2_tax_office') && fieldVisible('party2_tax_no') ? "1fr 1fr" : "1fr", gap: 10 }}>
+                        {fieldVisible('party2_tax_office') && <div>
                           <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_taxOffice")}</div>
                           <input value={contractData.party2_tax_office || ""} onChange={e => setContractData(p => ({ ...p, party2_tax_office: e.target.value }))}
                             placeholder="Örn: Çankaya"
                             style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                        </div>
-                        <div>
+                        </div>}
+                        {fieldVisible('party2_tax_no') && <div>
                           <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_taxNo")}</div>
                           <input value={contractData.party2_tax_no || ""} onChange={e => setContractData(p => ({ ...p, party2_tax_no: e.target.value }))}
                             placeholder="10 digits"
                             style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                        </div>
+                        </div>}
                       </div>
-                      <div style={{ marginTop: 10 }}>
+                      )}
+                      {fieldVisible('party2_address') && <div style={{ marginTop: 10 }}>
                         {field(t("contract_address"), "party2_address", { placeholder: "...", textarea: true })}
-                      </div>
+                      </div>}
                     </div>
 
                     {/* Party 3 (optional) */}
-                    {!showParty3 ? (
+                    {fieldVisible('party3') && (!showParty3 ? (
                       <button onClick={() => setShowParty3(true)}
                         style={{ width: "100%", marginBottom: 16, padding: "10px", background: "transparent", border: `1px dashed ${colors.border}`, borderRadius: 10, color: colors.textMuted, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                         + Add Third Party
@@ -4987,10 +5048,10 @@ Kurallar:
                           {field(t("contract_address"), "party3_address", { placeholder: "...", textarea: true })}
                         </div>
                       </div>
-                    )}
+                    ))}
 
                     {/* Payment schedule */}
-                    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                    {fieldVisible('payment_schedule') && (<div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionSchedule")}</div>
                         <button onClick={() => setContractData(p => ({ ...p, payment_schedule: [...p.payment_schedule, { date: "", amount: "" }] }))}
@@ -5021,7 +5082,8 @@ Kurallar:
                           </div>
                         );
                       })}
-                    </div>
+                    </div>)}
+
                   </div>
 
                   {/* Download buttons — full width */}
