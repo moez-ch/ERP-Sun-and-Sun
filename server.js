@@ -103,6 +103,7 @@ db.exec(`
   )
 `);
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN template_type TEXT NOT NULL DEFAULT 'docx'`); } catch {}
+try { db.exec(`ALTER TABLE contract_templates ADD COLUMN visible_fields TEXT`); } catch {}
 db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIKE '%.html' AND template_type = 'docx'`);
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
