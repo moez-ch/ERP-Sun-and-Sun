@@ -4129,7 +4129,8 @@ Kurallar:
 
         {/* ══ CONTRACTS VIEW ══ */}
         {view === "contracts" && (() => {
-          const selectedCompany = contractCompanies.find(c => String(c.id) === String(contractData.party1_id));
+          const effectiveParty1Id = contractData.party1_id || (contractTemplate?.default_party1_id ? String(contractTemplate.default_party1_id) : "");
+          const selectedCompany = contractCompanies.find(c => String(c.id) === effectiveParty1Id);
           const dataWithCompany = selectedCompany ? {
             ...contractData,
             party1_name: selectedCompany.name,
@@ -4556,6 +4557,7 @@ Kurallar:
                               await fetch(`/contracts/templates/${contractPreviewTpl.id}/party1`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ default_party1_id: val }) });
                               setContractTemplates(p => p.map(t => t.id === contractPreviewTpl.id ? { ...t, default_party1_id: val } : t));
                               setContractPreviewTpl(p => ({ ...p, default_party1_id: val }));
+                              if (contractTemplate?.id === contractPreviewTpl.id) setContractTemplate(p => ({ ...p, default_party1_id: val }));
                             }}
                             style={{ width: "100%", padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none" }}>
                             <option value="">— No default —</option>
