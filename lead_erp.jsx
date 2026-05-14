@@ -4893,7 +4893,7 @@ Kurallar:
                     {/* Party 1 */}
                     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionParty1")}</div>
-                      {isAdmin ? (
+                      {isAdmin && !contractTemplate?.default_party1_id ? (
                         <select value={contractData.party1_id} onChange={e => {
                           const company = contractCompanies.find(c => String(c.id) === e.target.value);
                           const defaultIban = company?.ibans?.find(i => i.is_default)?.iban || company?.iban || "";
