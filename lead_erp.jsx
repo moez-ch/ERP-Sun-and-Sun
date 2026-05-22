@@ -573,7 +573,18 @@ function Dashboard({ authUser, onLogout: handleLogout }) {
     } catch { return []; }
   });
   const [view, setView] = useState("dashboard"); // dashboard | leads | agent | pipeline | detail
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768);
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setSidebarCollapsed(true);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const [selectedLead, setSelectedLead] = useState(null);
   const [search, setSearch] = useState("");
   const [filterIndustry, setFilterIndustry] = useState("All");
@@ -683,9 +694,11 @@ Kurallar:
     { key: "party2_tax_no",            label: "Tax Number",                  group: "Party 2" },
     { key: "party2_address",           label: "Address",                     group: "Party 2" },
     { key: "party3",                   label: "Third Party (Party 3)",       group: "Party 3" },
+    { key: "financier",                label: "Financier",                   group: "Contract Details" },
     { key: "program_name",             label: "Program Name",                group: "Contract Details" },
     { key: "down_payment",             label: "Service Fee",                 group: "Contract Details" },
     { key: "down_payment_deadline",    label: "Service Fee Deadline",        group: "Contract Details" },
+    { key: "success_bonus_type",       label: "Success Bonus Type",          group: "Contract Details" },
     { key: "success_bonus",            label: "Success Bonus 1 (%)",         group: "Contract Details" },
     { key: "sb1ddl",                   label: "Success Bonus 1 Deadline",    group: "Contract Details" },
     { key: "success_bonus_2",          label: "Success Bonus 2 (%)",         group: "Contract Details" },
@@ -698,7 +711,8 @@ Kurallar:
   const EMPTY_CONTRACT_DATA = () => ({
     party1_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
     party2_address: "", party3_name: "", party3_tax_office: "", party3_tax_no: "", party3_address: "",
-    program_name: "", down_payment: "", down_payment_2: "", success_bonus: "", success_bonus_2: "",
+    financier: "", program_name: "", down_payment: "", down_payment_2: "", success_bonus: "", success_bonus_2: "",
+    success_bonus_type: "onaylanan destek",
     down_payment_deadline: "", sb1ddl: "", success_bonus_2_deadline: "",
     program2_name: "", program2_fee: "", program2_fee_2: "", program2_bonus: "", program2_bonus_2: "",
     program2_fee_deadline: "", program2_bonus_deadline: "", program2_bonus_2_deadline: "",
@@ -735,6 +749,7 @@ Kurallar:
   const [contractGenerating, setContractGenerating] = useState(false);
   const [contractPreviewTpl, setContractPreviewTpl] = useState(null);
   const [contractPreviewHtml, setContractPreviewHtml] = useState("");
+  const [contractFormPreviewHtml, setContractFormPreviewHtml] = useState("");
   const [contractOcrLoading, setContractOcrLoading] = useState(false);
   const [contractUploadName, setContractUploadName] = useState("");
   const [contractUploadFile, setContractUploadFile] = useState(null);
@@ -750,8 +765,8 @@ Kurallar:
   const [canvaCredDraft, setCanvaCredDraft] = useState({ client_id: "", client_secret: "" });
   const [canvaSavingCreds, setCanvaSavingCreds] = useState(false);
   // ── Pricing state ─────────────────────────────────────────────
-  const EMPTY_OPT = () => ({ title: "", dp: "", succ_fee_1: "", note1: "", succ_fee_2: "", note2: "" });
-  const [pricingData, setPricingData] = useState({ num_options: 1, gen_note: "", design_id: "", theme: "blue", opt: [EMPTY_OPT(), EMPTY_OPT(), EMPTY_OPT()] });
+  const EMPTY_OPT = () => ({ title: "", dp: "", dp_original: "", succ_fee_1: "", note1: "", succ_fee_2: "", note2: "" });
+  const [pricingData, setPricingData] = useState({ num_options: 1, gen_note: "", design_id: "", theme: "blue", discount: false, client_name: "", opt: [EMPTY_OPT(), EMPTY_OPT(), EMPTY_OPT()] });
   const [pricingMode, setPricingMode] = useState("quote"); // "quote" | "program"
   const EMPTY_PROG = () => ({ name: "", fee: "", bonus: "" });
   const [programData, setProgramData] = useState({ num_programs: 1, party2_name: "", contract_date: new Date().toLocaleDateString("tr-TR"), notes: "", programs: [EMPTY_PROG(), EMPTY_PROG(), EMPTY_PROG()] });
@@ -767,6 +782,7 @@ Kurallar:
   const [progPresShowAdd, setProgPresShowAdd] = useState(false);
   const [progPresDraft, setProgPresDraft] = useState({ category: "", name: "", canva_link: "" });
   const [progPresAdding, setProgPresAdding] = useState(false);
+  const [selectedPresCategory, setSelectedPresCategory] = useState(null);
   const [canvaSavingTheme, setCanvaSavingTheme] = useState({});// { [id]: bool }
 
   // ── Settings — companies state ────────────────────────────────
@@ -1077,14 +1093,18 @@ Kurallar:
     if (!window.confirm(`Delete "${name}"?`)) return;
     setUmError(""); setUmSuccess("");
     const token = localStorage.getItem("sns_token");
-    const r = await fetch(`/auth/users/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await r.json();
-    if (!r.ok) return setUmError(data.error || "Failed to delete user.");
-    setUmSuccess(`${name} deleted.`);
-    umFetch();
+    try {
+      const r = await fetch(`/auth/users/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) return setUmError(data.error || `Server error ${r.status}`);
+      setUmSuccess(`${name} deleted.`);
+      umFetch();
+    } catch (e) {
+      setUmError("Network error: " + e.message);
+    }
   };
 
   const umChangePw = async () => {
@@ -1700,7 +1720,7 @@ Kurallar:
     { id: "email", label: t("nav_email"), icon: <MailIcon size={18} /> },
     { id: "monday", label: t("nav_monday"), icon: <GridIcon size={18} /> },
     { id: "contracts", label: t("nav_contracts"), icon: <FileTextIcon size={18} /> },
-    { id: "pricing", label: "Price Quote", icon: <FileTextIcon size={18} /> },
+    { id: "pricing", label: t("nav_pricing"), icon: <FileTextIcon size={18} /> },
     ...(isAdmin ? [
       { id: "inbox", label: t("nav_inbox"), icon: <InboxIcon size={18} /> },
       { id: "agent", label: t("nav_agent"), icon: <BotIcon size={18} /> },
@@ -1711,8 +1731,23 @@ Kurallar:
   // ─── RENDER ──────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: font, background: colors.bg, color: colors.text, overflow: "hidden" }}>
+      {/* MOBILE SIDEBAR OVERLAY */}
+      {isMobile && sidebarMobileOpen && (
+        <div onClick={() => setSidebarMobileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99 }} />
+      )}
       {/* SIDEBAR */}
-      <div style={{ width: sidebarCollapsed ? 56 : 220, background: colors.surface, borderRight: `1px solid ${colors.border}`, display: "flex", flexDirection: "column", flexShrink: 0, transition: "width .2s ease", overflow: "hidden" }}>
+      <div style={{
+        width: isMobile ? 220 : (sidebarCollapsed ? 56 : 220),
+        background: colors.surface,
+        borderRight: `1px solid ${colors.border}`,
+        display: "flex", flexDirection: "column", flexShrink: 0,
+        transition: "transform .25s ease, width .2s ease",
+        overflow: "hidden",
+        ...(isMobile ? {
+          position: "fixed", left: 0, top: 0, bottom: 0, zIndex: 100,
+          transform: sidebarMobileOpen ? "translateX(0)" : "translateX(-100%)",
+        } : {})
+      }}>
         {/* Logo + toggle */}
         <div style={{ padding: sidebarCollapsed ? "16px 10px" : "16px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "space-between", minHeight: 64 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
@@ -1748,7 +1783,7 @@ Kurallar:
           {sidebarItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => { setView(item.id); setSelectedLead(null); }}
+              onClick={() => { setView(item.id); setSelectedLead(null); if (isMobile) setSidebarMobileOpen(false); }}
               title={sidebarCollapsed ? item.label : undefined}
               style={{
                 display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "flex-start", gap: 10, width: "100%", padding: sidebarCollapsed ? "10px 0" : "10px 12px", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: font, marginBottom: 2, transition: "all .15s", position: "relative",
@@ -1814,7 +1849,11 @@ Kurallar:
       </div>
 
       {/* MAIN CONTENT */}
-      <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
+      <div style={{ flex: 1, overflow: "auto", padding: isMobile ? 12 : 24, minWidth: 0 }}>
+        {/* Mobile hamburger */}
+        {isMobile && (
+          <button onClick={() => setSidebarMobileOpen(true)} style={{ position: "fixed", top: 10, left: 10, zIndex: 98, background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, padding: "6px 10px", cursor: "pointer", color: colors.text, fontSize: 18, lineHeight: 1, boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>☰</button>
+        )}
         <style>{`
           @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
           @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -1865,7 +1904,7 @@ Kurallar:
             </div>
 
             {/* Row 2 — Win rate + Score distribution + Call stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
               {/* Win Rate */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 <div style={{ fontSize: 11, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.8 }}>{t("dash_winRate")}</div>
@@ -1947,7 +1986,7 @@ Kurallar:
             </div>
 
             {/* Row 4 — Pipeline + Top Needs */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t("dash_pipelineBreakdown")}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1980,7 +2019,7 @@ Kurallar:
             </div>
 
             {/* Row 5 — Industry + City + Source */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t("dash_byIndustry")}</div>
                 {stats.byIndustry.slice(0, 6).map((ind) => (
@@ -2020,7 +2059,7 @@ Kurallar:
             </div>
 
             {/* Row 6 — Hot Leads + Recent Leads */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
               {/* Hot Leads */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 20, border: `1px solid ${colors.border}` }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
@@ -2272,7 +2311,7 @@ Kurallar:
                 </button>
               )}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
               {/* Left: Info */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
@@ -2678,7 +2717,7 @@ Kurallar:
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
               {/* Config Panel */}
               <div style={{ background: colors.surface, borderRadius: 12, padding: 24, border: `1px solid ${colors.border}` }}>
                 <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>{t("agent_config")}</h3>
@@ -3363,7 +3402,7 @@ Kurallar:
                   </div>
 
                   {/* ── Tag fields ── */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginTop: 12 }}>
                     {[
                       { label: "mail Konuları", col: mailKonulariCol, val: mondayMailKonulari, set: setMondayMailKonulari, required: true },
                       { label: "ortak mail", col: ortakMailCol, val: mondayOrtakMail, set: setMondayOrtakMail, required: false },
@@ -4180,17 +4219,19 @@ Kurallar:
             setContractGenerating(true);
             try {
               const token = localStorage.getItem("sns_token");
+              const party2Words = (contractData.party2_name || "").trim().split(/\s+/).slice(0, 2).join("_");
+              const filename = [party2Words, "Sözleşme", contractTemplate.name].filter(Boolean).join("_").replace(/[\\/:*?"<>|]/g, "");
               const r = await fetch("/contracts/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ templateId: contractTemplate.id, data: dataWithCompany, format }),
+                body: JSON.stringify({ templateId: contractTemplate.id, data: dataWithCompany, format, filename }),
               });
               if (!r.ok) { const e = await r.json(); alert("Hata: " + e.error); return; }
               const blob = await r.blob();
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
               const ext = format === "word" ? "docx" : "pdf";
-              a.href = url; a.download = `sozlesme_${contractTemplate.name}_${new Date().toLocaleDateString("tr-TR").replace(/\./g,"-")}.${ext}`;
+              a.href = url; a.download = `${filename}.${ext}`;
               a.click(); URL.revokeObjectURL(url);
             } catch (e) { alert("Hata: " + e.message); }
             finally { setContractGenerating(false); }
@@ -4321,7 +4362,8 @@ Kurallar:
           );
 
           return (
-            <div style={{ animation: "slideIn .3s ease", maxWidth: 780 }}>
+            <div style={{ animation: "slideIn .3s ease", display: "flex", gap: 24, alignItems: "flex-start" }}>
+            <div style={{ flex: isMobile ? "1" : "0 0 780px", minWidth: 0 }}>
               {/* Header */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t("contract_title")}</h2>
@@ -4483,13 +4525,11 @@ Kurallar:
                       ) : contractTemplates.map(tpl => (
                         <div key={tpl.id} onClick={async () => {
                           setContractPreviewTpl(tpl);
-                          if (tpl.template_type === "html") {
-                            setContractPreviewHtml("loading");
-                            const token = localStorage.getItem("sns_token");
-                            const r = await fetch(`/contracts/templates/${tpl.id}/content`, { headers: { Authorization: `Bearer ${token}` } });
-                            const d = await r.json();
-                            setContractPreviewHtml(d.content || "");
-                          } else { setContractPreviewHtml(""); }
+                          setContractPreviewHtml("loading");
+                          const token = localStorage.getItem("sns_token");
+                          const r = await fetch(`/contracts/templates/${tpl.id}/preview`, { headers: { Authorization: `Bearer ${token}` } });
+                          const d = await r.json();
+                          setContractPreviewHtml(d.html || "");
                         }} style={{ borderBottom: `1px solid ${colors.border}`, padding: "11px 14px", cursor: "pointer", background: contractPreviewTpl?.id === tpl.id ? `${colors.primary}10` : "transparent", borderLeft: contractPreviewTpl?.id === tpl.id ? `3px solid ${colors.primary}` : "3px solid transparent", transition: "all .15s" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -4505,7 +4545,15 @@ Kurallar:
                                         setRenamingTplId(null);
                                       } else if (e.key === "Escape") { setRenamingTplId(null); }
                                     }}
-                                    onBlur={() => setRenamingTplId(null)}
+                                    onBlur={async () => {
+                                      if (renamingValue.trim() && renamingValue.trim() !== tpl.name) {
+                                        const token = localStorage.getItem("sns_token");
+                                        await fetch(`/contracts/templates/${tpl.id}/name`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: renamingValue }) });
+                                        setContractTemplates(p => p.map(t => t.id === tpl.id ? { ...t, name: renamingValue } : t));
+                                        if (contractPreviewTpl?.id === tpl.id) setContractPreviewTpl(p => ({ ...p, name: renamingValue }));
+                                      }
+                                      setRenamingTplId(null);
+                                    }}
                                     onClick={e => e.stopPropagation()}
                                     style={{ fontSize: 13, fontWeight: 600, background: colors.bg, border: `1px solid ${colors.primary}`, borderRadius: 4, color: colors.text, padding: "1px 6px", outline: "none", width: 160 }} />
                                 ) : (
@@ -4541,22 +4589,12 @@ Kurallar:
                           </div>
                           <button onClick={() => { setContractTemplate(contractPreviewTpl); resetContractData(contractPreviewTpl); setContractProgramCount(1); setShowParty3(false); setContractView("form"); }} style={{ padding: "6px 14px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Use this template →</button>
                         </div>
-                        {contractPreviewTpl.template_type === "html" ? (
-                          contractPreviewHtml === "loading" ? (
-                            <div style={{ height: 420, display: "flex", alignItems: "center", justifyContent: "center", color: colors.textMuted, fontSize: 13 }}>Loading preview…</div>
-                          ) : (
-                            <iframe srcDoc={contractPreviewHtml} style={{ width: "100%", height: 480, border: "none", display: "block" }} title="Template Preview" sandbox="allow-same-origin" />
-                          )
+                        {contractPreviewHtml === "loading" ? (
+                          <div style={{ height: 420, display: "flex", alignItems: "center", justifyContent: "center", color: colors.textMuted, fontSize: 13 }}>Loading preview…</div>
+                        ) : contractPreviewHtml ? (
+                          <iframe srcDoc={contractPreviewHtml} style={{ width: "100%", height: 480, border: "none", display: "block", background: "#fff" }} title="Template Preview" sandbox="allow-same-origin" />
                         ) : (
-                          <div style={{ padding: 16 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 10 }}>Variables in this template</div>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                              {contractPreviewTpl.variables.map(v => (
-                                <span key={v} style={{ fontSize: 12, fontFamily: "monospace", background: `${colors.primary}18`, color: colors.primaryLight, border: `1px solid ${colors.primary}33`, borderRadius: 5, padding: "3px 10px" }}>@@{v}@@</span>
-                              ))}
-                              {contractPreviewTpl.variables.length === 0 && <span style={{ color: colors.textMuted, fontSize: 13 }}>No variables detected.</span>}
-                            </div>
-                          </div>
+                          <div style={{ height: 420, display: "flex", alignItems: "center", justifyContent: "center", color: colors.textMuted, fontSize: 13 }}>Click a template to preview</div>
                         )}
                         {/* Default Party 1 */}
                         <div style={{ padding: 16, borderTop: `1px solid ${colors.border}` }}>
@@ -4614,7 +4652,7 @@ Kurallar:
                               {groups.map(group => (
                                 <div key={group} style={{ marginBottom: 12 }}>
                                   <div style={{ fontSize: 10, fontWeight: 700, color: colors.primary, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>{group}</div>
-                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px" }}>
+                                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "4px 12px" }}>
                                     {ALL_CONTRACT_FIELDS.filter(f => f.group === group).map(f => (
                                       <label key={f.key} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: colors.text }}>
                                         <input type="checkbox" checked={isVis(f.key)} onChange={e => {
@@ -4753,7 +4791,7 @@ Kurallar:
                           <div style={{ padding: "0 16px 16px" }}>
                             <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, padding: 16 }}>
                               <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 10 }}>Data from contract form</div>
-                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
+                              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 6, marginBottom: 12 }}>
                                 {[
                                   { label: "Client", val: contractData.party2_name },
                                   { label: "Date", val: contractData.contract_date },
@@ -4798,7 +4836,7 @@ Kurallar:
                                   {canvaThumbUrls[d.id] && canvaThumbUrls[d.id] !== "loading" && canvaThumbUrls[d.id] !== "error" && (
                                     <img src={canvaThumbUrls[d.id]} alt="cover" style={{ width: "100%", borderRadius: 6, marginBottom: 8, border: `1px solid ${colors.border}` }} />
                                   )}
-                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, marginBottom: 8 }}>
                                     {[["Accent color", "accent_color", d.accent_color || "#2563eb"], ["Dark color", "dark_color", d.dark_color || "#1a2e47"]].map(([lbl, key, def]) => (
                                       <div key={key}>
                                         <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 3, fontWeight: 600 }}>{lbl}</div>
@@ -4856,6 +4894,10 @@ Kurallar:
                   {/* Contract details (programs + notes) */}
                   <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionDetails")}</div>
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_financier")} <span style={{ fontWeight: 400, opacity: 0.7 }}>(@@financier@@)</span></div>
+                      <input value={contractData.financier || ""} onChange={e => setContractData(p => ({ ...p, financier: e.target.value }))} placeholder="e.g. KOSGEB, TÜBİTAK" style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                    </div>
                     {[
                       { label: "Program 1", nameKey: "program_name",  feeKey: "down_payment",  bonusKey: "success_bonus"  },
                       { label: "Program 2", nameKey: "program2_name", feeKey: "program2_fee",  bonusKey: "program2_bonus" },
@@ -4864,16 +4906,16 @@ Kurallar:
                       <div key={prog.label} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: idx < contractProgramCount - 1 ? `1px dashed ${colors.border}` : "none" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                           <div style={{ fontSize: 11, fontWeight: 700, color: colors.primary, textTransform: "uppercase", letterSpacing: 0.5 }}>{prog.label}</div>
-                          {idx > 0 && <button onClick={() => { setContractProgramCount(p => p - 1); setContractData(p => ({ ...p, [prog.nameKey]: "", [prog.feeKey]: "", [prog.bonusKey]: "" })); }} style={{ fontSize: 11, color: "#e57373", background: "none", border: "none", cursor: "pointer" }}>✕ Remove</button>}
+                          {idx > 0 && <button onClick={() => { setContractProgramCount(p => p - 1); setContractData(p => ({ ...p, [prog.nameKey]: "", [prog.feeKey]: "", [prog.bonusKey]: "" })); }} style={{ fontSize: 11, color: "#e57373", background: "none", border: "none", cursor: "pointer" }}>{t("contract_remove")}</button>}
                         </div>
-                        {field("Program Name", prog.nameKey, { placeholder: "e.g. SoGreen" })}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        {field(t("contract_programName"), prog.nameKey, { placeholder: t("contract_programNamePh") })}
+                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                           <div>
-                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Service Fee (TL + VAT)</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_serviceFeeVat")}</div>
                             <input value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))} placeholder="e.g. 50.000" style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                           </div>
                           <div>
-                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Success Bonus (%)</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus")}</div>
                             <input value={contractData[prog.bonusKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusKey]: e.target.value }))} placeholder="e.g. 5" style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                           </div>
                         </div>
@@ -4881,9 +4923,23 @@ Kurallar:
                     ))}
                     {contractProgramCount < 3 && (
                       <button onClick={() => setContractProgramCount(p => p + 1)} style={{ fontSize: 12, fontWeight: 600, color: colors.primary, background: `${colors.primary}15`, border: `1px dashed ${colors.primary}55`, borderRadius: 7, padding: "6px 14px", cursor: "pointer", width: "100%", marginBottom: 14 }}>
-                        + Add Program
+                        {t("contract_addProgram")}
                       </button>
                     )}
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} <span style={{ fontWeight: 400, opacity: 0.7 }}>(@@success_bonus_type@@)</span></div>
+                      <select value={contractData.success_bonus_type || "onaylanan destek"} onChange={e => setContractData(p => ({ ...p, success_bonus_type: e.target.value }))}
+                        style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
+                        <option value="onaylanan destek">{t("contract_approvedSupport")}</option>
+                        <option value="onaylanan kredi">{t("contract_approvedLoan")}</option>
+                        <option value="sağlanan fayda">{t("contract_benefitProvided")}</option>
+                      </select>
+                      {contractData.success_bonus_type === "sağlanan fayda" && (
+                        <div style={{ marginTop: 6, padding: "8px 10px", background: `${colors.primary}12`, border: `1px solid ${colors.primary}33`, borderRadius: 6, fontSize: 11, color: colors.textMuted, fontStyle: "italic", lineHeight: 1.5 }}>
+                          ℹ @@vakifbank_clause@@ will be added: "Sağlanan fayda; projenin onaylandığı tarihte Vakıfbank'ın ticari müşterilerine kullandırdığı 1 yıl vadeli ticari kredilerindeki tabela faiz oranı üzerinden..."
+                        </div>
+                      )}
+                    </div>
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}</div>
                       <input type="date" value={contractData.contract_date || ""} onChange={e => setContractData(p => ({ ...p, contract_date: e.target.value }))}
@@ -4903,31 +4959,30 @@ Kurallar:
                   </button>
                 </div>
               ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
                   {/* Left column */}
                   <div>
                     {/* Template selector */}
                     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionTemplate")}</div>
-                      <select value={contractTemplate?.id || ""} onChange={e => {
+                      <select value={contractTemplate?.id || ""} onChange={async e => {
                         const tpl = contractTemplates.find(t => String(t.id) === e.target.value) || null;
                         setContractTemplate(tpl);
-                        setContractData(EMPTY_CONTRACT_DATA());
+                        resetContractData(tpl);
                         setShowParty3(false);
+                        setContractFormPreviewHtml("");
                         if (tpl) {
                           const v = tpl.variables || [];
                           setContractProgramCount(v.includes("program3_name") ? 3 : v.includes("program2_name") ? 2 : 1);
+                          const token = localStorage.getItem("sns_token");
+                          fetch(`/contracts/templates/${tpl.id}/preview`, { headers: { Authorization: `Bearer ${token}` } })
+                            .then(r => r.json()).then(d => setContractFormPreviewHtml(d.html || "")).catch(() => {});
                         } else { setContractProgramCount(1); }
                       }}
                         style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" }}>
                         <option value="">{ t("contract_selectTemplate")}</option>
                         {contractTemplates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
                       </select>
-                      {contractTemplate && (
-                        <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 6 }}>
-                          Değişkenler: {contractTemplate.variables.map(v => `@@${v}@@`).join(", ") || "yok"}
-                        </div>
-                      )}
                     </div>
 
                     {/* Party 1 */}
@@ -4971,13 +5026,14 @@ Kurallar:
                     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionDetails")}</div>
 
+                      {fieldVisible('financier') && <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Financier <span style={{ fontWeight: 400, opacity: 0.7 }}>(@@financier@@)</span></div>
+                        <input value={contractData.financier || ""} onChange={e => setContractData(p => ({ ...p, financier: e.target.value }))} placeholder="e.g. KOSGEB, TÜBİTAK" style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                      </div>}
+
                       {/* Program 1 */}
                       {(() => {
-                        const DeadlineBox = ({ k }) => (
-                          <input value={contractData[k] || ""} onChange={e => setContractData(p => ({ ...p, [k]: e.target.value }))}
-                            placeholder="e.g. 60 days"
-                            style={{ marginTop: 5, width: "100%", padding: "6px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 11, outline: "none", boxSizing: "border-box" }} />
-                        );
+                        const dlStyle = { marginTop: 5, width: "100%", padding: "6px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 11, outline: "none", boxSizing: "border-box" };
                         return [
                         { label: "Program 1", nameKey: "program_name", feeKey: "down_payment", fee2Key: "down_payment_2", bonusKey: "success_bonus", bonus2Key: "success_bonus_2", feeDeadlineKey: "down_payment_deadline", bonusDeadlineKey: "sb1ddl", bonus2DeadlineKey: "success_bonus_2_deadline" },
                         { label: "Program 2", nameKey: "program2_name", feeKey: "program2_fee", fee2Key: "program2_fee_2", bonusKey: "program2_bonus", bonus2Key: "program2_bonus_2", feeDeadlineKey: "program2_fee_deadline", bonusDeadlineKey: "program2_bonus_deadline", bonus2DeadlineKey: "program2_bonus_2_deadline" },
@@ -4988,40 +5044,40 @@ Kurallar:
                             <div style={{ fontSize: 11, fontWeight: 700, color: colors.primary, textTransform: "uppercase", letterSpacing: 0.5 }}>{prog.label}</div>
                             {idx > 0 && (
                               <button onClick={() => { setContractProgramCount(p => p - 1); setContractData(p => ({ ...p, [prog.nameKey]: "", [prog.feeKey]: "", [prog.fee2Key]: "", [prog.bonusKey]: "", [prog.bonus2Key]: "", [prog.feeDeadlineKey]: "", [prog.bonusDeadlineKey]: "", [prog.bonus2DeadlineKey]: "" })); }}
-                                style={{ fontSize: 11, color: "#e57373", background: "none", border: "none", cursor: "pointer", padding: "0 4px" }}>✕ Remove</button>
+                                style={{ fontSize: 11, color: "#e57373", background: "none", border: "none", cursor: "pointer", padding: "0 4px" }}>{t("contract_remove")}</button>
                             )}
                           </div>
-                          {fieldVisible('program_name') && field("Program Name", prog.nameKey, { placeholder: "e.g. SoGreen" })}
+                          {fieldVisible('program_name') && field(t("contract_programName"), prog.nameKey, { placeholder: t("contract_programNamePh") })}
                           {/* Service Fee */}
                           {fieldVisible('down_payment') && (
                           <div style={{ marginBottom: 10 }}>
-                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Service Fee (TL)</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_serviceFeeShort")}</div>
                             <input type="number" min="0" value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))}
                               placeholder="e.g. 50000"
                               style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                            {fieldVisible('down_payment_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, marginBottom: 2 }}>Deadline</div><DeadlineBox k={prog.feeDeadlineKey} /></>}
+                            {fieldVisible('down_payment_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.feeDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeDeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
                           </div>
                           )}
                           {/* Success Bonuses */}
                           {(fieldVisible('success_bonus') || fieldVisible('success_bonus_2')) && (
                           <div style={{ display: "grid", gridTemplateColumns: fieldVisible('success_bonus') && fieldVisible('success_bonus_2') ? "1fr 1fr" : "1fr", gap: 10 }}>
                             {fieldVisible('success_bonus') && <div>
-                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Success Bonus 1 (%)</div>
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus1")}</div>
                               <select value={contractData[prog.bonusKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusKey]: e.target.value }))}
                                 style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('sb1ddl') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline</div><DeadlineBox k={prog.bonusDeadlineKey} /></>}
+                              {fieldVisible('sb1ddl') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonusDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
                             </div>}
                             {fieldVisible('success_bonus_2') && <div>
-                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Success Bonus 2 (%)</div>
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus2")}</div>
                               <select value={contractData[prog.bonus2Key] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2Key]: e.target.value }))}
                                 style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('success_bonus_2_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline</div><DeadlineBox k={prog.bonus2DeadlineKey} /></>}
+                              {fieldVisible('success_bonus_2_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonus2DeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
                             </div>}
                           </div>
                           )}
@@ -5033,9 +5089,24 @@ Kurallar:
                       {fieldVisible('multi_program') && contractProgramCount < 3 && (
                         <button onClick={() => setContractProgramCount(p => p + 1)}
                           style={{ fontSize: 12, fontWeight: 600, color: colors.primary, background: `${colors.primary}15`, border: `1px dashed ${colors.primary}55`, borderRadius: 7, padding: "6px 14px", cursor: "pointer", width: "100%", marginBottom: 14 }}>
-                          + Add Program
+                          {t("contract_addProgram")}
                         </button>
                       )}
+
+                      {fieldVisible('success_bonus_type') && <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} <span style={{ fontWeight: 400, opacity: 0.7 }}>(@@success_bonus_type@@)</span></div>
+                        <select value={contractData.success_bonus_type || "onaylanan destek"} onChange={e => setContractData(p => ({ ...p, success_bonus_type: e.target.value }))}
+                          style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
+                          <option value="onaylanan destek">Onaylanan Destek (Approved Support)</option>
+                          <option value="onaylanan kredi">Onaylanan Kredi (Approved Loan)</option>
+                          <option value="sağlanan fayda">Sağlanan Fayda (Benefit Provided)</option>
+                        </select>
+                        {contractData.success_bonus_type === "sağlanan fayda" && (
+                          <div style={{ marginTop: 6, padding: "8px 10px", background: `${colors.primary}12`, border: `1px solid ${colors.primary}33`, borderRadius: 6, fontSize: 11, color: colors.textMuted, fontStyle: "italic", lineHeight: 1.5 }}>
+                            {t("contract_vakifbankNote")}
+                          </div>
+                        )}
+                      </div>}
 
                       {fieldVisible('contract_date') && <div style={{ marginBottom: 10 }}>
                         <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}</div>
@@ -5053,13 +5124,6 @@ Kurallar:
                           style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
                       </div>}
 
-                      {/* Download button */}
-                      {contractTemplate && (
-                        <button onClick={() => handleGenerate("pdf")} disabled={contractGenerating}
-                          style={{ marginTop: 14, width: "100%", padding: "10px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: contractGenerating ? 0.6 : 1 }}>
-                          {contractGenerating ? t("contract_generating") : "⬇ " + t("contract_generate")}
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -5118,7 +5182,7 @@ Kurallar:
                           </div>
                         </div>
                         {field("Full Name", "party3_name", { placeholder: "Company or person name" })}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                           <div>
                             <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_taxOffice")}</div>
                             <input value={contractData.party3_tax_office || ""} onChange={e => setContractData(p => ({ ...p, party3_tax_office: e.target.value }))}
@@ -5142,7 +5206,7 @@ Kurallar:
                     {fieldVisible('payment_schedule') && (<div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionSchedule")}</div>
-                        <button onClick={() => setContractData(p => ({ ...p, payment_schedule: [...p.payment_schedule, { date: "", amount: "" }] }))}
+                        <button onClick={() => setContractData(p => ({ ...p, payment_schedule: [...p.payment_schedule, { subject: "Hizmet Başlangıç Ücreti", subjectCustom: "", dateType: "calendar", date: "", dateText: "", amount: "" }] }))}
                           style={{ padding: "4px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                           {t("contract_addRow")}
                         </button>
@@ -5150,22 +5214,66 @@ Kurallar:
                       {contractData.payment_schedule.length === 0 ? (
                         <div style={{ fontSize: 12, color: colors.textMuted, textAlign: "center", padding: "10px 0" }}>{t("contract_scheduleEmpty")}</div>
                       ) : contractData.payment_schedule.map((row, i) => {
+                        const upd = (k, v) => setContractData(p => { const s = [...p.payment_schedule]; s[i] = { ...s[i], [k]: v }; return { ...p, payment_schedule: s }; });
                         const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-                        const dayLabel = row.date ? days[new Date(row.date).getDay()] : null;
+                        const dayLabel = row.date && row.dateType !== "text" ? days[new Date(row.date).getDay()] : null;
+                        const rowSubject = row.subject || "Peşinat";
+                        const rowDateType = row.dateType || "calendar";
+                        const inputSt = { width: "100%", padding: "7px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box" };
                         return (
-                          <div key={i} style={{ marginBottom: 8 }}>
-                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                              <div style={{ flex: 1 }}>
-                                <input type="date" value={row.date} onChange={e => setContractData(p => { const s = [...p.payment_schedule]; s[i] = { ...s[i], date: e.target.value }; return { ...p, payment_schedule: s }; })}
-                                  onClick={e => { try { e.target.showPicker(); } catch {} }}
-                                  style={{ width: "100%", padding: "7px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none", boxSizing: "border-box", cursor: "pointer", colorScheme: "dark" }} />
-                                {dayLabel && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 2, paddingLeft: 2 }}>{dayLabel}</div>}
-                              </div>
-                              <input type="number" min="0" value={row.amount} onChange={e => setContractData(p => { const s = [...p.payment_schedule]; s[i] = { ...s[i], amount: e.target.value }; return { ...p, payment_schedule: s }; })}
-                                placeholder={t("contract_amountPh")}
-                                style={{ flex: 1, padding: "7px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 12, outline: "none" }} />
+                          <div key={i} style={{ marginBottom: 10, padding: "10px", background: colors.bg, borderRadius: 7, border: `1px solid ${colors.border}` }}>
+                            {/* Subject row */}
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                              <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 600, width: 90, flexShrink: 0 }}>{t("contract_paySubject")}</div>
+                              <select value={rowSubject} onChange={e => upd("subject", e.target.value)}
+                                style={{ ...inputSt, flex: 1 }}>
+                                <option value="Hizmet Başlangıç Ücreti">1 — Hizmet Başlangıç Ücreti</option>
+                                <option value="Hizmet Başlangıç Ücreti 1. Taksit">2 — Hizmet Başlangıç Ücreti 1. Taksit</option>
+                                <option value="Hizmet Başlangıç Ücreti 2. Taksit">3 — Hizmet Başlangıç Ücreti 2. Taksit</option>
+                                <option value="Hizmet Başlangıç Ücreti 3. Taksit">4 — Hizmet Başlangıç Ücreti 3. Taksit</option>
+                                <option value="Hizmet Başlangıç Ücreti 4. Taksit">5 — Hizmet Başlangıç Ücreti 4. Taksit</option>
+                                <option value="Hizmet Başlangıç Ücreti 5. Taksit">6 — Hizmet Başlangıç Ücreti 5. Taksit</option>
+                                <option value="Hizmet Başlangıç Ücreti 6. Taksit">7 — Hizmet Başlangıç Ücreti 6. Taksit</option>
+                                <option value="Hizmet Başlangıç Ücreti 7. Taksit">8 — Hizmet Başlangıç Ücreti 7. Taksit</option>
+                                <option value="Hizmet Başlangıç Ücreti 8. Taksit">9 — Hizmet Başlangıç Ücreti 8. Taksit</option>
+                                <option value="Hizmet Başlangıç Ücreti 9. Taksit">10 — Hizmet Başlangıç Ücreti 9. Taksit</option>
+                                <option value="Hizmet Başlangıç Ücreti 10. Taksit">11 — Hizmet Başlangıç Ücreti 10. Taksit</option>
+                                <option value="Hizmet Başlangıç Ücreti 11. Taksit">12 — Hizmet Başlangıç Ücreti 11. Taksit</option>
+                                <option value="Hizmet Başlangıç Ücreti 12. Taksit">13 — Hizmet Başlangıç Ücreti 12. Taksit</option>
+                                <option value="other">14 — Diğer</option>
+                              </select>
+                              {rowSubject === "other" && (
+                                <input value={row.subjectCustom || ""} onChange={e => upd("subjectCustom", e.target.value)}
+                                  placeholder={t("contract_paySubjectPh")} style={{ ...inputSt, flex: 1 }} />
+                              )}
+                            </div>
+                            {/* Date row */}
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                              <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 600, width: 90, flexShrink: 0 }}>{t("contract_payDate")}</div>
+                              <select value={rowDateType} onChange={e => upd("dateType", e.target.value)}
+                                style={{ ...inputSt, width: 140, flexShrink: 0 }}>
+                                <option value="calendar">{t("contract_payCalendar")}</option>
+                                <option value="text">{t("contract_payText")}</option>
+                              </select>
+                              {rowDateType === "calendar" ? (
+                                <div style={{ flex: 1 }}>
+                                  <input type="date" value={row.date || ""} onChange={e => upd("date", e.target.value)}
+                                    onClick={e => { try { e.target.showPicker(); } catch {} }}
+                                    style={{ ...inputSt, cursor: "pointer", colorScheme: "dark" }} />
+                                  {dayLabel && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 2 }}>{dayLabel}</div>}
+                                </div>
+                              ) : (
+                                <input value={row.dateText || ""} onChange={e => upd("dateText", e.target.value)}
+                                  placeholder="e.g. Proje onayından itibaren 30 gün" style={{ ...inputSt, flex: 1 }} />
+                              )}
+                            </div>
+                            {/* Amount row */}
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                              <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 600, width: 90, flexShrink: 0 }}>{t("contract_payAmount")}</div>
+                              <input type="number" min="0" value={row.amount || ""} onChange={e => upd("amount", e.target.value)}
+                                placeholder={t("contract_amountPh")} style={{ ...inputSt, flex: 1 }} />
                               <button onClick={() => setContractData(p => ({ ...p, payment_schedule: p.payment_schedule.filter((_, j) => j !== i) }))}
-                                style={{ padding: "5px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 12, cursor: "pointer" }}>✕</button>
+                                style={{ padding: "5px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>✕</button>
                             </div>
                           </div>
                         );
@@ -5190,16 +5298,34 @@ Kurallar:
                 </div>
               )}
 
+
+            </div>
+
+            {/* Right preview panel — always visible when form is active and template selected */}
+            {contractView === "form" && contractTemplate && !isMobile && (
+              <div style={{ flex: 1, minWidth: 0, position: "sticky", top: 0, background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 600 }}>
+                <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, flexShrink: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{contractTemplate.name}</div>
+                  <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{contractTemplate.template_type.toUpperCase()} preview</div>
+                </div>
+                {contractFormPreviewHtml ? (
+                  <iframe srcDoc={contractFormPreviewHtml} style={{ flex: 1, border: "none", display: "block", background: "#fff" }} title="Template Preview" sandbox="allow-same-origin" />
+                ) : (
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: colors.textMuted, fontSize: 13 }}>Loading preview…</div>
+                )}
+              </div>
+            )}
+
             </div>
           );
         })()}
 
         {view === "pricing" && (() => {
           const NOTE_OPTIONS = [
-            "Based on approved support",
-            "Based on approved grant",
-            "Based on approved loan",
-            "Based on benefit provided",
+            { value: "Based on approved support", tr: "Onaylatılan Destek Tutarı Üzerinden Hesaplanacaktır" },
+            { value: "Based on approved grant",   tr: "Onaylatılan Hibe Tutarı Üzerinden Hesaplanacaktır" },
+            { value: "Based on approved loan",    tr: "Onaylatılan Kredi Tutarı Üzerinden Hesaplanacaktır" },
+            { value: "Based on benefit provided", tr: "Sağlanan Fayda Üzerinden Hesaplanacaktır" },
           ];
           const FEE_OPTIONS = Array.from({ length: 15 }, (_, i) => i + 1);
           const pd = (k, v) => setPricingData(p => ({ ...p, [k]: v }));
@@ -5262,19 +5388,7 @@ Kurallar:
             <div style={{ flex: 1, overflowY: "auto", padding: 32 }}>
               <div style={{ maxWidth: 580, margin: "0 auto" }}>
                 <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>Price Quote</div>
-                  {/* Theme toggle */}
-                  <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16 }}>
-                    <div style={{ ...labelStyle, marginBottom: 12 }}>Slide Theme</div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {[["blue", "🔵 Blue"], ["green", "🟢 Green"]].map(([t, label]) => (
-                        <button key={t} onClick={() => pd("theme", t)}
-                          style={{ flex: 1, padding: "10px 0", border: `2px solid ${pricingData.theme === t ? colors.primary : colors.border}`, borderRadius: 8, background: pricingData.theme === t ? `${colors.primary}18` : "transparent", color: pricingData.theme === t ? colors.primaryLight : colors.textMuted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>{t("pricing_title")}</div>
                 </div>
 
                 <>
@@ -5297,13 +5411,13 @@ Kurallar:
                       const d = await r.json();
                       if (!r.ok) { alert(d.error); return; }
                       setProgPresentations(prev => [...prev, d]);
-                      setProgPresDraft({ category: "", name: "", canva_link: "" });
+                      setProgPresDraft({ category: "", name: "", canva_link: "", theme: "blue" });
                       setProgPresShowAdd(false);
                     } finally { setProgPresAdding(false); }
                   };
 
                   const handleDeletePres = async (id) => {
-                    if (!confirm("Remove this presentation?")) return;
+                    if (!confirm(t("pricing_removePresConfirm"))) return;
                     const token = localStorage.getItem("sns_token");
                     await fetch(`/presentations/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
                     setProgPresentations(prev => prev.filter(p => p.id !== id));
@@ -5313,8 +5427,8 @@ Kurallar:
                   return (
                     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                        <div style={labelStyle}>Presentation</div>
-                        {isAdmin && <button onClick={() => setProgPresShowAdd(s => !s)} style={{ fontSize: 11, padding: "4px 10px", background: `${colors.primary}18`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, cursor: "pointer", fontWeight: 600 }}>{progPresShowAdd ? "✕ Cancel" : "+ Add"}</button>}
+                        <div style={labelStyle}>{t("pricing_presentation")}</div>
+                        {isAdmin && <button onClick={() => setProgPresShowAdd(s => !s)} style={{ fontSize: 11, padding: "4px 10px", background: `${colors.primary}18`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, cursor: "pointer", fontWeight: 600 }}>{progPresShowAdd ? t("pricing_cancel") : t("pricing_add")}</button>}
                       </div>
 
                       {progPresShowAdd && (
@@ -5322,51 +5436,90 @@ Kurallar:
                           <input placeholder="Category (e.g. KOSGEB)" value={progPresDraft.category} onChange={e => setProgPresDraft(p => ({ ...p, category: e.target.value }))} style={{ ...inputStyle }} />
                           <input placeholder="Name (e.g. Fiyat Teklifi_DDX)" value={progPresDraft.name} onChange={e => setProgPresDraft(p => ({ ...p, name: e.target.value }))} style={{ ...inputStyle }} />
                           <input placeholder="canva.link/… or canva.com/design/…" value={progPresDraft.canva_link} onChange={e => setProgPresDraft(p => ({ ...p, canva_link: e.target.value }))} style={{ ...inputStyle }} />
+                          <div style={{ display: "flex", gap: 8 }}>
+                            {[["blue", "🔵 Blue"], ["green", "🟢 Green"]].map(([t, label]) => (
+                              <button key={t} type="button" onClick={() => setProgPresDraft(p => ({ ...p, theme: t }))}
+                                style={{ flex: 1, padding: "7px 0", border: `2px solid ${(progPresDraft.theme || "blue") === t ? colors.primary : colors.border}`, borderRadius: 7, background: (progPresDraft.theme || "blue") === t ? `${colors.primary}18` : "transparent", color: (progPresDraft.theme || "blue") === t ? colors.primaryLight : colors.textMuted, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
                           <button onClick={handleAddPres} disabled={progPresAdding} style={{ padding: "8px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-                            {progPresAdding ? "Resolving link…" : "Add"}
+                            {progPresAdding ? t("pricing_resolvingLink") : t("pricing_addBtn")}
                           </button>
                         </div>
                       )}
 
                       {progPresLoading ? (
-                        <div style={{ fontSize: 12, color: colors.textMuted }}>Loading…</div>
+                        <div style={{ fontSize: 12, color: colors.textMuted }}>{t("pricing_loadingPres")}</div>
                       ) : progPresEntations.length === 0 ? (
-                        <div style={{ fontSize: 12, color: colors.textMuted }}>No presentations yet. {isAdmin ? "Click + Add to add one." : ""}</div>
+                        <div style={{ fontSize: 12, color: colors.textMuted }}>{t("pricing_noPresentations", isAdmin)}</div>
                       ) : (
-                        <div style={{ maxHeight: 300, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
-                          {Object.entries(grouped).map(([cat, items]) => (
-                            <div key={cat}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>{cat}</div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                {items.map(p => {
-                                  const selected = pricingData.design_id === p.design_id;
-                                  return (
-                                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                      <div onClick={() => pd("design_id", selected ? "" : p.design_id)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderRadius: 7, cursor: "pointer", border: `2px solid ${selected ? colors.primary : colors.border}`, background: selected ? `${colors.primary}14` : "transparent", transition: "all .15s" }}>
-                                        <span style={{ fontSize: 12, fontWeight: selected ? 700 : 500, color: selected ? colors.primaryLight : colors.text }}>{p.name}</span>
-                                        {selected && <span style={{ fontSize: 11, fontWeight: 700, color: colors.primaryLight }}>✓</span>}
-                                      </div>
-                                      {isAdmin && <button onClick={() => handleDeletePres(p.id)} style={{ padding: "4px 7px", background: "rgba(229,115,115,0.1)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>✕</button>}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {/* Category buttons */}
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 4 }}>
+                            {Object.keys(grouped).map(cat => {
+                              const isOpen = selectedPresCategory === cat;
+                              const hasSelected = grouped[cat].some(p => pricingData.design_id && pricingData.design_id === p.design_id);
+                              return (
+                                <button key={cat} onClick={() => setSelectedPresCategory(isOpen ? null : cat)}
+                                  style={{ padding: "6px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all .15s", border: `1.5px solid ${isOpen ? colors.primary : hasSelected ? colors.primary : colors.border}`, background: isOpen ? colors.primary : hasSelected ? `${colors.primary}18` : "transparent", color: isOpen ? "#fff" : hasSelected ? colors.primaryLight : colors.textMuted }}>
+                                  {cat} {hasSelected && !isOpen ? "✓" : isOpen ? "▲" : "▼"}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {/* Expanded category presentations */}
+                          {selectedPresCategory && grouped[selectedPresCategory] && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 260, overflowY: "auto" }}>
+                              {grouped[selectedPresCategory].map(p => {
+                                const selected = pricingData.design_id && pricingData.design_id === p.design_id;
+                                return (
+                                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <div onClick={() => { if (selected) { pd("design_id", ""); } else { pd("design_id", p.design_id); pd("theme", p.theme || "blue"); } }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderRadius: 7, cursor: "pointer", border: `2px solid ${selected ? colors.primary : colors.border}`, background: selected ? `${colors.primary}14` : "transparent", transition: "all .15s" }}>
+                                      <span style={{ fontSize: 12, fontWeight: selected ? 700 : 500, color: selected ? colors.primaryLight : colors.text }}>{p.name}</span>
+                                      {selected && <span style={{ fontSize: 11, fontWeight: 700, color: colors.primaryLight }}>✓</span>}
                                     </div>
-                                  );
-                                })}
-                              </div>
+                                    {isAdmin && <button onClick={() => handleDeletePres(p.id)} style={{ padding: "4px 7px", background: "rgba(229,115,115,0.1)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>✕</button>}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          ))}
+                          )}
                         </div>
                       )}
                     </div>
                   );
                 })()}
 
+                {/* Client name */}
+                <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                  <div style={{ ...labelStyle, marginBottom: 8 }}>{lang === "tr" ? "Müşteri Adı" : "Client Name"} <span style={{ fontWeight: 400, textTransform: "none" }}>{lang === "tr" ? "(PDF dosya adı)" : "(PDF file name)"}</span></div>
+                  <input value={pricingData.client_name} onChange={e => pd("client_name", e.target.value)}
+                    placeholder={lang === "tr" ? "ör. ABC Tekstil A.Ş." : "e.g. ABC Tekstil A.Ş."} style={inputStyle} />
+                </div>
+
+                {/* Slide type */}
+                <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                  <div style={{ ...labelStyle, marginBottom: 12 }}>{t("pricing_slideType")}</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[[false, t("pricing_standard")], [true, t("pricing_withDiscount")]].map(([val, label]) => (
+                      <button key={String(val)} onClick={() => pd("discount", val)}
+                        style={{ flex: 1, padding: "10px 0", border: `2px solid ${pricingData.discount === val ? colors.primary : colors.border}`, borderRadius: 8, background: pricingData.discount === val ? `${colors.primary}18` : "transparent", color: pricingData.discount === val ? colors.primaryLight : colors.textMuted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Layout selector */}
                 <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
-                  <div style={{ ...labelStyle, marginBottom: 12 }}>Layout</div>
+                  <div style={{ ...labelStyle, marginBottom: 12 }}>{t("pricing_layout")}</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     {[1, 2, 3].map(n => (
                       <button key={n} onClick={() => pd("num_options", n)}
                         style={{ flex: 1, padding: "10px 0", border: `2px solid ${pricingData.num_options === n ? colors.primary : colors.border}`, borderRadius: 8, background: pricingData.num_options === n ? `${colors.primary}18` : "transparent", color: pricingData.num_options === n ? colors.primaryLight : colors.textMuted, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                        {n === 1 ? "1 Option" : n === 2 ? "2 Options" : "3 Options"}
+                        {n === 1 ? t("pricing_1option") : n === 2 ? t("pricing_2options") : t("pricing_3options")}
                       </button>
                     ))}
                   </div>
@@ -5379,43 +5532,48 @@ Kurallar:
                     <div key={i} style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 20, marginBottom: 12 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
                         <div style={{ width: 10, height: 10, borderRadius: "50%", background: BADGE_COLORS[i], flexShrink: 0 }} />
-                        <div style={{ fontSize: 13, fontWeight: 700 }}>Option {i + 1}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>{t("pricing_optionN", i + 1)}</div>
                       </div>
-                      <div style={labelStyle}>Option Title</div>
+                      <div style={labelStyle}>{t("pricing_optionTitle")}</div>
                       <input value={o.title} onChange={e => pdOpt(i, "title", e.target.value)}
                         placeholder={`e.g. Package ${String.fromCharCode(65 + i)}`} style={{ ...inputStyle, marginBottom: 14 }} />
-                      <div style={labelStyle}>Down Payment</div>
+                      {pricingData.discount && (<>
+                        <div style={labelStyle}>{t("pricing_originalPrice")} <span style={{ fontWeight: 400, textTransform: "none" }}>{t("pricing_crossedOut")}</span></div>
+                        <input value={o.dp_original} onChange={e => pdOpt(i, "dp_original", e.target.value)}
+                          placeholder="e.g. 90.000" style={{ ...inputStyle, marginBottom: 14 }} />
+                      </>)}
+                      <div style={labelStyle}>{pricingData.discount ? t("pricing_discountedPrice") : t("pricing_downPayment")}</div>
                       <input value={o.dp} onChange={e => pdOpt(i, "dp", e.target.value)}
-                        placeholder="e.g. 50.000 TRY + KDV" style={{ ...inputStyle, marginBottom: 14 }} />
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                        placeholder="e.g. 50.000" style={{ ...inputStyle, marginBottom: 14 }} />
+                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
                         <div>
-                          <div style={labelStyle}>Success Fee 1</div>
+                          <div style={labelStyle}>{t("pricing_successFee1")}</div>
                           <select value={o.succ_fee_1} onChange={e => pdOpt(i, "succ_fee_1", e.target.value)} style={inputStyle}>
                             <option value="">— select —</option>
                             {FEE_OPTIONS.map(n => <option key={n} value={n}>{n}% + KDV</option>)}
                           </select>
                         </div>
                         <div>
-                          <div style={labelStyle}>Note 1</div>
+                          <div style={labelStyle}>{t("pricing_note1")}</div>
                           <select value={o.note1} onChange={e => pdOpt(i, "note1", e.target.value)} style={inputStyle}>
                             <option value="">— none —</option>
-                            {NOTE_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                            {NOTE_OPTIONS.map(n => <option key={n.value} value={n.value}>{lang === "tr" ? n.tr : n.value}</option>)}
                           </select>
                         </div>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                         <div>
-                          <div style={labelStyle}>Success Fee 2 <span style={{ fontWeight: 400, textTransform: "none" }}>(optional)</span></div>
+                          <div style={labelStyle}>{t("pricing_successFee2")} <span style={{ fontWeight: 400, textTransform: "none" }}>{t("pricing_optional")}</span></div>
                           <select value={o.succ_fee_2} onChange={e => pdOpt(i, "succ_fee_2", e.target.value)} style={inputStyle}>
                             <option value="">— none —</option>
                             {FEE_OPTIONS.map(n => <option key={n} value={n}>{n}% + KDV</option>)}
                           </select>
                         </div>
                         <div>
-                          <div style={labelStyle}>Note 2</div>
+                          <div style={labelStyle}>{t("pricing_note2")}</div>
                           <select value={o.note2} onChange={e => pdOpt(i, "note2", e.target.value)} style={inputStyle} disabled={!o.succ_fee_2}>
                             <option value="">— none —</option>
-                            {NOTE_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                            {NOTE_OPTIONS.map(n => <option key={n.value} value={n.value}>{lang === "tr" ? n.tr : n.value}</option>)}
                           </select>
                         </div>
                       </div>
@@ -5425,7 +5583,7 @@ Kurallar:
 
                 {/* General note */}
                 <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
-                  <div style={labelStyle}>General Note <span style={{ fontWeight: 400, textTransform: "none" }}>(optional)</span></div>
+                  <div style={labelStyle}>{t("pricing_generalNote")} <span style={{ fontWeight: 400, textTransform: "none" }}>{t("pricing_optional")}</span></div>
                   <textarea value={pricingData.gen_note} onChange={e => pd("gen_note", e.target.value)}
                     rows={3} placeholder="e.g. This proposal is valid until 15.05.2026."
                     style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }} />
@@ -5433,7 +5591,7 @@ Kurallar:
 
                 <button onClick={handleGenerate} disabled={pricingGenerating}
                   style={{ width: "100%", padding: "13px", background: pricingGenerating ? colors.border : colors.primary, border: "none", borderRadius: 9, color: "#fff", fontSize: 14, fontWeight: 700, cursor: pricingGenerating ? "not-allowed" : "pointer" }}>
-                  {pricingGenerating ? "⏳ Building PDF…" : "⬇ Download PDF"}
+                  {pricingGenerating ? t("pricing_building") : t("pricing_download")}
                 </button>
               </>}
               </div>
@@ -5577,7 +5735,7 @@ Kurallar:
                         <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setSettingsAddDraft); }} />
                         <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{ocrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
                       </label>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 10 }}>
                         {companyFields.map(f => (
                           <div key={f.key} style={{ gridColumn: f.full ? "1/-1" : "auto" }}>
                             <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 3 }}>{f.label}</div>
@@ -5598,7 +5756,7 @@ Kurallar:
                             <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setSettingsEditDraft); }} />
                             <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{ocrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
                           </label>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 10 }}>
                             {companyFields.map(f => (
                               <div key={f.key} style={{ gridColumn: f.full ? "1/-1" : "auto" }}>
                                 <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 3 }}>{f.label}</div>
@@ -5821,7 +5979,7 @@ Kurallar:
                 {showAddUser && (
                   <div style={{ background: colors.bg, borderRadius: 8, padding: 16, marginBottom: 16, border: `1px solid ${colors.border}` }}>
                     <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 12, color: colors.text }}>{t("settings_newUser")}</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 10 }}>
                       {[
                         { label: t("settings_fullName"), key: "name", placeholder: "Ahmet Yılmaz" },
                         { label: t("settings_email"), key: "email", placeholder: "ahmet@sunandsun.com.tr" },
@@ -5977,7 +6135,7 @@ Kurallar:
               <div>
                 <div style={{ padding: 16, background: colors.bg, borderRadius: 10, marginBottom: 20, fontSize: 13 }}>
                   <div style={{ fontWeight: 600, marginBottom: 12, color: colors.text }}>{importFileName}</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 12 }}>
                     {[
                       { label: t("modal_totalLeads"), value: importStats.total, color: colors.primary },
                       { label: t("modal_withContact"), value: importStats.withContact, color: colors.success },
@@ -6027,7 +6185,7 @@ Kurallar:
               <button onClick={() => setShowAddModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: colors.textMuted }}><XIcon size={20} /></button>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
               {[
                 { label: t("modal_firstName"), key: "firstName", placeholder: "Ahmet" },
                 { label: t("modal_lastName"),  key: "lastName",  placeholder: "Yılmaz" },

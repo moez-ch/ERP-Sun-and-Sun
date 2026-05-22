@@ -11,6 +11,7 @@ import { execSync } from "child_process";
 import multer from "multer";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
+import mammoth from "mammoth";
 import puppeteer from "puppeteer-core";
 import { PDFDocument } from "pdf-lib";
 import { randomBytes, createHash } from "node:crypto";
@@ -383,8 +384,14 @@ app.delete("/auth/users/:id", authenticate, requireAdmin, (req, res) => {
   const id = parseInt(req.params.id);
   if (id === req.user.id)
     return res.status(400).json({ error: "Cannot delete your own account" });
-  db.prepare("DELETE FROM users WHERE id = ?").run(id);
-  res.json({ success: true });
+  try {
+    db.prepare("DELETE FROM email_campaigns WHERE user_id = ?").run(id);
+    db.prepare("DELETE FROM users WHERE id = ?").run(id);
+    res.json({ success: true });
+  } catch (e) {
+    console.error("[delete user]", e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // PUT /auth/users/:id/password — change password (admin or self)
@@ -1040,6 +1047,30 @@ app.get("/contracts/templates/:id/content", authenticate, (req, res) => {
   res.json({ content: row.file.toString("utf-8") });
 });
 
+// GET /contracts/templates/:id/preview — clean rendered HTML for any template type
+app.get("/contracts/templates/:id/preview", authenticate, async (req, res) => {
+  const row = db.prepare("SELECT file, template_type FROM contract_templates WHERE id=?").get(req.params.id);
+  if (!row) return res.status(404).json({ error: "Not found" });
+  try {
+    let html;
+    if (row.template_type === "html") {
+      html = row.file.toString("utf-8");
+      // Replace @@variable@@ tags with a blank underline span
+      html = html.replace(/@@[a-zA-Z0-9_]+@@/g, '<span style="display:inline-block;min-width:60px;border-bottom:1.5px solid #aaa;height:1.1em;vertical-align:bottom;opacity:0.5"></span>');
+    } else {
+      const result = await mammoth.convertToHtml({ buffer: Buffer.from(row.file) });
+      // Replace [[var]], {var} docxtemplater placeholders with blank underlines
+      html = result.value
+        .replace(/\[\[[^\]]+\]\]/g, '<span style="display:inline-block;min-width:60px;border-bottom:1.5px solid #aaa;height:1.1em;vertical-align:bottom;opacity:0.5"></span>')
+        .replace(/\{[^}]+\}/g, '<span style="display:inline-block;min-width:60px;border-bottom:1.5px solid #aaa;height:1.1em;vertical-align:bottom;opacity:0.5"></span>');
+      html = `<html><body style="font-family:serif;padding:32px;max-width:800px;margin:0 auto;line-height:1.6">${html}</body></html>`;
+    }
+    res.json({ html });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // PUT /contracts/templates/:id/name
 app.put("/contracts/templates/:id/name", authenticate, (req, res) => {
   const { name } = req.body || {};
@@ -1075,7 +1106,7 @@ app.delete("/contracts/templates/:id", authenticate, (req, res) => {
 
 // POST /contracts/generate — fill template and return PDF or Word
 app.post("/contracts/generate", authenticate, async (req, res) => {
-  const { templateId, data, format } = req.body || {};
+  const { templateId, data, format, filename } = req.body || {};
   const returnWord = format === "word";
   const row = db.prepare("SELECT * FROM contract_templates WHERE id=?").get(templateId);
   if (!row) return res.status(404).json({ error: "Template not found" });
@@ -1107,7 +1138,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       db.prepare("INSERT INTO contracts (template_id, template_name, data, created_by, created_by_name) VALUES (?,?,?,?,?)")
         .run(templateId, row.name, JSON.stringify(data), req.user.id, req.user.name || req.user.email);
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.pdf"`);
+      res.setHeader("Content-Disposition", "attachment");
       return res.send(pdfBytes);
     } catch (e) {
       console.error("[contracts/generate html]", e);
@@ -1207,7 +1238,8 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       for (const f of pctFields) { if (renderData[f]) renderData[f] = fmtPct(renderData[f]); }
       if (renderData.contract_date) renderData.contract_date = fmtDate(renderData.contract_date);
       const schedule = (data.payment_schedule || []).map(r => ({
-        payment_date: fmtDate(r.date || ""),
+        payment_subject: r.subject === "other" ? (r.subjectCustom || "") : (r.subject || "Hizmet Başlangıç Ücreti"),
+        payment_date: r.dateType === "text" ? (r.dateText || "") : fmtDate(r.date || ""),
         down_payment: fmtTL(r.amount || ""),
       }));
       doc.render({ ...renderData, payment_schedule: schedule });
@@ -1292,7 +1324,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
         .run(templateId, row.name, JSON.stringify(data), req.user.id, req.user.name || req.user.email);
       if (returnWord) {
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-        res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.docx"`);
+        res.setHeader("Content-Disposition", "attachment");
         return res.send(docxBuf);
       }
       const loProfile1 = path.join(TMP_DIR, `lo_profile_${tmpId}`);
@@ -1308,7 +1340,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       fs.unlinkSync(docxPath);
       fs.unlinkSync(pdfPath);
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.pdf"`);
+      res.setHeader("Content-Disposition", "attachment");
       return res.send(pdfBuf);
     } catch (e) {
       console.error("[contracts/generate docxtemplater]", e);
@@ -1327,15 +1359,28 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     if (data.contract_date) data.contract_date = fmtLegacyDate(data.contract_date);
     for (const f of ["down_payment","down_payment_2","program2_fee","program2_fee_2","program3_fee","program3_fee_2"]) { if (data[f]) data[f] = fmtLegacyNum(data[f]); }
 
+    // Auto-set vakifbank_clause based on success_bonus_type
+    console.log("[contract] success_bonus_type:", data.success_bonus_type);
+    console.log("[contract] payment_schedule rows:", (data.payment_schedule || []).length);
+    if ((data.success_bonus_type || "").includes("sağlanan fayda") || (data.success_bonus_type || "").toLowerCase().includes("benefit")) {
+      data.vakifbank_clause = " Sağlanan fayda; projenin onaylandığı tarihte Vakıfbank’ ın ticari müşterilerine kullandırdığı 1 yıl vadeli ticari kredilerindeki tabela faiz oranı üzerinden, projenin toplam uygulama süresince hesaplanacak faiz miktarınca olacaktır.";
+      console.log("[contract] vakifbank_clause SET");
+    } else {
+      data.vakifbank_clause = data.vakifbank_clause || "";
+      console.log("[contract] vakifbank_clause EMPTY");
+    }
+
     // Expand payment_schedule array → named variables (payment_date1, down_payment1, ...)
     {
       const schedule = data.payment_schedule || [];
       schedule.forEach((row, i) => {
-        data[`payment_date${i + 1}`] = row.date || "";
-        data[`down_payment${i + 1}`] = row.amount || "";
+        data[`payment_subject${i + 1}`] = row.subject === "other" ? (row.subjectCustom || "") : (row.subject || "Peşinat");
+        data[`payment_date${i + 1}`]    = row.dateType === "text" ? (row.dateText || "") : (row.date || "");
+        data[`down_payment${i + 1}`]    = row.amount || "";
       });
       // Clear unused slots up to 20
       for (let i = schedule.length + 1; i <= 20; i++) {
+        data[`payment_subject${i}`] = "";
         data[`payment_date${i}`] = "";
         data[`down_payment${i}`] = "";
       }
@@ -1393,7 +1438,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       const buf = fs.readFileSync(docxPath);
       fs.unlinkSync(docxPath);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-      res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.docx"`);
+      res.setHeader("Content-Disposition", "attachment");
       return res.send(buf);
     }
 
@@ -1413,7 +1458,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     fs.unlinkSync(pdfPath);
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="sozlesme_${tmpId}.pdf"`);
+    res.setHeader("Content-Disposition", "attachment");
     res.send(pdfBuf);
   } catch (e) {
     console.error("[contracts/generate]", e);
@@ -1535,17 +1580,15 @@ function replaceLegacyTagsAcrossRuns(xml, data) {
 }
 
 function buildScheduleTable(rows) {
-  const headerRow = `
-    <w:tr>
-      <w:tc><w:tcPr><w:tcW w:w="4320" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>ÖDEME TARİHİ</w:t></w:r></w:p></w:tc>
-      <w:tc><w:tcPr><w:tcW w:w="4320" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>ÖDENECEK MEBLAĞ</w:t></w:r></w:p></w:tc>
-    </w:tr>`;
-  const dataRows = rows.map(r => `
-    <w:tr>
-      <w:tc><w:tcPr><w:tcW w:w="4320" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${escapeXml(r.date)}</w:t></w:r></w:p></w:tc>
-      <w:tc><w:tcPr><w:tcW w:w="4320" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>${escapeXml(r.amount)}</w:t></w:r></w:p></w:tc>
-    </w:tr>`).join("");
-  return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="8640" w:type="dxa"/></w:tblPr><w:tblGrid><w:gridCol w:w="4320"/><w:gridCol w:w="4320"/></w:tblGrid>${headerRow}${dataRows}</w:tbl>`;
+  const tc = (w, text, bold = false) =>
+    `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>${bold ? "<w:rPr><w:b/></w:rPr>" : ""}<w:t>${escapeXml(text)}</w:t></w:r></w:p></w:tc>`;
+  const headerRow = `<w:tr>${tc(2880,"ÖDEME KONUSU",true)}${tc(2880,"ÖDEME VADESİ",true)}${tc(2880,"ÖDENECEK MEBLAĞ",true)}</w:tr>`;
+  const dataRows = rows.map(r => {
+    const subject = r.subject === "other" ? (r.subjectCustom || "") : (r.subject || "Hizmet Başlangıç Ücreti");
+    const date    = r.dateType === "text" ? (r.dateText || "") : (r.date || "");
+    return `<w:tr>${tc(2880, subject)}${tc(2880, date)}${tc(2880, r.amount || "")}</w:tr>`;
+  }).join("");
+  return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="8640" w:type="dxa"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid>${headerRow}${dataRows}</w:tbl>`;
 }
 
 function escapeXml(s) {
@@ -1681,6 +1724,7 @@ async function generateContractSlide(contractData, theme = {}) {
   fs.unlinkSync(htmlPath);
   return Buffer.from(pdfBytes);
 }
+
 
 async function mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex) {
   const canvaDoc = await PDFDocument.load(canvaPdfBytes);
@@ -1994,6 +2038,14 @@ function replacePptxPlaceholders(pptxBuffer, replacements) {
 
 function buildPricingSlideHtml(d) {
   const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const fmtNum = s => String(s||"").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const NOTE_TR = {
+    "Based on approved support": "Onaylatılan Destek Tutarı Üzerinden Hesaplanacaktır",
+    "Based on approved grant":   "Onaylatılan Hibe Tutarı Üzerinden Hesaplanacaktır",
+    "Based on approved loan":    "Onaylatılan Kredi Tutarı Üzerinden Hesaplanacaktır",
+    "Based on benefit provided": "Sağlanan Fayda Üzerinden Hesaplanacaktır",
+  };
+  const trNote = s => NOTE_TR[s] || s;
   const n = Math.min(Math.max(parseInt(d.num_options) || 1, 1), 3);
   const opts = (d.opt || []).slice(0, n);
   while (opts.length < n) opts.push({});
@@ -2003,16 +2055,16 @@ function buildPricingSlideHtml(d) {
   const cardHtml = (o, valSize) => {
     const fee2 = o.succ_fee_2;
     return `<div class="card">
-      <div class="price-label">Peşinat / Down Payment</div>
-      <div class="price-value" style="font-size:${valSize}px">${esc(o.dp ? o.dp+" TL + KDV" : "")}</div>
+      <div class="price-label">Peşinat</div>
+      <div class="price-value" style="font-size:${valSize}px">${esc(o.dp ? fmtNum(o.dp)+" TL + KDV" : "")}</div>
       <hr class="divider">
-      <div class="price-label">Başarı Primi 1 / Success Fee 1</div>
+      <div class="price-label">Başarı Primi 1</div>
       <div class="price-value" style="font-size:${valSize}px;margin-bottom:4px">${esc(o.succ_fee_1 ? "%"+o.succ_fee_1+" + KDV" : "")}</div>
-      ${o.note1 ? `<div class="price-note">${esc(o.note1)}</div>` : `<div style="margin-bottom:10px"></div>`}
+      ${o.note1 ? `<div class="price-note">${esc(trNote(o.note1))}</div>` : `<div style="margin-bottom:10px"></div>`}
       ${fee2 ? `<hr class="divider">
-      <div class="price-label">Başarı Primi 2 / Success Fee 2</div>
+      <div class="price-label">Başarı Primi 2</div>
       <div class="price-value" style="font-size:${valSize}px;margin-bottom:4px">${esc("%"+fee2+" + KDV")}</div>
-      ${o.note2 ? `<div class="price-note" style="margin-bottom:0">${esc(o.note2)}</div>` : ""}` : ""}
+      ${o.note2 ? `<div class="price-note" style="margin-bottom:0">${esc(trNote(o.note2))}</div>` : ""}` : ""}
     </div>`;
   };
 
@@ -2026,10 +2078,17 @@ function buildPricingSlideHtml(d) {
   const cardW     = "350px";
   const notesW    = is1 ? cardW : `calc(${n} * ${cardW} + ${n-1} * ${gap})`;
 
+  const badgeInner = (o, i) => {
+    const title = (o.title || "").trim();
+    return title
+      ? `<span style="font-size:23px;opacity:0.85;display:block">Seçenek ${i+1}</span><span style="font-size:25px;display:block">${esc(title)}</span>`
+      : `Seçenek ${i+1}`;
+  };
+
   const badgesHtml = is1
-    ? `<div class="badge" style="background:${BADGE_COLORS[0]}">${esc(opts[0]?.title || "FİYATLANDIRMA")}</div>`
+    ? `<div class="badge" style="background:${BADGE_COLORS[0]}">${opts[0]?.title ? `<span style="font-size:23px;opacity:0.85;display:block">Seçenek 1</span><span style="font-size:25px;display:block">${esc(opts[0].title)}</span>` : "FİYATLANDIRMA"}</div>`
     : `<div class="badges">${opts.map((o, i) =>
-        `<div class="badge" style="background:${BADGE_COLORS[i]}">${esc(o.title || `Seçenek ${i+1}`)}</div>`
+        `<div class="badge" style="background:${BADGE_COLORS[i]}">${badgeInner(o, i)}</div>`
       ).join("")}</div>`;
 
   const cardsHtml = is1
@@ -2052,11 +2111,11 @@ body { font-family: 'Arial', sans-serif; color: #0b3e64; width: 338.67mm; height
 .deco-left { position: absolute; width: 36px; height: 36px; border-radius: 50%; background: #0b3e64; left: 24px; top: 42%; }
 .deco-br { position: absolute; width: 150px; height: 150px; border-radius: 50%; background: #ad3125; right: -50px; bottom: -55px; opacity: 0.85; }
 .deco-bl { position: absolute; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, #ad3125 0%, transparent 70%); left: -30px; bottom: -30px; opacity: 0.7; }
-.notes-wrap { margin-top: 10px; text-align: center; width: ${notesW}; }
-.notes-text { font-size: 11px; color: rgba(255,255,255,0.75); font-style: italic; line-height: 1.6; }
+.notes-wrap { margin-top: 12px; width: ${notesW}; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; padding: 10px 16px; }
+.notes-text { font-size: 13px; color: rgba(255,255,255,0.92); font-style: italic; line-height: 1.6; text-align: center; white-space: pre-wrap; }
 
 /* Badge+card group: absolutely positioned on the page, straddling the boundary */
-.card-group { position: absolute; left: 50%; transform: translateX(-50%); top: calc(50% - 120px); z-index: 10; display: flex; flex-direction: column; align-items: center; }
+.card-group { position: absolute; left: 50%; transform: translateX(-50%); top: calc(50% - ${d.gen_note ? 150 : 120}px); z-index: 10; display: flex; flex-direction: column; align-items: center; }
 .badge { display: block; width: ${cardW}; color: #fff; font-size: 14px; font-weight: 700; padding: 11px 14px; text-align: center; border-radius: 6px 6px 0 0; word-break: break-word; overflow: hidden; box-sizing: border-box; }
 .badges { display: flex; gap: ${gap}; justify-content: center; }
 .badges .badge { flex: 0 0 ${cardW}; width: ${cardW}; border-radius: 6px 6px 0 0; }
@@ -2099,8 +2158,118 @@ function buildGreenPricingSlideHtml(d) {
     .replaceAll("#dde4f0", "#E0EAF4");
 }
 
+function buildDiscountPricingSlideHtml(d) {
+  const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const fmtNum = s => String(s||"").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const n = Math.min(Math.max(parseInt(d.num_options) || 1, 1), 3);
+  const opts = (d.opt || []).slice(0, n);
+  while (opts.length < n) opts.push({});
+
+  const BADGE_COLORS = ["#ad3125", "#0b3e64", "#1B5EA8"];
+  const is1 = n === 1, is3 = n === 3;
+  const gap       = is3 ? "14px" : "18px";
+  const valSize   = is3 ? 20 : is1 ? 26 : 22;
+  const labelSize = is3 ? 11 : 13;
+  const noteSize  = is3 ? 10 : 11;
+  const cardPad   = "22px 40px";
+  const cardW     = "350px";
+  const notesW    = is1 ? cardW : `calc(${n} * ${cardW} + ${n-1} * ${gap})`;
+
+  const cardHtml = (o, valSize) => {
+    const fee2 = o.succ_fee_2;
+    return `<div class="card">
+      <div class="price-label">Peşinat</div>
+      ${o.dp_original ? `<div style="text-align:center;font-size:${valSize-1}px;color:#555;text-decoration:line-through;margin-bottom:2px;font-weight:700;">${esc(fmtNum(o.dp_original))} TL + KDV</div>` : ""}
+      <div class="price-value" style="font-size:${valSize}px">${esc(o.dp ? fmtNum(o.dp)+" TL + KDV" : "")}</div>
+      <hr class="divider">
+      <div class="price-label">Başarı Primi 1</div>
+      <div class="price-value" style="font-size:${valSize}px;margin-bottom:4px">${esc(o.succ_fee_1 ? "%"+o.succ_fee_1+" + KDV" : "")}</div>
+      ${o.note1 ? `<div class="price-note">${esc(o.note1)}</div>` : `<div style="margin-bottom:10px"></div>`}
+      ${fee2 ? `<hr class="divider">
+      <div class="price-label">Başarı Primi 2</div>
+      <div class="price-value" style="font-size:${valSize}px;margin-bottom:4px">${esc("%"+fee2+" + KDV")}</div>
+      ${o.note2 ? `<div class="price-note" style="margin-bottom:0">${esc(o.note2)}</div>` : ""}` : ""}
+    </div>`;
+  };
+
+  const badgeInner = (o, i) => {
+    const title = (o.title || "").trim();
+    return title
+      ? `<span style="font-size:23px;opacity:0.85;display:block">Seçenek ${i+1}</span><span style="font-size:25px;display:block">${esc(title)}</span>`
+      : `Seçenek ${i+1}`;
+  };
+
+  const badgesHtml = is1
+    ? `<div class="badge" style="background:${BADGE_COLORS[0]}">${opts[0]?.title ? `<span style="font-size:23px;opacity:0.85;display:block">Seçenek 1</span><span style="font-size:25px;display:block">${esc(opts[0].title)}</span>` : "FİYATLANDIRMA"}</div>`
+    : `<div class="badges">${opts.map((o, i) =>
+        `<div class="badge" style="background:${BADGE_COLORS[i]}">${badgeInner(o, i)}</div>`
+      ).join("")}</div>`;
+
+  const cardsHtml = is1
+    ? cardHtml(opts[0], valSize)
+    : `<div class="cols">${opts.map(o => cardHtml(o, valSize)).join("")}</div>`;
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Arial', sans-serif; color: #0b3e64; width: 338.67mm; height: 190.5mm; overflow: hidden; }
+.page { display: flex; flex-direction: column; height: 190.5mm; position: relative; }
+.top { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 80px 80px 0; background: #fff; position: relative; overflow: hidden; }
+.deco-tr { position: absolute; width: 90px; height: 90px; border-radius: 50%; background: #ad3125; top: -30px; right: -25px; }
+.title { font-size: ${is3 ? 36 : 40}px; font-weight: 900; color: #ad3125; letter-spacing: 4px; }
+.dark-section { flex: 1; background: #081828; position: relative; overflow: hidden; }
+.deco-left { position: absolute; width: 36px; height: 36px; border-radius: 50%; background: #0b3e64; left: 24px; top: 42%; }
+.deco-br { position: absolute; width: 150px; height: 150px; border-radius: 50%; background: #ad3125; right: -50px; bottom: -55px; opacity: 0.85; }
+.deco-bl { position: absolute; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, #ad3125 0%, transparent 70%); left: -30px; bottom: -30px; opacity: 0.7; }
+.notes-wrap { margin-top: 12px; width: ${notesW}; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; padding: 10px 16px; }
+.notes-text { font-size: 13px; color: rgba(255,255,255,0.92); font-style: italic; line-height: 1.6; text-align: center; white-space: pre-wrap; }
+.card-group { position: absolute; left: 50%; transform: translateX(-50%); top: calc(50% - ${d.gen_note ? 150 : 120}px); z-index: 10; display: flex; flex-direction: column; align-items: center; }
+.badge { display: block; width: ${cardW}; color: #fff; font-size: 14px; font-weight: 700; padding: 11px 14px; text-align: center; border-radius: 6px 6px 0 0; word-break: break-word; overflow: hidden; box-sizing: border-box; }
+.badges { display: flex; gap: ${gap}; justify-content: center; }
+.badges .badge { flex: 0 0 ${cardW}; width: ${cardW}; border-radius: 6px 6px 0 0; }
+.cols { display: flex; gap: ${gap}; }
+.card { width: ${cardW}; flex: 0 0 ${cardW}; background: #fff; border-radius: 0 0 12px 12px; padding: ${cardPad}; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.price-label { text-align: center; font-size: ${labelSize}px; color: #ad3125; font-weight: 700; margin-bottom: 3px; }
+.price-value { text-align: center; font-weight: 900; color: #0b3e64; margin-bottom: 10px; white-space: nowrap; }
+.price-note { text-align: center; font-size: ${noteSize}px; color: #555; font-style: italic; margin-bottom: 10px; }
+.divider { border: none; border-top: 1px solid #dde4f0; margin: 8px 0 12px; }
+</style></head><body>
+<div class="page">
+  <div class="top">
+    <div class="deco-tr"></div>
+    <div class="title">ÜCRETLENDİRME</div>
+  </div>
+  <div class="dark-section">
+    <div class="deco-left"></div>
+    <div class="deco-br"></div>
+    <div class="deco-bl"></div>
+  </div>
+  <div class="card-group">
+    ${badgesHtml}
+    ${cardsHtml}
+    ${d.gen_note ? `<div class="notes-wrap"><div class="notes-text">${esc(d.gen_note)}</div></div>` : ""}
+  </div>
+</div>
+</body></html>`;
+}
+
+function buildGreenDiscountPricingSlideHtml(d) {
+  const src = buildDiscountPricingSlideHtml(d);
+  return src
+    .replaceAll("#ad3125", "#4B6428")
+    .replaceAll("#0b3e64", "#1B2E5E")
+    .replace("background: #081828", "background: linear-gradient(135deg, #2D5016 0%, #1B2E5E 100%)")
+    .replaceAll("color: #0b3e64", "color: #1B2E5E")
+    .replaceAll("#dde4f0", "#E0EAF4");
+}
+
 async function generatePricingSlide(data) {
-  const html = data.theme === "green" ? buildGreenPricingSlideHtml(data) : buildPricingSlideHtml(data);
+  let html;
+  if (data.discount) {
+    html = data.theme === "green" ? buildGreenDiscountPricingSlideHtml(data) : buildDiscountPricingSlideHtml(data);
+  } else {
+    html = data.theme === "green" ? buildGreenPricingSlideHtml(data) : buildPricingSlideHtml(data);
+  }
   const htmlPath = path.join(TMP_DIR, `pricing_slide_${Date.now()}.html`);
   fs.writeFileSync(htmlPath, html, "utf-8");
   const browser = await puppeteer.launch({ executablePath: EDGE_PATH, headless: true, args: ["--no-sandbox","--disable-setuid-sandbox"] });
@@ -2138,16 +2307,15 @@ app.get("/presentations", authenticate, (req, res) => {
 });
 
 app.post("/presentations", authenticate, requireAdmin, async (req, res) => {
-  const { category, name, canva_link } = req.body || {};
+  const { category, name, canva_link, theme } = req.body || {};
   if (!name || !canva_link) return res.status(400).json({ error: "name and canva_link required" });
-  // Resolve canva.link short URL → extract design ID
   let design_id = "";
   try {
     const r = await fetch(canva_link.trim(), { redirect: "follow", signal: AbortSignal.timeout(10000) });
     const match = r.url.match(/canva\.com\/design\/([A-Za-z0-9_-]+)/);
     if (match) design_id = match[1];
   } catch (e) { /* leave empty, user can fix manually */ }
-  const row = db.prepare("INSERT INTO program_presentations (category, name, canva_link, design_id) VALUES (?,?,?,?)").run(category || "", name.trim(), canva_link.trim(), design_id);
+  const row = db.prepare("INSERT INTO program_presentations (category, name, canva_link, design_id, theme) VALUES (?,?,?,?,?)").run(category || "", name.trim(), canva_link.trim(), design_id, theme === "green" ? "green" : "blue");
   res.json(db.prepare("SELECT * FROM program_presentations WHERE id=?").get(row.lastInsertRowid));
 });
 
@@ -2220,8 +2388,8 @@ app.post("/pricing/generate-program", authenticate, async (req, res) => {
 
 // POST /pricing/generate
 app.post("/pricing/generate", authenticate, async (req, res) => {
-  const { num_options, opt, gen_note, design_id, theme } = req.body || {};
-  const data = { num_options: num_options || 1, opt: opt || [], gen_note: gen_note || "", theme: theme || "blue" };
+  const { num_options, opt, gen_note, design_id, theme, discount, client_name } = req.body || {};
+  const data = { num_options: num_options || 1, opt: opt || [], gen_note: gen_note || "", theme: theme || "blue", discount: !!discount };
   const targetDesignId = (design_id || "").trim() || PRICING_DESIGN_ID;
   try {
     const slidePdfBytes = await generatePricingSlide(data);
@@ -2239,8 +2407,9 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
       finalPdfBytes = slidePdfBytes;
     }
 
+    const safeName = (client_name || "").trim().replace(/[\/\\:*?"<>|]/g, "").replace(/\s+/g, "_") || `pricing_${Date.now()}`;
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="pricing_${Date.now()}.pdf"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}.pdf"`);
     res.send(finalPdfBytes);
   } catch (e) {
     console.error("[pricing/generate]", e);
@@ -2251,7 +2420,10 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
 // Serve built frontend
 const distPath = path.join(__dirname, "dist");
 if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { etag: false, lastModified: false, setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".html")) res.setHeader("Cache-Control", "no-store");
+    else res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+  }}));
   app.use((req, res, next) => {
     if (req.method !== "GET") return next();
     if (req.path.startsWith("/auth") || req.path.startsWith("/email") || req.path.startsWith("/contracts") || req.path.startsWith("/ml") || req.path.startsWith("/canva") || req.path.startsWith("/pricing") || req.path.startsWith("/presentations") || req.path.startsWith("/monday") || req.path.startsWith("/companies")) return next();
