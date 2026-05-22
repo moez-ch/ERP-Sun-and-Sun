@@ -1282,7 +1282,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
           if (!f5) continue;
           let xml5 = f5.asText();
           if (!xml5.includes("@@payment_schedule@@")) continue;
-          xml5 = xml5.split("@@payment_schedule@@").join(scheduleXml2);
+          xml5 = replacePaymentSchedule(xml5, scheduleXml2);
           zip5.file(fname, xml5);
           changed5 = true;
         }
@@ -1461,11 +1461,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       let xml = replaceLegacyTagsAcrossRuns(xmlFile.asText(), data);
 
       // Replace @@payment_schedule@@ with table XML
-      if (scheduleTableXml) {
-        xml = xml.split("@@payment_schedule@@").join(scheduleTableXml);
-      } else {
-        xml = xml.split("@@payment_schedule@@").join("");
-      }
+      xml = replacePaymentSchedule(xml, scheduleTableXml);
 
       zip.file(fname, xml);
     }
@@ -1637,6 +1633,13 @@ function buildScheduleTable(rows) {
 
 function escapeXml(s) {
   return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function replacePaymentSchedule(xml, scheduleXml) {
+  if (!xml.includes("@@payment_schedule@@")) return xml;
+  const paraRe = /<w:p\b[^>]*>(?:(?!<\/w:p>)[\s\S])*?@@payment_schedule@@(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/;
+  if (paraRe.test(xml)) return xml.replace(paraRe, scheduleXml || "");
+  return xml.split("@@payment_schedule@@").join(scheduleXml || "");
 }
 
 
