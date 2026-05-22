@@ -108,6 +108,31 @@ try { db.exec(`ALTER TABLE contract_templates ADD COLUMN visible_fields TEXT`); 
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN default_party1_id INTEGER`); } catch {}
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN default_iban TEXT`); } catch {}
 db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIKE '%.html' AND template_type = 'docx'`);
+
+// Migration: inject @@payment_schedule@@ into docx templates that have an empty payment table
+{
+  const templates = db.prepare("SELECT id, file FROM contract_templates WHERE template_type = 'docx'").all();
+  for (const tpl of templates) {
+    try {
+      const zip = new PizZip(tpl.file);
+      const xmlFile = zip.file("word/document.xml");
+      if (!xmlFile) continue;
+      let xml = xmlFile.asText();
+      if (xml.includes("@@payment_schedule@@")) continue;
+      if (!xml.includes("ÖDEME KONUSU")) continue;
+      xml = xml.replace(/<w:tbl\b[\s\S]*?ÖDEME KONUSU[\s\S]*?<\/w:tbl>/,
+        "<w:p><w:r><w:t>@@payment_schedule@@</w:t></w:r></w:p>");
+      if (!xml.includes("@@payment_schedule@@")) continue;
+      zip.file("word/document.xml", xml);
+      const updated = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      db.prepare("UPDATE contract_templates SET file = ? WHERE id = ?").run(updated, tpl.id);
+      console.log(`[migration] injected @@payment_schedule@@ into template ${tpl.id}`);
+    } catch (e) {
+      console.error(`[migration] failed for template ${tpl.id}:`, e.message);
+    }
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
