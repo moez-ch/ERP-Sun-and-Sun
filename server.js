@@ -133,6 +133,32 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
   }
 }
 
+// Migration: remove leftover empty static tables from docx templates that have @@payment_schedule@@
+{
+  const templates = db.prepare("SELECT id, file FROM contract_templates WHERE template_type = 'docx'").all();
+  for (const tpl of templates) {
+    try {
+      const zip = new PizZip(tpl.file);
+      const xmlFile = zip.file("word/document.xml");
+      if (!xmlFile) continue;
+      let xml = xmlFile.asText();
+      if (!xml.includes("@@payment_schedule@@")) continue;
+      const before = xml;
+      xml = xml.replace(/<w:tbl\b[\s\S]*?<\/w:tbl>/g, match => {
+        const hasText = /<w:t(?:\s[^>]*)?>([^<\s][^<]*)/.test(match);
+        return hasText ? match : "";
+      });
+      if (xml === before) continue;
+      zip.file("word/document.xml", xml);
+      const updated = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      db.prepare("UPDATE contract_templates SET file = ? WHERE id = ?").run(updated, tpl.id);
+      console.log(`[migration2] removed empty tables from template ${tpl.id}`);
+    } catch (e) {
+      console.error(`[migration2] failed for template ${tpl.id}:`, e.message);
+    }
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
