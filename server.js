@@ -261,7 +261,7 @@ if (db.prepare("SELECT COUNT(*) as c FROM program_presentations").get().c === 0)
 }
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
-const LIBREOFFICE = "C:\\Program Files\\LibreOffice\\program\\soffice.exe";
+const LIBREOFFICE = process.platform === "win32" ? "C:\\Program Files\\LibreOffice\\program\\soffice.exe" : "soffice";
 const TMP_DIR = path.join(__dirname, "tmp_contracts");
 if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR);
 
