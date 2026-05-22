@@ -1270,6 +1270,25 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       doc.render({ ...renderData, payment_schedule: schedule });
       let docxBuf = doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" });
 
+      // Handle @@payment_schedule@@ placeholder (injected by migration into legacy templates)
+      {
+        const scheduleRows2 = (data.payment_schedule || []);
+        const scheduleXml2 = scheduleRows2.length > 0 ? buildScheduleTable(scheduleRows2) : "";
+        const zip5 = new PizZip(docxBuf);
+        const xmlFiles5 = Object.keys(zip5.files).filter(f => f.startsWith("word/") && f.endsWith(".xml"));
+        let changed5 = false;
+        for (const fname of xmlFiles5) {
+          const f5 = zip5.file(fname);
+          if (!f5) continue;
+          let xml5 = f5.asText();
+          if (!xml5.includes("@@payment_schedule@@")) continue;
+          xml5 = xml5.split("@@payment_schedule@@").join(scheduleXml2);
+          zip5.file(fname, xml5);
+          changed5 = true;
+        }
+        if (changed5) docxBuf = zip5.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      }
+
       // Second pass: replace any {variable} tags left in the template (legacy syntax)
       {
         const zip2 = new PizZip(docxBuf);
