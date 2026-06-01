@@ -310,7 +310,9 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
   }
 }
 
-// Migration 8: inject @@vakifbank_clause@@ at the end of the paragraph containing @@sb1ddl@@
+// Migration 8: inject vakifbank_clause placeholder at end of bonus deadline paragraph
+// Searches for static phrase "hesab" + "na ödenecektir" (avoids variable split-run issues)
+// Uses [[vakifbank_clause]] for docxtemplater templates, @@vakifbank_clause@@ for legacy
 {
   const templates = db.prepare("SELECT id, file FROM contract_templates WHERE template_type = 'docx'").all();
   for (const tpl of templates) {
@@ -319,20 +321,22 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
       const xmlFile = zip.file("word/document.xml");
       if (!xmlFile) continue;
       let xml = xmlFile.asText();
-      const hasSb1 = xml.includes("@@sb1ddl@@") || xml.includes("[[sb1ddl]]") || xml.includes("{{sb1ddl}}");
-      if (!hasSb1) continue;
-      const paraRe = /<w:p\b[^>]*>(?:(?!<\/w:p>)[\s\S])*?(?:@@sb1ddl@@|\[\[sb1ddl\]\]|\{\{sb1ddl\}\})(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/;
+      if (!xml.includes("\xF6denecektir") && !xml.includes("ödenecektir")) continue;
+      if (xml.includes("vakifbank_clause")) continue;
+      const paraRe = /<w:p\b[^>]*>(?:(?!<\/w:p>)[\s\S])*?hesab[\s\S]{1,10}na\s+\xF6denecektir(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/;
       const paraMatch = xml.match(paraRe);
-      if (!paraMatch || paraMatch[0].includes("@@vakifbank_clause@@")) continue;
+      if (!paraMatch) continue;
+      const isDocx = xml.includes("[[") || !xml.includes("@@");
+      const tag = isDocx ? "[[vakifbank_clause]]" : "@@vakifbank_clause@@";
       const before = xml;
       xml = xml.replace(paraRe, m =>
-        m.replace(/<\/w:p>$/, '<w:r><w:t xml:space="preserve">@@vakifbank_clause@@</w:t></w:r></w:p>')
+        m.replace(/<\/w:p>$/, `<w:r><w:t xml:space="preserve">${tag}</w:t></w:r></w:p>`)
       );
       if (xml === before) continue;
       zip.file("word/document.xml", xml);
       const updated = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
       db.prepare("UPDATE contract_templates SET file = ? WHERE id = ?").run(updated, tpl.id);
-      console.log(`[migration8] injected @@vakifbank_clause@@ into sb1ddl paragraph in template ${tpl.id}`);
+      console.log(`[migration8] injected ${tag} into bonus deadline paragraph in template ${tpl.id}`);
     } catch (e) {
       console.error(`[migration8] failed for template ${tpl.id}:`, e.message);
     }
