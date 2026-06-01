@@ -699,6 +699,7 @@ Kurallar:
     { key: "down_payment",             label: "Service Fee",                 group: "Contract Details" },
     { key: "down_payment_deadline",    label: "Service Fee Deadline",        group: "Contract Details" },
     { key: "success_bonus_type",       label: "Success Bonus Type",          group: "Contract Details" },
+    { key: "success_bonus_type_2",     label: "Success Bonus Type 2",        group: "Contract Details" },
     { key: "success_bonus",            label: "Success Bonus 1 (%)",         group: "Contract Details" },
     { key: "sb1ddl",                   label: "Success Bonus 1 Deadline",    group: "Contract Details" },
     { key: "success_bonus_2",          label: "Success Bonus 2 (%)",         group: "Contract Details" },
@@ -4927,8 +4928,8 @@ Kurallar:
                       </button>
                     )}
                     <div style={{ marginBottom: 14 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: fieldVisible('success_bonus_2') ? "1fr 1fr" : "1fr", gap: 10 }}>
-                        {[["success_bonus_type","@@success_bonus_type@@"],...(fieldVisible('success_bonus_2')?[["success_bonus_type_2","@@success_bonus_type_2@@"]]:[])] .map(([key, tag], i) => (
+                      <div style={{ display: "grid", gridTemplateColumns: (fieldVisible('success_bonus_2')||fieldVisible('success_bonus_type_2')) ? "1fr 1fr" : "1fr", gap: 10 }}>
+                        {[["success_bonus_type","@@success_bonus_type@@"],...(fieldVisible('success_bonus_2')||fieldVisible('success_bonus_type_2')?[["success_bonus_type_2","@@success_bonus_type_2@@"]]:[])] .map(([key, tag], i) => (
                           <div key={key}>
                             <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} {i+1} <span style={{ fontWeight: 400, opacity: 0.7 }}>({tag})</span></div>
                             <select value={contractData[key] || "onaylanan destek"} onChange={e => setContractData(p => ({ ...p, [key]: e.target.value }))}
@@ -5101,7 +5102,7 @@ Kurallar:
 
                       {fieldVisible('success_bonus_type') && <div style={{ marginBottom: 14 }}>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                          {[["success_bonus_type","@@success_bonus_type@@"],...(fieldVisible('success_bonus_2')?[["success_bonus_type_2","@@success_bonus_type_2@@"]]:[])] .map(([key, tag], i) => (
+                          {[["success_bonus_type","@@success_bonus_type@@"],...(fieldVisible('success_bonus_2')||fieldVisible('success_bonus_type_2')?[["success_bonus_type_2","@@success_bonus_type_2@@"]]:[])] .map(([key, tag], i) => (
                             <div key={key}>
                               <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} {i+1} <span style={{ fontWeight: 400, opacity: 0.7 }}>({tag})</span></div>
                               <select value={contractData[key] || "onaylanan destek"} onChange={e => setContractData(p => ({ ...p, [key]: e.target.value }))}
