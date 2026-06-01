@@ -372,6 +372,30 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
   }
 }
 
+// Migration 10: add leading space before "gün" text runs in template
+// so [[sb1ddl]] = "60" renders as "60 gün" instead of "60gün"
+{
+  const templates = db.prepare("SELECT id, file FROM contract_templates WHERE template_type = 'docx'").all();
+  for (const tpl of templates) {
+    try {
+      const zip = new PizZip(tpl.file);
+      const xmlFile = zip.file("word/document.xml");
+      if (!xmlFile) continue;
+      let xml = xmlFile.asText();
+      const before = xml;
+      // Match <w:t> (with or without attributes) whose content starts immediately with gün
+      xml = xml.replace(/(<w:t(?:\s[^>]*)?>)(gün)/g, '<w:t xml:space="preserve"> $2');
+      if (xml === before) continue;
+      zip.file("word/document.xml", xml);
+      const updated = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      db.prepare("UPDATE contract_templates SET file = ? WHERE id = ?").run(updated, tpl.id);
+      console.log(`[migration10] added space before gün run in template ${tpl.id}`);
+    } catch (e) {
+      console.error(`[migration10] failed for template ${tpl.id}:`, e.message);
+    }
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
