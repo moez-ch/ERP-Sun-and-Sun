@@ -248,6 +248,36 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
   }
 }
 
+// Migration 6: remove all tables from header/footer XML files — they repeat on every page
+{
+  const templates = db.prepare("SELECT id, file FROM contract_templates WHERE template_type = 'docx'").all();
+  for (const tpl of templates) {
+    try {
+      const zip = new PizZip(tpl.file);
+      const hfFiles = Object.keys(zip.files).filter(f => /^word\/(header|footer)\d*\.xml$/.test(f));
+      if (hfFiles.length === 0) continue;
+      let changed = false;
+      for (const fname of hfFiles) {
+        const f = zip.file(fname);
+        if (!f) continue;
+        let xml = f.asText();
+        if (!xml.includes("<w:tbl")) continue;
+        const before = xml;
+        xml = xml.replace(/<w:tbl\b[\s\S]*?<\/w:tbl>/g, "");
+        if (xml === before) continue;
+        zip.file(fname, xml);
+        changed = true;
+        console.log(`[migration6] removed ghost table from ${fname} in template ${tpl.id}`);
+      }
+      if (!changed) continue;
+      const updated = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      db.prepare("UPDATE contract_templates SET file = ? WHERE id = ?").run(updated, tpl.id);
+    } catch (e) {
+      console.error(`[migration6] failed for template ${tpl.id}:`, e.message);
+    }
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
