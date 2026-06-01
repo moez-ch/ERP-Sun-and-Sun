@@ -159,6 +159,36 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
   }
 }
 
+// Migration 3: remove tables whose cells contain only whitespace / non-breaking spaces / XML entities
+// (Migration 2 missed these because &# entity chars were counted as non-whitespace)
+{
+  const templates = db.prepare("SELECT id, file FROM contract_templates WHERE template_type = 'docx'").all();
+  for (const tpl of templates) {
+    try {
+      const zip = new PizZip(tpl.file);
+      const xmlFile = zip.file("word/document.xml");
+      if (!xmlFile) continue;
+      let xml = xmlFile.asText();
+      if (!xml.includes("@@payment_schedule@@")) continue;
+      const before = xml;
+      xml = xml.replace(/<w:tbl\b[\s\S]*?<\/w:tbl>/g, match => {
+        const re = /<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g;
+        let text = "", m2;
+        while ((m2 = re.exec(match)) !== null) text += m2[1];
+        text = text.replace(/&#\d+;|&[a-zA-Z]+;/g, "").replace(/\s/g, "");
+        return text.length > 0 ? match : "";
+      });
+      if (xml === before) continue;
+      zip.file("word/document.xml", xml);
+      const updated = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      db.prepare("UPDATE contract_templates SET file = ? WHERE id = ?").run(updated, tpl.id);
+      console.log(`[migration3] removed whitespace-only tables from template ${tpl.id}`);
+    } catch (e) {
+      console.error(`[migration3] failed for template ${tpl.id}:`, e.message);
+    }
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
