@@ -218,6 +218,36 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
   }
 }
 
+// Migration 5: find the last <w:tbl> before @@payment_schedule@@ and remove it directly
+// No regex guessing — plain string search, works regardless of table content
+{
+  const templates = db.prepare("SELECT id, file FROM contract_templates WHERE template_type = 'docx'").all();
+  for (const tpl of templates) {
+    try {
+      const zip = new PizZip(tpl.file);
+      const xmlFile = zip.file("word/document.xml");
+      if (!xmlFile) continue;
+      let xml = xmlFile.asText();
+      const schedIdx = xml.indexOf("@@payment_schedule@@");
+      if (schedIdx === -1) continue;
+      const lastTblOpen = xml.lastIndexOf("<w:tbl", schedIdx);
+      if (lastTblOpen === -1) continue;
+      const tblCloseIdx = xml.indexOf("</w:tbl>", lastTblOpen);
+      if (tblCloseIdx === -1) continue;
+      const tblEnd = tblCloseIdx + "</w:tbl>".length;
+      const before = xml;
+      xml = xml.substring(0, lastTblOpen) + xml.substring(tblEnd);
+      if (xml === before) continue;
+      zip.file("word/document.xml", xml);
+      const updated = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      db.prepare("UPDATE contract_templates SET file = ? WHERE id = ?").run(updated, tpl.id);
+      console.log(`[migration5] removed ghost table before @@payment_schedule@@ in template ${tpl.id}`);
+    } catch (e) {
+      console.error(`[migration5] failed for template ${tpl.id}:`, e.message);
+    }
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
