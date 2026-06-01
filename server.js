@@ -189,6 +189,35 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
   }
 }
 
+// Migration 4: remove any table immediately before @@payment_schedule@@ regardless of content
+// (Migration 3 still misses it — ghost table has content that passes entity stripping)
+{
+  const templates = db.prepare("SELECT id, file FROM contract_templates WHERE template_type = 'docx'").all();
+  for (const tpl of templates) {
+    try {
+      const zip = new PizZip(tpl.file);
+      const xmlFile = zip.file("word/document.xml");
+      if (!xmlFile) continue;
+      let xml = xmlFile.asText();
+      if (!xml.includes("@@payment_schedule@@")) continue;
+      const before = xml;
+      // Remove any <w:tbl> block that is immediately followed (allowing empty paragraphs between)
+      // by the paragraph containing @@payment_schedule@@
+      xml = xml.replace(
+        /<w:tbl\b[\s\S]*?<\/w:tbl>((?:\s*<w:p\b[^>]*>(?:(?!<w:t[ >])[\s\S])*?<\/w:p>)*\s*<w:p\b[^>]*>(?:(?!<\/w:p>)[\s\S])*?@@payment_schedule@@[\s\S]*?<\/w:p>)/,
+        '$1'
+      );
+      if (xml === before) continue;
+      zip.file("word/document.xml", xml);
+      const updated = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      db.prepare("UPDATE contract_templates SET file = ? WHERE id = ?").run(updated, tpl.id);
+      console.log(`[migration4] removed ghost table before @@payment_schedule@@ in template ${tpl.id}`);
+    } catch (e) {
+      console.error(`[migration4] failed for template ${tpl.id}:`, e.message);
+    }
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
