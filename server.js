@@ -1545,7 +1545,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
         if (changed6) docxBuf = zip6.generate({ type: "nodebuffer", compression: "DEFLATE" });
       }
 
-      // Fix digit + "gün" split across adjacent XML runs (e.g. [[sb1ddl]]="60" then "gün" in next run)
+      // Fix digit + "gün" — same run and cross-run cases
       {
         const zip7 = new PizZip(docxBuf);
         let fix7 = false;
@@ -1553,8 +1553,14 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
           const f7 = zip7.file(fname);
           if (!f7) continue;
           let xml7 = f7.asText();
-          const fixed = xml7.replace(
-            /(\d)(<\/w:t><\/w:r>(?:\s*<w:bookmarkEnd[^>\/]*\/>)*\s*<w:r\b[^>]*>(?:<w:rPr>[\s\S]*?<\/w:rPr>)?<w:t(?:\s[^>]*)?>)([gğ][üu]n)/g,
+          // Same run: digit immediately followed by gün inside one <w:t>
+          let fixed = xml7.replace(/<w:t([^>]*)>([\s\S]*?)<\/w:t>/g, (m, attrs, content) => {
+            const c2 = content.replace(/(\d)(gün)/gi, "$1 $2");
+            return c2 !== content ? `<w:t${attrs}>${c2}</w:t>` : m;
+          });
+          // Cross-run: digit ends one <w:t>, gün starts the next <w:t> within ~500 chars
+          fixed = fixed.replace(
+            /(\d)(<\/w:t>[\s\S]{0,500}?<w:t(?:[^>]*)?>)(gün)/gi,
             (_, digit, middle, gun) => digit + " " + middle + gun
           );
           if (fixed !== xml7) { zip7.file(fname, fixed); fix7 = true; }
