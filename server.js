@@ -343,6 +343,35 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
   }
 }
 
+// Migration 9: move vakifbank_clause tag from separate <w:r> into the last <w:t> of the paragraph
+// so the sentence inherits the surrounding text's font and size
+{
+  const templates = db.prepare("SELECT id, file FROM contract_templates WHERE template_type = 'docx'").all();
+  for (const tpl of templates) {
+    try {
+      const zip = new PizZip(tpl.file);
+      const xmlFile = zip.file("word/document.xml");
+      if (!xmlFile) continue;
+      let xml = xmlFile.asText();
+      if (!xml.includes("vakifbank_clause")) continue;
+      const before = xml;
+      // Pattern: separate <w:r> containing only the vakifbank tag, just before </w:p>
+      // Move the tag inside the preceding </w:t> so it shares that run's formatting
+      xml = xml.replace(
+        /(<\/w:t>)(<\/w:r>(?:\s*<w:bookmarkEnd[^\/]*\/>)*\s*)<w:r><w:t[^>]*>((?:@@|[[][[])\s*vakifbank_clause\s*(?:@@|\]\]))<\/w:t><\/w:r>(<\/w:p>)/g,
+        (_, closet, closeRun, tag, closeP) => `${tag}${closet}${closeRun}${closeP}`
+      );
+      if (xml === before) continue;
+      zip.file("word/document.xml", xml);
+      const updated = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      db.prepare("UPDATE contract_templates SET file = ? WHERE id = ?").run(updated, tpl.id);
+      console.log(`[migration9] moved vakifbank_clause inside last text run in template ${tpl.id}`);
+    } catch (e) {
+      console.error(`[migration9] failed for template ${tpl.id}:`, e.message);
+    }
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1632,10 +1661,14 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
 
     // Format deadline values: add space between digit and letter (e.g. "60gün" → "60 gün")
     for (const key of ["sb1ddl","down_payment_deadline","success_bonus_2_deadline","program2_bonus_deadline","program2_bonus_2_deadline","program3_bonus_deadline","program3_bonus_2_deadline"]) {
-      if (data[key]) data[key] = String(data[key]).replace(/(\d)([^\d\s])/g, "$1 $2").trim();
+      if (data[key]) {
+        data[key] = String(data[key]).replace(/(\d)([^\d\s])/g, "$1 $2").trim();
+        // Add trailing space if ends with digit so "60" + hardcoded "gün" in template → "60 gün"
+        if (/\d$/.test(data[key])) data[key] = data[key] + " ";
+      }
     }
     // Set vakifbank_clause: appended by migration 8 to the sb1ddl paragraph in the template
-    const VAKIFBANK_SENTENCE = " projenin onaylandığı tarihte Vakıfbank’ ın ticari müşterilerine kullandırdığı 1 yıl vadeli ticari kredilerindeki tabela faiz oranı üzerinden, projenin toplam uygulama süresince hesaplanacak faiz miktarınca olacaktır.";
+    const VAKIFBANK_SENTENCE = " Sağlanan fayda; projenin onaylandığı tarihte Vakıfbank’ ın ticari müşterilerine kullandırdığı 1 yıl vadeli ticari kredilerindeki tabela faiz oranı üzerinden, projenin toplam uygulama süresince hesaplanacak faiz miktarınca olacaktır.";
     const isFayda = (v) => (v || "").includes("sağlanan fayda");
     data.vakifbank_clause = (isFayda(data.success_bonus_type) || isFayda(data.success_bonus_type_2)) ? VAKIFBANK_SENTENCE : "";
 
