@@ -310,6 +310,34 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
   }
 }
 
+// Migration 8: inject @@vakifbank_clause@@ at the end of the paragraph containing @@sb1ddl@@
+{
+  const templates = db.prepare("SELECT id, file FROM contract_templates WHERE template_type = 'docx'").all();
+  for (const tpl of templates) {
+    try {
+      const zip = new PizZip(tpl.file);
+      const xmlFile = zip.file("word/document.xml");
+      if (!xmlFile) continue;
+      let xml = xmlFile.asText();
+      if (!xml.includes("@@sb1ddl@@")) continue;
+      const paraRe = /<w:p\b[^>]*>(?:(?!<\/w:p>)[\s\S])*?@@sb1ddl@@(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/;
+      const paraMatch = xml.match(paraRe);
+      if (!paraMatch || paraMatch[0].includes("@@vakifbank_clause@@")) continue;
+      const before = xml;
+      xml = xml.replace(paraRe, m =>
+        m.replace(/<\/w:p>$/, '<w:r><w:t xml:space="preserve">@@vakifbank_clause@@</w:t></w:r></w:p>')
+      );
+      if (xml === before) continue;
+      zip.file("word/document.xml", xml);
+      const updated = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      db.prepare("UPDATE contract_templates SET file = ? WHERE id = ?").run(updated, tpl.id);
+      console.log(`[migration8] injected @@vakifbank_clause@@ into sb1ddl paragraph in template ${tpl.id}`);
+    } catch (e) {
+      console.error(`[migration8] failed for template ${tpl.id}:`, e.message);
+    }
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1584,15 +1612,10 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     for (const key of ["sb1ddl","down_payment_deadline","success_bonus_2_deadline","program2_bonus_deadline","program2_bonus_2_deadline","program3_bonus_deadline","program3_bonus_2_deadline"]) {
       if (data[key]) data[key] = String(data[key]).replace(/(\d)([^\d\s])/g, "$1 $2").trim();
     }
-    // When "Sağlanan Fayda" is selected, append the Vakıfbank sentence to the relevant deadline field
+    // Set vakifbank_clause: appended by migration 8 to the sb1ddl paragraph in the template
     const VAKIFBANK_SENTENCE = " projenin onaylandığı tarihte Vakıfbank’ ın ticari müşterilerine kullandırdığı 1 yıl vadeli ticari kredilerindeki tabela faiz oranı üzerinden, projenin toplam uygulama süresince hesaplanacak faiz miktarınca olacaktır.";
-    if (data.sb1ddl && (data.success_bonus_type || "").includes("sağlanan fayda")) {
-      data.sb1ddl = data.sb1ddl + VAKIFBANK_SENTENCE;
-    }
-    if (data.success_bonus_2_deadline && (data.success_bonus_type_2 || "").includes("sağlanan fayda")) {
-      data.success_bonus_2_deadline = data.success_bonus_2_deadline + VAKIFBANK_SENTENCE;
-    }
-    data.vakifbank_clause = "";
+    const isFayda = (v) => (v || "").includes("sağlanan fayda");
+    data.vakifbank_clause = (isFayda(data.success_bonus_type) || isFayda(data.success_bonus_type_2)) ? VAKIFBANK_SENTENCE : "";
 
     // Expand payment_schedule array → named variables (payment_date1, down_payment1, ...)
     {
