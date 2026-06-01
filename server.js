@@ -1929,8 +1929,9 @@ function buildScheduleTable(rows) {
   const b = `w:val="single" w:sz="4" w:space="0" w:color="000000"`;
   const tblBorders = `<w:tblBorders><w:top ${b}/><w:left ${b}/><w:bottom ${b}/><w:right ${b}/><w:insideH ${b}/><w:insideV ${b}/></w:tblBorders>`;
   const tcBorders = `<w:tcBorders><w:top ${b}/><w:left ${b}/><w:bottom ${b}/><w:right ${b}/></w:tcBorders>`;
+  const font = `<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>`;
   const tc = (w, text, bold = false) =>
-    `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${tcBorders}</w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>${bold ? "<w:rPr><w:b/></w:rPr>" : ""}<w:t>${escapeXml(text)}</w:t></w:r></w:p></w:tc>`;
+    `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${tcBorders}</w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr>${font}${bold ? "<w:b/>" : ""}</w:rPr><w:t>${escapeXml(text)}</w:t></w:r></w:p></w:tc>`;
   const headerRow = `<w:tr>${tc(2880,"ÖDEME KONUSU",true)}${tc(2880,"ÖDEME VADESİ",true)}${tc(2880,"ÖDENECEK MEBLAĞ",true)}</w:tr>`;
   const dataRows = rows.map(r => {
     const subject = r.subject === "other" ? (r.subjectCustom || "") : (r.subject || "Hizmet Başlangıç Ücreti");
