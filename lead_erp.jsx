@@ -5099,7 +5099,7 @@ Kurallar:
                         </button>
                       )}
 
-                      {fieldVisible('success_bonus_type') && <div style={{ marginBottom: 14 }}>
+                      {(fieldVisible('success_bonus_type') || fieldVisible('success_bonus')) && <div style={{ marginBottom: 14 }}>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                           {[["success_bonus_type","@@success_bonus_type@@"],["success_bonus_type_2","@@success_bonus_type_2@@"]].map(([key, tag], i) => (
                             <div key={key}>
