@@ -1545,6 +1545,23 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
         if (changed6) docxBuf = zip6.generate({ type: "nodebuffer", compression: "DEFLATE" });
       }
 
+      // Fix digit + "gün" split across adjacent XML runs (e.g. [[sb1ddl]]="60" then "gün" in next run)
+      {
+        const zip7 = new PizZip(docxBuf);
+        let fix7 = false;
+        for (const fname of Object.keys(zip7.files).filter(f => f.startsWith("word/") && f.endsWith(".xml"))) {
+          const f7 = zip7.file(fname);
+          if (!f7) continue;
+          let xml7 = f7.asText();
+          const fixed = xml7.replace(
+            /(\d)(<\/w:t><\/w:r>(?:\s*<w:bookmarkEnd[^>\/]*\/>)*\s*<w:r\b[^>]*>(?:<w:rPr>[\s\S]*?<\/w:rPr>)?<w:t(?:\s[^>]*)?>)([gğ][üu]n)/g,
+            (_, digit, middle, gun) => digit + " " + middle + gun
+          );
+          if (fixed !== xml7) { zip7.file(fname, fixed); fix7 = true; }
+        }
+        if (fix7) docxBuf = zip7.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      }
+
       // Second pass: replace any {variable} tags left in the template (legacy syntax)
       {
         const zip2 = new PizZip(docxBuf);
