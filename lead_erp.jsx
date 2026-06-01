@@ -712,7 +712,7 @@ Kurallar:
     party1_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
     party2_address: "", party3_name: "", party3_tax_office: "", party3_tax_no: "", party3_address: "",
     financier: "", program_name: "", down_payment: "", down_payment_2: "", success_bonus: "", success_bonus_2: "",
-    success_bonus_type: "onaylanan destek",
+    success_bonus_type: "onaylanan destek", success_bonus_type_2: "onaylanan destek",
     down_payment_deadline: "", sb1ddl: "", success_bonus_2_deadline: "",
     program2_name: "", program2_fee: "", program2_fee_2: "", program2_bonus: "", program2_bonus_2: "",
     program2_fee_deadline: "", program2_bonus_deadline: "", program2_bonus_2_deadline: "",
@@ -4927,18 +4927,24 @@ Kurallar:
                       </button>
                     )}
                     <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} <span style={{ fontWeight: 400, opacity: 0.7 }}>(@@success_bonus_type@@)</span></div>
-                      <select value={contractData.success_bonus_type || "onaylanan destek"} onChange={e => setContractData(p => ({ ...p, success_bonus_type: e.target.value }))}
-                        style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
-                        <option value="onaylanan destek">{t("contract_approvedSupport")}</option>
-                        <option value="onaylanan kredi">{t("contract_approvedLoan")}</option>
-                        <option value="sağlanan fayda">{t("contract_benefitProvided")}</option>
-                      </select>
-                      {contractData.success_bonus_type === "sağlanan fayda" && (
-                        <div style={{ marginTop: 6, padding: "8px 10px", background: `${colors.primary}12`, border: `1px solid ${colors.primary}33`, borderRadius: 6, fontSize: 11, color: colors.textMuted, fontStyle: "italic", lineHeight: 1.5 }}>
-                          ℹ @@vakifbank_clause@@ will be added: "Sağlanan fayda; projenin onaylandığı tarihte Vakıfbank'ın ticari müşterilerine kullandırdığı 1 yıl vadeli ticari kredilerindeki tabela faiz oranı üzerinden..."
-                        </div>
-                      )}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        {[["success_bonus_type","@@success_bonus_type@@"],["success_bonus_type_2","@@success_bonus_type_2@@"]].map(([key, tag], i) => (
+                          <div key={key}>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} {i+1} <span style={{ fontWeight: 400, opacity: 0.7 }}>({tag})</span></div>
+                            <select value={contractData[key] || "onaylanan destek"} onChange={e => setContractData(p => ({ ...p, [key]: e.target.value }))}
+                              style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
+                              <option value="onaylanan destek">{t("contract_approvedSupport")}</option>
+                              <option value="onaylanan kredi">{t("contract_approvedLoan")}</option>
+                              <option value="sağlanan fayda">{t("contract_benefitProvided")}</option>
+                            </select>
+                            {contractData[key] === "sağlanan fayda" && (
+                              <div style={{ marginTop: 6, padding: "8px 10px", background: `${colors.primary}12`, border: `1px solid ${colors.primary}33`, borderRadius: 6, fontSize: 11, color: colors.textMuted, fontStyle: "italic", lineHeight: 1.5 }}>
+                                ℹ @@vakifbank_clause@@ will be added
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}</div>
@@ -5094,18 +5100,24 @@ Kurallar:
                       )}
 
                       {fieldVisible('success_bonus_type') && <div style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} <span style={{ fontWeight: 400, opacity: 0.7 }}>(@@success_bonus_type@@)</span></div>
-                        <select value={contractData.success_bonus_type || "onaylanan destek"} onChange={e => setContractData(p => ({ ...p, success_bonus_type: e.target.value }))}
-                          style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
-                          <option value="onaylanan destek">Onaylanan Destek (Approved Support)</option>
-                          <option value="onaylanan kredi">Onaylanan Kredi (Approved Loan)</option>
-                          <option value="sağlanan fayda">Sağlanan Fayda (Benefit Provided)</option>
-                        </select>
-                        {contractData.success_bonus_type === "sağlanan fayda" && (
-                          <div style={{ marginTop: 6, padding: "8px 10px", background: `${colors.primary}12`, border: `1px solid ${colors.primary}33`, borderRadius: 6, fontSize: 11, color: colors.textMuted, fontStyle: "italic", lineHeight: 1.5 }}>
-                            {t("contract_vakifbankNote")}
-                          </div>
-                        )}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          {[["success_bonus_type","@@success_bonus_type@@"],["success_bonus_type_2","@@success_bonus_type_2@@"]].map(([key, tag], i) => (
+                            <div key={key}>
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} {i+1} <span style={{ fontWeight: 400, opacity: 0.7 }}>({tag})</span></div>
+                              <select value={contractData[key] || "onaylanan destek"} onChange={e => setContractData(p => ({ ...p, [key]: e.target.value }))}
+                                style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
+                                <option value="onaylanan destek">Onaylanan Destek</option>
+                                <option value="onaylanan kredi">Onaylanan Kredi</option>
+                                <option value="sağlanan fayda">Sağlanan Fayda</option>
+                              </select>
+                              {contractData[key] === "sağlanan fayda" && (
+                                <div style={{ marginTop: 6, padding: "8px 10px", background: `${colors.primary}12`, border: `1px solid ${colors.primary}33`, borderRadius: 6, fontSize: 11, color: colors.textMuted, fontStyle: "italic", lineHeight: 1.5 }}>
+                                  {t("contract_vakifbankNote")}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>}
 
                       {fieldVisible('contract_date') && <div style={{ marginBottom: 10 }}>

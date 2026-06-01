@@ -1580,15 +1580,24 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     if (data.contract_date) data.contract_date = fmtLegacyDate(data.contract_date);
     for (const f of ["down_payment","down_payment_2","program2_fee","program2_fee_2","program3_fee","program3_fee_2"]) { if (data[f]) data[f] = fmtLegacyNum(data[f]); }
 
-    // Auto-set vakifbank_clause based on success_bonus_type
-    console.log("[contract] success_bonus_type:", data.success_bonus_type);
-    console.log("[contract] payment_schedule rows:", (data.payment_schedule || []).length);
-    if ((data.success_bonus_type || "").includes("sağlanan fayda") || (data.success_bonus_type || "").toLowerCase().includes("benefit")) {
+    // Format deadline values: add space between digit and letter (e.g. "60gün" → "60 gün")
+    for (const key of ["sb1ddl","down_payment_deadline","success_bonus_2_deadline","program2_bonus_deadline","program2_bonus_2_deadline","program3_bonus_deadline","program3_bonus_2_deadline"]) {
+      if (data[key]) data[key] = String(data[key]).replace(/(\d)([^\d\s])/g, "$1 $2").trim();
+    }
+    // Append bonus type at the end of each bonus deadline statement
+    if (data.sb1ddl && data.success_bonus_type) {
+      data.sb1ddl = data.sb1ddl + " (" + data.success_bonus_type + ")";
+    }
+    if (data.success_bonus_2_deadline && (data.success_bonus_type_2 || data.success_bonus_type)) {
+      data.success_bonus_2_deadline = data.success_bonus_2_deadline + " (" + (data.success_bonus_type_2 || data.success_bonus_type) + ")";
+    }
+
+    // Auto-set vakifbank_clause based on success_bonus_type or success_bonus_type_2
+    const isFayda = (v) => (v || "").includes("sağlanan fayda") || (v || "").toLowerCase().includes("benefit");
+    if (isFayda(data.success_bonus_type) || isFayda(data.success_bonus_type_2)) {
       data.vakifbank_clause = " Sağlanan fayda; projenin onaylandığı tarihte Vakıfbank’ ın ticari müşterilerine kullandırdığı 1 yıl vadeli ticari kredilerindeki tabela faiz oranı üzerinden, projenin toplam uygulama süresince hesaplanacak faiz miktarınca olacaktır.";
-      console.log("[contract] vakifbank_clause SET");
     } else {
       data.vakifbank_clause = data.vakifbank_clause || "";
-      console.log("[contract] vakifbank_clause EMPTY");
     }
 
     // Expand payment_schedule array → named variables (payment_date1, down_payment1, ...)
@@ -1805,8 +1814,13 @@ function buildScheduleTable(rows) {
   const headerRow = `<w:tr>${tc(2880,"ÖDEME KONUSU",true)}${tc(2880,"ÖDEME VADESİ",true)}${tc(2880,"ÖDENECEK MEBLAĞ",true)}</w:tr>`;
   const dataRows = rows.map(r => {
     const subject = r.subject === "other" ? (r.subjectCustom || "") : (r.subject || "Hizmet Başlangıç Ücreti");
-    const date    = r.dateType === "text" ? (r.dateText || "") : (r.date || "");
-    return `<w:tr>${tc(2880, subject)}${tc(2880, date)}${tc(2880, r.amount || "")}</w:tr>`;
+    const rawDate = r.dateType === "text" ? (r.dateText || "") : (r.date || "");
+    const dm = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const date = dm ? `${dm[3]}/${dm[2]}/${dm[1]}` : rawDate;
+    const rawAmt = String(r.amount || "").replace(/[^\d.,]/g, "").replace(",", ".");
+    const n = parseFloat(rawAmt);
+    const amount = (!rawAmt || isNaN(n)) ? (r.amount || "") : n.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + " TL+KDV";
+    return `<w:tr>${tc(2880, subject)}${tc(2880, date)}${tc(2880, amount)}</w:tr>`;
   }).join("");
   return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/>${tblBorders}<w:tblW w:w="8640" w:type="dxa"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid>${headerRow}${dataRows}</w:tbl>`;
 }
