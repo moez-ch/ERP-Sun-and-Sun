@@ -278,6 +278,38 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
   }
 }
 
+// Migration 7: keep EK-1 heading with table — add keepNext + pageBreakBefore to EK-1 paragraph
+{
+  const templates = db.prepare("SELECT id, file FROM contract_templates WHERE template_type = 'docx'").all();
+  for (const tpl of templates) {
+    try {
+      const zip = new PizZip(tpl.file);
+      const xmlFile = zip.file("word/document.xml");
+      if (!xmlFile) continue;
+      let xml = xmlFile.asText();
+      if (!xml.includes("EK-1") || !xml.includes("@@payment_schedule@@")) continue;
+      const before = xml;
+      xml = xml.replace(
+        /<w:p(\b[^>]*)>((?:(?!<\/w:p>)[\s\S])*?EK-1(?:(?!<\/w:p>)[\s\S])*?)<\/w:p>/,
+        (match, attrs, content) => {
+          if (content.includes('<w:keepNext/>')) return match;
+          const inject = '<w:keepNext/><w:pageBreakBefore/>';
+          if (content.includes('<w:pPr>'))
+            return `<w:p${attrs}>${content.replace('<w:pPr>', `<w:pPr>${inject}`)}</w:p>`;
+          return `<w:p${attrs}><w:pPr>${inject}</w:pPr>${content}</w:p>`;
+        }
+      );
+      if (xml === before) continue;
+      zip.file("word/document.xml", xml);
+      const updated = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      db.prepare("UPDATE contract_templates SET file = ? WHERE id = ?").run(updated, tpl.id);
+      console.log(`[migration7] added keepNext+pageBreak to EK-1 heading in template ${tpl.id}`);
+    } catch (e) {
+      console.error(`[migration7] failed for template ${tpl.id}:`, e.message);
+    }
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS contracts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
