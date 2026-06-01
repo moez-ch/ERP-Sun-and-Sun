@@ -1641,6 +1641,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
         }
       }
 
+      docxBuf = fixGunSpacing(docxBuf);
       const docxPath = path.join(TMP_DIR, tmpId + ".docx");
       fs.writeFileSync(docxPath, docxBuf);
       db.prepare("INSERT INTO contracts (template_id, template_name, data, created_by, created_by_name) VALUES (?,?,?,?,?)")
@@ -1747,7 +1748,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
       zip.file(fname, xml);
     }
 
-    const docxBuf  = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+    const docxBuf  = fixGunSpacing(zip.generate({ type: "nodebuffer", compression: "DEFLATE" }));
     const docxPath = path.join(TMP_DIR, tmpId + ".docx");
     fs.writeFileSync(docxPath, docxBuf);
 
@@ -1918,6 +1919,26 @@ function buildScheduleTable(rows) {
     return `<w:tr>${tc(2880, subject)}${tc(2880, date)}${tc(2880, amount)}</w:tr>`;
   }).join("");
   return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/>${tblBorders}<w:tblW w:w="8640" w:type="dxa"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid>${headerRow}${dataRows}</w:tbl>`;
+}
+
+function fixGunSpacing(buf) {
+  try {
+    const zip = new PizZip(buf);
+    let changed = false;
+    for (const fname of Object.keys(zip.files).filter(f => f.startsWith("word/") && f.endsWith(".xml"))) {
+      const f = zip.file(fname);
+      if (!f) continue;
+      let xml = f.asText();
+      let fixed = xml.replace(/<w:t([^>]*)>([\s\S]*?)<\/w:t>/g, (m, attrs, content) => {
+        const c2 = content.replace(/(\d)(gün)/gi, "$1 $2");
+        return c2 !== content ? `<w:t${attrs}>${c2}</w:t>` : m;
+      });
+      fixed = fixed.replace(/(\d)(<\/w:t>[\s\S]{0,500}?<w:t(?:[^>]*)?>)(gün)/gi,
+        (_, digit, middle, gun) => digit + " " + middle + gun);
+      if (fixed !== xml) { zip.file(fname, fixed); changed = true; }
+    }
+    return changed ? zip.generate({ type: "nodebuffer", compression: "DEFLATE" }) : buf;
+  } catch { return buf; }
 }
 
 function escapeXml(s) {
