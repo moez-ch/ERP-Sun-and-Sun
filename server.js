@@ -319,8 +319,9 @@ db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIK
       const xmlFile = zip.file("word/document.xml");
       if (!xmlFile) continue;
       let xml = xmlFile.asText();
-      if (!xml.includes("@@sb1ddl@@")) continue;
-      const paraRe = /<w:p\b[^>]*>(?:(?!<\/w:p>)[\s\S])*?@@sb1ddl@@(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/;
+      const hasSb1 = xml.includes("@@sb1ddl@@") || xml.includes("[[sb1ddl]]") || xml.includes("{{sb1ddl}}");
+      if (!hasSb1) continue;
+      const paraRe = /<w:p\b[^>]*>(?:(?!<\/w:p>)[\s\S])*?(?:@@sb1ddl@@|\[\[sb1ddl\]\]|\{\{sb1ddl\}\})(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/;
       const paraMatch = xml.match(paraRe);
       if (!paraMatch || paraMatch[0].includes("@@vakifbank_clause@@")) continue;
       const before = xml;
@@ -1492,6 +1493,23 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
           changed5 = true;
         }
         if (changed5) docxBuf = zip5.generate({ type: "nodebuffer", compression: "DEFLATE" });
+      }
+
+      // Replace @@vakifbank_clause@@ injected by migration 8 into the sb1ddl paragraph
+      if (data.vakifbank_clause !== undefined) {
+        const zip6 = new PizZip(docxBuf);
+        const xmlFiles6 = Object.keys(zip6.files).filter(f => f.startsWith("word/") && f.endsWith(".xml"));
+        let changed6 = false;
+        for (const fname of xmlFiles6) {
+          const f6 = zip6.file(fname);
+          if (!f6) continue;
+          let xml6 = f6.asText();
+          if (!xml6.includes("@@vakifbank_clause@@")) continue;
+          xml6 = xml6.split("@@vakifbank_clause@@").join(escapeXml(data.vakifbank_clause || ""));
+          zip6.file(fname, xml6);
+          changed6 = true;
+        }
+        if (changed6) docxBuf = zip6.generate({ type: "nodebuffer", compression: "DEFLATE" });
       }
 
       // Second pass: replace any {variable} tags left in the template (legacy syntax)
