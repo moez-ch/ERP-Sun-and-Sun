@@ -5064,26 +5064,26 @@ Kurallar:
                             {fieldVisible('down_payment_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.feeDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeDeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
                           </div>
                           )}
-                          {/* Success Bonuses */}
+                          {/* Success Bonuses — always show both if either is visible */}
                           {(fieldVisible('success_bonus') || fieldVisible('success_bonus_2')) && (
-                          <div style={{ display: "grid", gridTemplateColumns: fieldVisible('success_bonus') && fieldVisible('success_bonus_2') ? "1fr 1fr" : "1fr", gap: 10 }}>
-                            {fieldVisible('success_bonus') && <div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                            <div>
                               <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus1")}</div>
                               <select value={contractData[prog.bonusKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusKey]: e.target.value }))}
                                 style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('sb1ddl') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonusDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
-                            </div>}
-                            {fieldVisible('success_bonus_2') && <div>
+                              {(fieldVisible('sb1ddl') || fieldVisible('success_bonus')) && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonusDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
+                            </div>
+                            <div>
                               <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus2")}</div>
                               <select value={contractData[prog.bonus2Key] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2Key]: e.target.value }))}
                                 style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('success_bonus_2_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonus2DeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
+                              {(fieldVisible('success_bonus_2_deadline') || fieldVisible('success_bonus')) && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonus2DeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
                             </div>}
                           </div>
                           )}
