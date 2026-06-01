@@ -1676,15 +1676,18 @@ function replaceLegacyTagsAcrossRuns(xml, data) {
 }
 
 function buildScheduleTable(rows) {
+  const b = `w:val="single" w:sz="4" w:space="0" w:color="000000"`;
+  const tblBorders = `<w:tblBorders><w:top ${b}/><w:left ${b}/><w:bottom ${b}/><w:right ${b}/><w:insideH ${b}/><w:insideV ${b}/></w:tblBorders>`;
+  const tcBorders = `<w:tcBorders><w:top ${b}/><w:left ${b}/><w:bottom ${b}/><w:right ${b}/></w:tcBorders>`;
   const tc = (w, text, bold = false) =>
-    `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>${bold ? "<w:rPr><w:b/></w:rPr>" : ""}<w:t>${escapeXml(text)}</w:t></w:r></w:p></w:tc>`;
+    `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${tcBorders}</w:tcPr><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>${bold ? "<w:rPr><w:b/></w:rPr>" : ""}<w:t>${escapeXml(text)}</w:t></w:r></w:p></w:tc>`;
   const headerRow = `<w:tr>${tc(2880,"ÖDEME KONUSU",true)}${tc(2880,"ÖDEME VADESİ",true)}${tc(2880,"ÖDENECEK MEBLAĞ",true)}</w:tr>`;
   const dataRows = rows.map(r => {
     const subject = r.subject === "other" ? (r.subjectCustom || "") : (r.subject || "Hizmet Başlangıç Ücreti");
     const date    = r.dateType === "text" ? (r.dateText || "") : (r.date || "");
     return `<w:tr>${tc(2880, subject)}${tc(2880, date)}${tc(2880, r.amount || "")}</w:tr>`;
   }).join("");
-  return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="8640" w:type="dxa"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid>${headerRow}${dataRows}</w:tbl>`;
+  return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/>${tblBorders}<w:tblW w:w="8640" w:type="dxa"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid>${headerRow}${dataRows}</w:tbl>`;
 }
 
 function escapeXml(s) {
