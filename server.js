@@ -1584,21 +1584,15 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
     for (const key of ["sb1ddl","down_payment_deadline","success_bonus_2_deadline","program2_bonus_deadline","program2_bonus_2_deadline","program3_bonus_deadline","program3_bonus_2_deadline"]) {
       if (data[key]) data[key] = String(data[key]).replace(/(\d)([^\d\s])/g, "$1 $2").trim();
     }
-    // Append bonus type at the end of each bonus deadline statement
-    if (data.sb1ddl && data.success_bonus_type) {
-      data.sb1ddl = data.sb1ddl + " (" + data.success_bonus_type + ")";
+    // When "Sağlanan Fayda" is selected, append the Vakıfbank sentence to the relevant deadline field
+    const VAKIFBANK_SENTENCE = " projenin onaylandığı tarihte Vakıfbank’ ın ticari müşterilerine kullandırdığı 1 yıl vadeli ticari kredilerindeki tabela faiz oranı üzerinden, projenin toplam uygulama süresince hesaplanacak faiz miktarınca olacaktır.";
+    if (data.sb1ddl && (data.success_bonus_type || "").includes("sağlanan fayda")) {
+      data.sb1ddl = data.sb1ddl + VAKIFBANK_SENTENCE;
     }
-    if (data.success_bonus_2_deadline && (data.success_bonus_type_2 || data.success_bonus_type)) {
-      data.success_bonus_2_deadline = data.success_bonus_2_deadline + " (" + (data.success_bonus_type_2 || data.success_bonus_type) + ")";
+    if (data.success_bonus_2_deadline && (data.success_bonus_type_2 || "").includes("sağlanan fayda")) {
+      data.success_bonus_2_deadline = data.success_bonus_2_deadline + VAKIFBANK_SENTENCE;
     }
-
-    // Auto-set vakifbank_clause based on success_bonus_type or success_bonus_type_2
-    const isFayda = (v) => (v || "").includes("sağlanan fayda") || (v || "").toLowerCase().includes("benefit");
-    if (isFayda(data.success_bonus_type) || isFayda(data.success_bonus_type_2)) {
-      data.vakifbank_clause = " Sağlanan fayda; projenin onaylandığı tarihte Vakıfbank’ ın ticari müşterilerine kullandırdığı 1 yıl vadeli ticari kredilerindeki tabela faiz oranı üzerinden, projenin toplam uygulama süresince hesaplanacak faiz miktarınca olacaktır.";
-    } else {
-      data.vakifbank_clause = data.vakifbank_clause || "";
-    }
+    data.vakifbank_clause = "";
 
     // Expand payment_schedule array → named variables (payment_date1, down_payment1, ...)
     {
