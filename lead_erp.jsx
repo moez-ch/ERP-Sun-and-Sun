@@ -4253,12 +4253,14 @@ Kurallar:
             const extras = dropdownExtras[dropdownKey] || [];
             const isOpen = openDropdown === instanceId;
             const displayLabel = [...hardcodedOpts, ...extras].find(o => o.value === value)?.label || value || "—";
+            const words = displayLabel.split(" ");
+            const displayShort = words.length > 3 ? words.slice(0, 3).join(" ") + " …" : displayLabel;
             return (
               <div style={{ position: "relative" }}>
                 {isOpen && <div onClick={() => setOpenDropdown(null)} style={{ position: "fixed", inset: 0, zIndex: 998 }} />}
                 <div onClick={() => setOpenDropdown(isOpen ? null : instanceId)}
                   style={{ ...triggerStyle, cursor: "pointer", position: "relative", paddingRight: 22, userSelect: "none", fontFamily: font, boxSizing: "border-box", outline: "none" }}>
-                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayLabel}</span>
+                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayShort}</span>
                   <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", opacity: 0.5, fontSize: 10, pointerEvents: "none" }}>▾</span>
                 </div>
                 {isOpen && (
