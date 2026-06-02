@@ -4257,9 +4257,9 @@ Kurallar:
               <div style={{ position: "relative" }}>
                 {isOpen && <div onClick={() => setOpenDropdown(null)} style={{ position: "fixed", inset: 0, zIndex: 998 }} />}
                 <div onClick={() => setOpenDropdown(isOpen ? null : instanceId)}
-                  style={{ ...triggerStyle, cursor: "pointer", display: "flex", overflow: "hidden", justifyContent: "space-between", alignItems: "center", userSelect: "none", fontFamily: font, boxSizing: "border-box", outline: "none" }}>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 }}>{displayLabel}</span>
-                  <span style={{ marginLeft: 4, opacity: 0.5, flexShrink: 0, fontSize: 10 }}>▾</span>
+                  style={{ ...triggerStyle, cursor: "pointer", position: "relative", paddingRight: 22, userSelect: "none", fontFamily: font, boxSizing: "border-box", outline: "none" }}>
+                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayLabel}</span>
+                  <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", opacity: 0.5, fontSize: 10, pointerEvents: "none" }}>▾</span>
                 </div>
                 {isOpen && (
                   <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, zIndex: 999, background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, boxShadow: "0 4px 20px rgba(0,0,0,0.4)", maxHeight: 260, overflowY: "auto" }}>
