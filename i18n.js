@@ -500,7 +500,7 @@ const TR = {
   contract_approvedLoan: "Onaylanan Kredi",
   contract_benefitProvided: "Sağlanan Fayda",
   contract_vakifbankNote: "ℹ Vakıfbank cümlesi otomatik eklenecektir.",
-  contract_deadlineType: "Son Tarih Türü",
+  contract_deadlineType: "Vade Türü",
   contract_deadlinePh: "ör. 60",
   contract_notes: "Notlar",
   contract_notesPh: "Ek notlar...",
