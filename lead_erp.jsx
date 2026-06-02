@@ -4298,13 +4298,13 @@ Kurallar:
                       ? <div style={{ padding: "6px 10px", borderTop: `1px dashed ${colors.border}`, display: "flex", gap: 4 }}>
                           <input autoFocus value={newDropdownVal} onChange={e => setNewDropdownVal(e.target.value)}
                             onKeyDown={e => { if (e.key === "Enter") addDropdownOption(dropdownKey, newDropdownVal); if (e.key === "Escape") { setAddingDropdown(null); setNewDropdownVal(""); } }}
-                            placeholder="Yeni seçenek..." style={{ flex: 1, padding: "3px 6px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 3, color: colors.text, fontSize: 11, outline: "none" }} />
+                            placeholder={t("contract_newOptionPh")} style={{ flex: 1, padding: "3px 6px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 3, color: colors.text, fontSize: 11, outline: "none" }} />
                           <button onClick={() => addDropdownOption(dropdownKey, newDropdownVal)} style={addConfirmSt}>✓</button>
                           <button onClick={() => { setAddingDropdown(null); setNewDropdownVal(""); }} style={addCancelSt}>✕</button>
                         </div>
                       : <div onClick={() => { setAddingDropdown(instanceId); setNewDropdownVal(""); }}
                           style={{ padding: "7px 10px", color: colors.primary, fontSize: 11, cursor: "pointer", borderTop: `1px dashed ${colors.border}`, display: "flex", alignItems: "center", gap: 4 }}>
-                          <span>+</span> add option
+                          {t("contract_addOption")}
                         </div>
                     )}
                   </div>
@@ -5045,17 +5045,17 @@ Kurallar:
                       <input type="date" value={contractData.contract_date || ""} onChange={e => setContractData(p => ({ ...p, contract_date: e.target.value }))}
                         onClick={e => { try { e.target.showPicker(); } catch {} }}
                         style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box", cursor: "pointer", colorScheme: "dark" }} />
-                      {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(contractData.contract_date + "T12:00:00").getDay()]}</div>}
+                      {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{t("contract_days")[new Date(contractData.contract_date + "T12:00:00").getDay()]}</div>}
                     </div>
                     <div style={{ marginTop: 6 }}>
-                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Notes</div>
-                      <textarea value={contractData.notes || ""} onChange={e => setContractData(p => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Additional notes..." style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_notes")}</div>
+                      <textarea value={contractData.notes || ""} onChange={e => setContractData(p => ({ ...p, notes: e.target.value }))} rows={3} placeholder={t("contract_notesPh")} style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
                     </div>
                   </div>
 
                   <button onClick={() => handleGenerate("pdf")} disabled={contractGenerating || !contractTemplate}
                     style={{ width: "100%", padding: "13px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", opacity: (contractGenerating || !contractTemplate) ? 0.6 : 1 }}>
-                    {contractGenerating ? t("contract_generating") : "⬇ Download Pricing Proposal"}
+                    {contractGenerating ? t("contract_generating") : t("contract_downloadProposal")}
                   </button>
                 </div>
               ) : (
@@ -5155,7 +5155,7 @@ Kurallar:
                             <input type="number" min="0" value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))}
                               placeholder="e.g. 50000"
                               style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                            {fieldVisible('down_payment_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.feeDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeDeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
+                            {fieldVisible('down_payment_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.feeDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeDeadlineKey]: e.target.value }))} placeholder={t("contract_deadlinePh")} style={dlStyle} /></>}
                           </div>
                           )}
                           {/* Success Bonuses */}
@@ -5168,7 +5168,7 @@ Kurallar:
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('sb1ddl') && <>{prog.bonusDdlTypeKey && fieldVisible('sb1ddl_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline Type <span style={{ fontWeight: 400, opacity: 0.6 }}>(@@sb1ddl_type@@)</span></div>{renderCustomDropdown(`dlt_1_${prog.label}`, "deadline_type", contractData[prog.bonusDdlTypeKey] || "", v => setContractData(p => ({ ...p, [prog.bonusDdlTypeKey]: v })), [{ value: "", label: "—" }], dlStyle)}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonusDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
+                              {fieldVisible('sb1ddl') && <>{prog.bonusDdlTypeKey && fieldVisible('sb1ddl_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadlineType")} <span style={{ fontWeight: 400, opacity: 0.6 }}>(@@sb1ddl_type@@)</span></div>{renderCustomDropdown(`dlt_1_${prog.label}`, "deadline_type", contractData[prog.bonusDdlTypeKey] || "", v => setContractData(p => ({ ...p, [prog.bonusDdlTypeKey]: v })), [{ value: "", label: "—" }], dlStyle)}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonusDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDeadlineKey]: e.target.value }))} placeholder={t("contract_deadlinePh")} style={dlStyle} /></>}
                             </div>}
                             {fieldVisible('success_bonus_2') && <div>
                               <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus2")}</div>
@@ -5177,7 +5177,7 @@ Kurallar:
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('success_bonus_2_deadline') && <>{prog.bonus2DdlTypeKey && fieldVisible('sb1ddl_2_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline Type <span style={{ fontWeight: 400, opacity: 0.6 }}>(@@sb1ddl_2_type@@)</span></div>{renderCustomDropdown(`dlt_2_${prog.label}`, "deadline_type", contractData[prog.bonus2DdlTypeKey] || "", v => setContractData(p => ({ ...p, [prog.bonus2DdlTypeKey]: v })), [{ value: "", label: "—" }], dlStyle)}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonus2DeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
+                              {fieldVisible('success_bonus_2_deadline') && <>{prog.bonus2DdlTypeKey && fieldVisible('sb1ddl_2_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadlineType")} <span style={{ fontWeight: 400, opacity: 0.6 }}>(@@sb1ddl_2_type@@)</span></div>{renderCustomDropdown(`dlt_2_${prog.label}`, "deadline_type", contractData[prog.bonus2DdlTypeKey] || "", v => setContractData(p => ({ ...p, [prog.bonus2DdlTypeKey]: v })), [{ value: "", label: "—" }], dlStyle)}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonus2DeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DeadlineKey]: e.target.value }))} placeholder={t("contract_deadlinePh")} style={dlStyle} /></>}
                             </div>}
                           </div>
                           )}
@@ -5219,9 +5219,9 @@ Kurallar:
 
                       {/* Notes */}
                       {fieldVisible('notes') && <div style={{ marginTop: 6 }}>
-                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Notes</div>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_notes")}</div>
                         <textarea value={contractData.notes || ""} onChange={e => setContractData(p => ({ ...p, notes: e.target.value }))}
-                          rows={3} placeholder="Additional notes, conditions, or observations..."
+                          rows={3} placeholder={t("contract_notesPh")}
                           style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
                       </div>}
 
