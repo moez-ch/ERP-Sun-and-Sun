@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Excel Data Cleaner — Sun &amp; Sun</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #f2f2f2; color: #1a1a1a; font-size: 13px; line-height: 1.5; min-height: 100vh; }
+
+header { background: #1a1a1a; color: #fff; padding: 0; display: flex; align-items: stretch; }
+.header-bar { background: #c0392b; width: 6px; flex-shrink: 0; }
+.header-content { padding: 14px 22px; flex: 1; display: flex; align-items: center; justify-content: space-between; }
+.header-title { font-size: 16px; font-weight: 700; color: #FFD700; letter-spacing: 0.5px; }
+.header-title span { color: #c0392b; }
+.header-sub { font-size: 11px; color: #999; margin-top: 2px; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.header-badge { background: #c0392b; color: #fff; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 12px; letter-spacing: 1px; text-transform: uppercase; }
+.lang-toggle { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 12px; cursor: pointer; letter-spacing: 0.5px; transition: background 0.2s; }
+.lang-toggle:hover { background: rgba(255,255,255,0.2); }
+
+.main { display: grid; grid-template-columns: 320px 1fr; gap: 0; height: calc(100vh - 53px); }
+
+.sidebar { background: #fff; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-section { border-bottom: 1px solid #eee; }
+.sidebar-section-head { padding: 12px 16px; background: #fafafa; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #888; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+.sidebar-section-head:hover { background: #f5f5f5; }
+.collapse-arrow { font-size: 10px; transition: transform 0.2s; }
+.sidebar-section.collapsed .collapse-arrow { transform: rotate(-90deg); }
+.sidebar-section.collapsed .sidebar-section-body { display: none; }
+.sidebar-section-body { padding: 12px 16px; }
+
+.upload-zone { border: 2px dashed #ccc; border-radius: 8px; padding: 20px 14px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.upload-zone:hover, .upload-zone.drag { border-color: #c0392b; background: #fff5f5; }
+.upload-zone.loaded { border-color: #27ae60; background: #f0fff4; border-style: solid; }
+.upload-zone-icon { font-size: 28px; margin-bottom: 6px; }
+.upload-zone-text { font-size: 12px; color: #666; }
+.upload-zone-text strong { color: #1a1a1a; display: block; font-size: 13px; }
+.upload-zone-filename { font-size: 11px; color: #27ae60; font-weight: 700; margin-top: 4px; word-break: break-all; }
+#fileInput { display: none; }
+
+.col-options { display: flex; flex-direction: column; gap: 6px; }
+.col-option { display: flex; align-items: center; gap: 7px; font-size: 12px; cursor: pointer; }
+.col-option input[type=radio] { accent-color: #c0392b; }
+
+.kw-tabs { display: flex; border-bottom: 1px solid #eee; margin: 0 -16px; }
+.kw-tab { flex: 1; padding: 8px; text-align: center; font-size: 11px; font-weight: 700; color: #888; cursor: pointer; border-bottom: 2px solid transparent; }
+.kw-tab.active { color: #c0392b; border-bottom-color: #c0392b; }
+.kw-panel { display: none; padding-top: 10px; }
+.kw-panel.active { display: block; }
+
+.kw-add-row { display: flex; gap: 6px; margin-bottom: 8px; }
+.kw-add-row input { flex: 1; border: 1px solid #ddd; border-radius: 5px; padding: 5px 8px; font-size: 12px; outline: none; }
+.kw-add-row input:focus { border-color: #c0392b; }
+.btn-add-kw { background: #c0392b; color: #fff; border: none; border-radius: 5px; padding: 5px 10px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.btn-add-kw:hover { background: #a93226; }
+
+.kw-list { max-height: 180px; overflow-y: auto; }
+.kw-item { display: flex; align-items: center; gap: 6px; padding: 4px 2px; border-bottom: 1px solid #f5f5f5; }
+.kw-item:last-child { border-bottom: none; }
+.kw-item input[type=checkbox] { accent-color: #c0392b; flex-shrink: 0; }
+.kw-item-label { flex: 1; font-size: 12px; word-break: break-word; }
+.kw-item-del { background: none; border: none; color: #ccc; cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1; }
+.kw-item-del:hover { color: #c0392b; }
+
+.kw-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.btn-kw-action { background: none; border: 1px solid #ddd; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; color: #555; }
+.btn-kw-action:hover { border-color: #c0392b; color: #c0392b; }
+
+.kw-import-area { margin-top: 8px; display: none; }
+.kw-import-area textarea { width: 100%; border: 1px solid #ddd; border-radius: 5px; padding: 6px 8px; font-size: 11px; height: 80px; resize: vertical; outline: none; }
+.kw-import-area textarea:focus { border-color: #c0392b; }
+.kw-import-btns { display: flex; gap: 6px; margin-top: 4px; }
+
+.kw-count { font-size: 10px; color: #999; margin-top: 6px; }
+
+.search-section { padding: 14px 16px; }
+.btn-scan { width: 100%; background: #1a1a1a; color: #FFD700; border: none; border-radius: 7px; padding: 11px; font-size: 13px; font-weight: 700; cursor: pointer; letter-spacing: 0.5px; transition: background 0.2s; }
+.btn-scan:hover { background: #2d2d2d; }
+.btn-scan:disabled { background: #aaa; color: #fff; cursor: not-allowed; }
+
+.content { display: flex; flex-direction: column; overflow: hidden; }
+
+.results-toolbar { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 10px 18px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.results-stat { font-size: 12px; }
+.stat-del { font-weight: 700; color: #c0392b; }
+.stat-keep { font-weight: 700; color: #27ae60; }
+.stat-total { color: #555; }
+.toolbar-actions { display: flex; gap: 8px; margin-left: auto; }
+.btn-toolbar { border: 1px solid #ddd; background: #fff; border-radius: 5px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-weight: 600; color: #333; }
+.btn-toolbar:hover { border-color: #c0392b; color: #c0392b; }
+.btn-download { background: #27ae60; color: #fff; border: none; border-radius: 5px; padding: 6px 16px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.btn-download:hover { background: #219a52; }
+.btn-download:disabled { background: #aaa; cursor: not-allowed; }
+
+.results-container { flex: 1; overflow-y: auto; }
+.results-table-wrap { min-width: 100%; }
+table.results { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.results thead th { background: #1a1a1a; color: #FFD700; padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 700; position: sticky; top: 0; z-index: 2; white-space: nowrap; }
+table.results thead th:first-child { width: 36px; }
+table.results tbody tr { border-bottom: 1px solid #f0f0f0; }
+table.results tbody tr:hover { background: #fafafa; }
+table.results tbody tr.marked td { background: #fff5f5; }
+table.results tbody tr.marked td:first-child { border-left: 3px solid #c0392b; }
+table.results tbody tr.kept td { background: #f0fff4; }
+table.results tbody tr.kept td:first-child { border-left: 3px solid #27ae60; }
+table.results td { padding: 6px 12px; vertical-align: middle; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-tag { display: inline-block; background: #fde8e8; color: #c0392b; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-left: 4px; white-space: nowrap; }
+.match-highlight { background: #ffd7d7; border-radius: 2px; padding: 0 1px; }
+table.results td input[type=checkbox] { accent-color: #c0392b; cursor: pointer; width: 14px; height: 14px; }
+table.results td .row-num { color: #aaa; font-size: 10px; }
+
+.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #bbb; text-align: center; padding: 40px; }
+.empty-icon { font-size: 48px; margin-bottom: 14px; }
+.empty-title { font-size: 16px; font-weight: 700; color: #999; margin-bottom: 6px; }
+.empty-desc { font-size: 12px; color: #bbb; max-width: 320px; }
+
+#columnPickerWrap { display: none; }
+.col-checkboxes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.col-pill { display: flex; align-items: center; gap: 4px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 12px; padding: 2px 8px; font-size: 11px; cursor: pointer; user-select: none; }
+.col-pill input { accent-color: #c0392b; }
+.col-pill.active-pill { background: #fff0f0; border-color: #c0392b; color: #c0392b; font-weight: 700; }
+.no-matches { padding: 40px; text-align: center; color: #999; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f5f5f5; }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+@media (max-width: 700px) {
+  .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; }
+  .sidebar { max-height: 60vh; overflow-y: auto; }
+  .content { height: 70vh; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-bar"></div>
+  <div class="header-content">
+    <div>
+      <div class="header-title">Sun &amp; <span>Sun</span> — <span data-i18n="appTitle">Excel Data Cleaner</span></div>
+      <div class="header-sub" data-i18n="appSub">Filter &amp; remove unwanted rows by keyword · Everything stays in your browser</div>
+    </div>
+    <div class="header-right">
+      <button class="lang-toggle" onclick="toggleLang()" id="langBtn">🌐 Türkçe</button>
+      <div class="header-badge" data-i18n="badge">Standalone Tool</div>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+
+    <!-- UPLOAD -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-head" onclick="toggleSection(this)">
+        📂 &nbsp;<span data-i18n="step1Head">1. Load Excel File</span>
+        <span class="collapse-arrow">▾</span>
+      </div>
+      <div class="sidebar-section-body">
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+          <div class="upload-zone-icon" id="uploadIcon">📊</div>
+          <div class="upload-zone-text">
+            <strong id="uploadTitle" data-i18n="uploadTitle">Click to choose file</strong>
+            <span id="uploadHint" data-i18n="uploadHint">or drag &amp; drop an .xlsx / .xls file</span>
+          </div>
+          <div class="upload-zone-filename" id="uploadFilename"></div>
+        </div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileInput(event)"/>
+      </div>
+    </div>
+
+    <!-- SCOPE -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-head" onclick="toggleSection(this)">
+        🔍 &nbsp;<span data-i18n="step2Head">2. Search Scope</span>
+        <span class="collapse-arrow">▾</span>
+      </div>
+      <div class="sidebar-section-body">
+        <div class="col-options">
+          <label class="col-option">
+            <input type="radio" name="colScope" value="all" checked onchange="onScopeChange()"/>
+            <span data-i18n="scopeAll">Search <strong>all columns</strong></span>
+          </label>
+          <label class="col-option">
+            <input type="radio" name="colScope" value="first" onchange="onScopeChange()"/>
+            <span data-i18n="scopeFirst">Search <strong>column A only</strong></span>
+          </label>
+          <label class="col-option">
+            <input type="radio" name="colScope" value="pick" onchange="onScopeChange()"/>
+            <span data-i18n="scopePick">Pick specific columns…</span>
+          </label>
+        </div>
+        <div id="columnPickerWrap">
+          <div style="font-size:11px;color:#888;margin-top:8px;margin-bottom:4px;" data-i18n="colPickerLabel">Select columns to search:</div>
+          <div class="col-checkboxes" id="columnPills"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KEYWORDS -->
+    <div class="sidebar-section" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+      <div class="sidebar-section-head" onclick="toggleSection(this)">
+        🏷️ &nbsp;<span data-i18n="step3Head">3. Keywords</span>
+        <span class="collapse-arrow">▾</span>
+      </div>
+      <div class="sidebar-section-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
+        <div class="kw-tabs">
+          <div class="kw-tab active" id="tab-company" onclick="switchKwTab('company')">🏢 <span data-i18n="tabCompany">Company</span> <span id="cnt-company">(0)</span></div>
+          <div class="kw-tab" id="tab-profession" onclick="switchKwTab('profession')">👤 <span data-i18n="tabProfession">Profession</span> <span id="cnt-profession">(0)</span></div>
+        </div>
+
+        <!-- Company -->
+        <div class="kw-panel active" id="panel-company">
+          <div class="kw-add-row">
+            <input type="text" id="input-company" data-i18n-placeholder="kwPlaceholder" placeholder="Add keyword…" onkeydown="if(event.key==='Enter')addKeyword('company')"/>
+            <button class="btn-add-kw" onclick="addKeyword('company')" data-i18n="btnAdd">+ Add</button>
+          </div>
+          <div class="kw-list" id="list-company"></div>
+          <div class="kw-actions">
+            <button class="btn-kw-action" onclick="checkAll('company')" data-i18n="btnAll">✓ All</button>
+            <button class="btn-kw-action" onclick="uncheckAll('company')" data-i18n="btnNone">○ None</button>
+            <button class="btn-kw-action" onclick="toggleImport('company')" data-i18n="btnImport">⬆ Import</button>
+            <button class="btn-kw-action" onclick="exportKeywords('company')" data-i18n="btnExport">⬇ Export</button>
+            <button class="btn-kw-action" onclick="clearKeywords('company')" data-i18n="btnClear">🗑 Clear</button>
+          </div>
+          <div class="kw-import-area" id="import-company">
+            <div style="font-size:11px;color:#888;margin-bottom:3px;" data-i18n="importLabel">Paste keywords — one per line:</div>
+            <textarea id="importText-company" data-i18n-placeholder="importPlaceholderCompany"></textarea>
+            <div class="kw-import-btns">
+              <button class="btn-add-kw" onclick="importKeywords('company')" data-i18n="btnImportDo">Import</button>
+              <button class="btn-kw-action" onclick="toggleImport('company')" data-i18n="btnCancel">Cancel</button>
+            </div>
+          </div>
+          <div class="kw-count" id="kcount-company"></div>
+        </div>
+
+        <!-- Profession -->
+        <div class="kw-panel" id="panel-profession">
+          <div class="kw-add-row">
+            <input type="text" id="input-profession" data-i18n-placeholder="kwPlaceholder" placeholder="Add keyword…" onkeydown="if(event.key==='Enter')addKeyword('profession')"/>
+            <button class="btn-add-kw" onclick="addKeyword('profession')" data-i18n="btnAdd">+ Add</button>
+          </div>
+          <div class="kw-list" id="list-profession"></div>
+          <div class="kw-actions">
+            <button class="btn-kw-action" onclick="checkAll('profession')" data-i18n="btnAll">✓ All</button>
+            <button class="btn-kw-action" onclick="uncheckAll('profession')" data-i18n="btnNone">○ None</button>
+            <button class="btn-kw-action" onclick="toggleImport('profession')" data-i18n="btnImport">⬆ Import</button>
+            <button class="btn-kw-action" onclick="exportKeywords('profession')" data-i18n="btnExport">⬇ Export</button>
+            <button class="btn-kw-action" onclick="clearKeywords('profession')" data-i18n="btnClear">🗑 Clear</button>
+          </div>
+          <div class="kw-import-area" id="import-profession">
+            <div style="font-size:11px;color:#888;margin-bottom:3px;" data-i18n="importLabel">Paste keywords — one per line:</div>
+            <textarea id="importText-profession" data-i18n-placeholder="importPlaceholderProfession"></textarea>
+            <div class="kw-import-btns">
+              <button class="btn-add-kw" onclick="importKeywords('profession')" data-i18n="btnImportDo">Import</button>
+              <button class="btn-kw-action" onclick="toggleImport('profession')" data-i18n="btnCancel">Cancel</button>
+            </div>
+          </div>
+          <div class="kw-count" id="kcount-profession"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCAN -->
+    <div class="search-section">
+      <button class="btn-scan" id="btnScan" onclick="runScan()" disabled data-i18n="btnScan">🔍 &nbsp;Scan for Matches</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <div class="results-toolbar" id="toolbar" style="display:none;">
+      <div class="results-stat">
+        <span class="stat-del" id="statDel"></span>
+        &nbsp;·&nbsp;
+        <span class="stat-keep" id="statKeep"></span>
+        &nbsp;·&nbsp;
+        <span class="stat-total" id="statTotal"></span>
+      </div>
+      <div class="toolbar-actions">
+        <button class="btn-toolbar" onclick="markAll()" data-i18n="btnMarkAll">☑ Mark all for deletion</button>
+        <button class="btn-toolbar" onclick="unmarkAll()" data-i18n="btnUnmarkAll">☐ Unmark all</button>
+        <button class="btn-download" id="btnDownload" onclick="downloadCleaned()" disabled data-i18n="btnDownload">⬇ Download Cleaned File</button>
+      </div>
+    </div>
+    <div class="results-container" id="resultsContainer">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title" data-i18n="emptyTitle">No file loaded yet</div>
+        <div class="empty-desc" data-i18n="emptyDesc">Load an Excel file, add your keywords, then click "Scan for Matches" to find rows to review.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// TRANSLATIONS
+// ─────────────────────────────────────────────
+const T = {
+  en: {
+    appTitle: 'Excel Data Cleaner',
+    appSub: 'Filter & remove unwanted rows by keyword · Everything stays in your browser',
+    badge: 'Standalone Tool',
+    langBtn: '🌐 Türkçe',
+    step1Head: '1. Load Excel File',
+    step2Head: '2. Search Scope',
+    step3Head: '3. Keywords',
+    uploadTitle: 'Click to choose file',
+    uploadHint: 'or drag & drop an .xlsx / .xls file',
+    scopeAll: 'Search <strong>all columns</strong>',
+    scopeFirst: 'Search <strong>column A only</strong>',
+    scopePick: 'Pick specific columns…',
+    colPickerLabel: 'Select columns to search:',
+    tabCompany: 'Company',
+    tabProfession: 'Profession',
+    kwPlaceholder: 'Add keyword…',
+    btnAdd: '+ Add',
+    btnAll: '✓ All',
+    btnNone: '○ None',
+    btnImport: '⬆ Import',
+    btnExport: '⬇ Export',
+    btnClear: '🗑 Clear',
+    importLabel: 'Paste keywords — one per line:',
+    importPlaceholderCompany: 'hospital\ngendarmerie\nshopping mall\nuniversity',
+    importPlaceholderProfession: 'warehouse manager\noccupational safety\njanitor',
+    btnImportDo: 'Import',
+    btnCancel: 'Cancel',
+    btnScan: '🔍  Scan for Matches',
+    btnMarkAll: '☑ Mark all for deletion',
+    btnUnmarkAll: '☐ Unmark all',
+    btnDownload: '⬇ Download Cleaned File',
+    emptyTitle: 'No file loaded yet',
+    emptyDesc: 'Load an Excel file, add your keywords, then click "Scan for Matches" to find rows to review.',
+    emptyLoadedDesc: 'data rows · {cols} columns detected.\nAdd keywords and click Scan for Matches.',
+    kwEmpty: 'No keywords yet. Add some above.',
+    kwCount: '{active} active · {total} total',
+    statDel: '{n} to delete',
+    statKeep: '{n} to keep',
+    statTotal: '{n} matches',
+    colHeader: 'Matched Keywords',
+    rowPrefix: 'R',
+    noMatches: 'No matches found',
+    noMatchesSub: 'None of the active keywords matched any rows in the selected columns.',
+    clearConfirm: 'Delete all {cat} keywords?',
+    catCompany: 'company',
+    catProfession: 'profession',
+    toastImported: '{n} keyword(s) imported',
+    toastDownloaded: '✅ Downloaded: {file} — {del} rows removed, {kept} rows kept',
+    sheetLabel: 'Sheet:',
+    noActiveKw: 'No active keywords selected.',
+    noCols: 'No columns selected to search.',
+    emptyFile: 'The file appears to be empty.',
+    fileError: 'Could not read the file: ',
+    duplicateKw: '',
+  },
+  tr: {
+    appTitle: 'Excel Veri Temizleyici',
+    appSub: 'Anahtar kelimeye göre istenmeyen satırları filtrele ve kaldır · Her şey tarayıcında kalır',
+    badge: 'Bağımsız Araç',
+    langBtn: '🌐 English',
+    step1Head: '1. Excel Dosyası Yükle',
+    step2Head: '2. Arama Kapsamı',
+    step3Head: '3. Anahtar Kelimeler',
+    uploadTitle: 'Dosya seçmek için tıkla',
+    uploadHint: 'veya .xlsx / .xls dosyasını sürükle & bırak',
+    scopeAll: '<strong>Tüm sütunlarda</strong> ara',
+    scopeFirst: 'Yalnızca <strong>A sütununda</strong> ara',
+    scopePick: 'Belirli sütunları seç…',
+    colPickerLabel: 'Aranacak sütunları seçin:',
+    tabCompany: 'Şirket',
+    tabProfession: 'Meslek',
+    kwPlaceholder: 'Anahtar kelime ekle…',
+    btnAdd: '+ Ekle',
+    btnAll: '✓ Tümü',
+    btnNone: '○ Hiçbiri',
+    btnImport: '⬆ İçe Aktar',
+    btnExport: '⬇ Dışa Aktar',
+    btnClear: '🗑 Temizle',
+    importLabel: 'Anahtar kelimeleri yapıştır — her satıra bir tane:',
+    importPlaceholderCompany: 'hastane\njandarma\nalışveriş merkezi\nüniversite',
+    importPlaceholderProfession: 'depo müdürü\niş güvenliği uzmanı\ntemizlik görevlisi',
+    btnImportDo: 'İçe Aktar',
+    btnCancel: 'İptal',
+    btnScan: '🔍  Eşleşmeleri Tara',
+    btnMarkAll: '☑ Tümünü sil olarak işaretle',
+    btnUnmarkAll: '☐ Tümünün işaretini kaldır',
+    btnDownload: '⬇ Temizlenmiş Dosyayı İndir',
+    emptyTitle: 'Henüz dosya yüklenmedi',
+    emptyDesc: 'Bir Excel dosyası yükle, anahtar kelimelerini ekle ve ardından "Eşleşmeleri Tara"ya tıkla.',
+    emptyLoadedDesc: 'veri satırı · {cols} sütun tespit edildi.\nAnahtar kelimelerini ekle ve Eşleşmeleri Tara\'ya tıkla.',
+    kwEmpty: 'Henüz anahtar kelime yok. Yukarıdan ekleyebilirsiniz.',
+    kwCount: '{active} aktif · {total} toplam',
+    statDel: '{n} silinecek',
+    statKeep: '{n} korunacak',
+    statTotal: '{n} eşleşme',
+    colHeader: 'Eşleşen Kelimeler',
+    rowPrefix: 'S',
+    noMatches: 'Eşleşme bulunamadı',
+    noMatchesSub: 'Aktif anahtar kelimeler seçili sütunlardaki hiçbir satırla eşleşmedi.',
+    clearConfirm: 'Tüm {cat} anahtar kelimeleri silinsin mi?',
+    catCompany: 'şirket',
+    catProfession: 'meslek',
+    toastImported: '{n} anahtar kelime içe aktarıldı',
+    toastDownloaded: '✅ İndirildi: {file} — {del} satır silindi, {kept} satır kaldı',
+    sheetLabel: 'Sayfa:',
+    noActiveKw: 'Aktif anahtar kelime seçilmedi.',
+    noCols: 'Aranacak sütun seçilmedi.',
+    emptyFile: 'Dosya boş görünüyor.',
+    fileError: 'Dosya okunamadı: ',
+    duplicateKw: '',
+  }
+};
+
+let lang = localStorage.getItem('eccleaner_lang') || 'en';
+
+function t(key, vars) {
+  let s = T[lang][key] || T['en'][key] || key;
+  if (vars) Object.keys(vars).forEach(k => { s = s.replace(new RegExp('{' + k + '}', 'g'), vars[k]); });
+  return s;
+}
+
+function applyLang() {
+  // text content
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    el.innerHTML = t(key);
+  });
+  // placeholders
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+  // lang toggle button label
+  document.getElementById('langBtn').textContent = t('langBtn');
+  // re-render dynamic content if already populated
+  renderAllKwLists();
+  updateStats();
+  if (sheetRows.length > 0 && !document.getElementById('emptyState').innerHTML.includes('empty-icon')) {
+    // file is loaded, update empty state hint (only if results not showing)
+  }
+}
+
+function toggleLang() {
+  lang = lang === 'en' ? 'tr' : 'en';
+  localStorage.setItem('eccleaner_lang', lang);
+  applyLang();
+  if (scanResults.length > 0) renderResults();
+}
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let workbook = null;
+let sheetRows = [];
+let headers = [];
+let scanResults = [];
+let currentFile = null;
+
+const STORAGE_KEY_COMPANY = 'eccleaner_kw_company';
+const STORAGE_KEY_PROF    = 'eccleaner_kw_profession';
+
+let keywords = {
+  company:    loadKw(STORAGE_KEY_COMPANY),
+  profession: loadKw(STORAGE_KEY_PROF)
+};
+
+function loadKw(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || []; }
+  catch(e) { return []; }
+}
+function saveKw() {
+  localStorage.setItem(STORAGE_KEY_COMPANY, JSON.stringify(keywords.company));
+  localStorage.setItem(STORAGE_KEY_PROF,    JSON.stringify(keywords.profession));
+}
+
+// ─────────────────────────────────────────────
+// SIDEBAR
+// ─────────────────────────────────────────────
+function toggleSection(headEl) {
+  headEl.closest('.sidebar-section').classList.toggle('collapsed');
+}
+
+// ─────────────────────────────────────────────
+// FILE
+// ─────────────────────────────────────────────
+function onDragOver(e) { e.preventDefault(); document.getElementById('uploadZone').classList.add('drag'); }
+function onDragLeave(e) { document.getElementById('uploadZone').classList.remove('drag'); }
+function onDrop(e) { e.preventDefault(); onDragLeave(e); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); }
+function handleFileInput(e) { if (e.target.files[0]) loadFile(e.target.files[0]); }
+
+function loadFile(file) {
+  currentFile = file;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+      const ws = workbook.Sheets[workbook.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (!raw || raw.length === 0) { alert(t('emptyFile')); return; }
+
+      headers = (raw[0] || []).map((h, i) => h ? String(h) : `Col ${i+1}`);
+      sheetRows = raw;
+
+      const zone = document.getElementById('uploadZone');
+      zone.classList.remove('drag');
+      zone.classList.add('loaded');
+      document.getElementById('uploadIcon').textContent = '✅';
+      document.getElementById('uploadTitle').textContent = file.name;
+      document.getElementById('uploadHint').textContent = `${raw.length - 1} ${t('emptyLoadedDesc').split('\n')[0].replace('{cols}', headers.length).split('·')[0].trim()}`;
+      document.getElementById('uploadFilename').textContent = t('sheetLabel') + ' ' + workbook.SheetNames[0];
+
+      buildColumnPills();
+      checkScanReady();
+
+      document.getElementById('emptyState').innerHTML = `
+        <div class="empty-icon">✅</div>
+        <div class="empty-title">${escHtml(file.name)}</div>
+        <div class="empty-desc">${raw.length - 1} ${t('emptyLoadedDesc').replace('{cols}', headers.length).replace('\n', '<br/>')}</div>`;
+    } catch(err) {
+      alert(t('fileError') + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function buildColumnPills() {
+  const container = document.getElementById('columnPills');
+  container.innerHTML = '';
+  headers.forEach((h, i) => {
+    const label = document.createElement('label');
+    label.className = 'col-pill active-pill';
+    label.innerHTML = `<input type="checkbox" checked data-col="${i}" onchange="pillChange(this)"/> ${escHtml(h)}`;
+    container.appendChild(label);
+  });
+}
+
+function pillChange(cb) {
+  cb.closest('.col-pill').classList.toggle('active-pill', cb.checked);
+}
+
+function onScopeChange() {
+  const val = document.querySelector('input[name=colScope]:checked').value;
+  document.getElementById('columnPickerWrap').style.display = val === 'pick' ? 'block' : 'none';
+}
+
+// ─────────────────────────────────────────────
+// KEYWORDS
+// ─────────────────────────────────────────────
+function switchKwTab(cat) {
+  document.querySelectorAll('.kw-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.kw-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + cat).classList.add('active');
+  document.getElementById('panel-' + cat).classList.add('active');
+}
+
+function renderKwList(cat) {
+  const list = document.getElementById('list-' + cat);
+  const kws  = keywords[cat];
+  if (kws.length === 0) {
+    list.innerHTML = `<div style="color:#bbb;font-size:11px;padding:6px 0;">${t('kwEmpty')}</div>`;
+  } else {
+    list.innerHTML = kws.map(k => `
+      <div class="kw-item" id="kwitem-${k.id}">
+        <input type="checkbox" ${k.active ? 'checked' : ''} onchange="toggleKw('${cat}','${k.id}',this.checked)"/>
+        <span class="kw-item-label">${escHtml(k.text)}</span>
+        <button class="kw-item-del" onclick="deleteKw('${cat}','${k.id}')">×</button>
+      </div>`).join('');
+  }
+  const active = kws.filter(k => k.active).length;
+  document.getElementById('kcount-' + cat).textContent = t('kwCount', { active, total: kws.length });
+  document.getElementById('cnt-' + cat).textContent = `(${active})`;
+  saveKw();
+  checkScanReady();
+}
+
+function renderAllKwLists() {
+  renderKwList('company');
+  renderKwList('profession');
+}
+
+function addKeyword(cat) {
+  const input = document.getElementById('input-' + cat);
+  const text  = input.value.trim();
+  if (!text) return;
+  if (keywords[cat].some(k => k.text.toLowerCase() === text.toLowerCase())) {
+    input.style.borderColor = '#c0392b';
+    setTimeout(() => input.style.borderColor = '', 1000);
+    input.value = '';
+    return;
+  }
+  keywords[cat].push({ id: Date.now() + Math.random(), text, active: true });
+  input.value = '';
+  renderKwList(cat);
+}
+
+function deleteKw(cat, id) {
+  keywords[cat] = keywords[cat].filter(k => String(k.id) !== String(id));
+  renderKwList(cat);
+}
+
+function toggleKw(cat, id, val) {
+  const kw = keywords[cat].find(k => String(k.id) === String(id));
+  if (kw) kw.active = val;
+  renderKwList(cat);
+}
+
+function checkAll(cat)   { keywords[cat].forEach(k => k.active = true);  renderKwList(cat); }
+function uncheckAll(cat) { keywords[cat].forEach(k => k.active = false); renderKwList(cat); }
+
+function clearKeywords(cat) {
+  const catLabel = cat === 'company' ? t('catCompany') : t('catProfession');
+  if (!confirm(t('clearConfirm', { cat: catLabel }))) return;
+  keywords[cat] = [];
+  renderKwList(cat);
+}
+
+function toggleImport(cat) {
+  const area = document.getElementById('import-' + cat);
+  area.style.display = area.style.display === 'block' ? 'none' : 'block';
+}
+
+function importKeywords(cat) {
+  const text  = document.getElementById('importText-' + cat).value;
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  let added = 0;
+  lines.forEach(line => {
+    if (!keywords[cat].some(k => k.text.toLowerCase() === line.toLowerCase())) {
+      keywords[cat].push({ id: Date.now() + Math.random(), text: line, active: true });
+      added++;
+    }
+  });
+  document.getElementById('importText-' + cat).value = '';
+  toggleImport(cat);
+  renderKwList(cat);
+  if (added > 0) showToast(t('toastImported', { n: added }));
+}
+
+function exportKeywords(cat) {
+  const text = keywords[cat].map(k => k.text).join('\n');
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `keywords_${cat}.txt`;
+  a.click();
+}
+
+// ─────────────────────────────────────────────
+// SCAN
+// ─────────────────────────────────────────────
+function checkScanReady() {
+  const hasFile = sheetRows.length > 0;
+  const hasKw   = keywords.company.some(k => k.active) || keywords.profession.some(k => k.active);
+  document.getElementById('btnScan').disabled = !(hasFile && hasKw);
+}
+
+function getActiveKeywords() {
+  return [...keywords.company.filter(k => k.active), ...keywords.profession.filter(k => k.active)];
+}
+
+function getColsToSearch() {
+  const scope = document.querySelector('input[name=colScope]:checked').value;
+  if (scope === 'all')   return headers.map((_, i) => i);
+  if (scope === 'first') return [0];
+  return Array.from(document.querySelectorAll('#columnPills input[type=checkbox]:checked'))
+    .map(cb => parseInt(cb.getAttribute('data-col')));
+}
+
+function runScan() {
+  const activeKws    = getActiveKeywords();
+  const colsToSearch = getColsToSearch();
+  if (activeKws.length === 0)    { alert(t('noActiveKw')); return; }
+  if (colsToSearch.length === 0) { alert(t('noCols'));     return; }
+
+  scanResults = [];
+  sheetRows.slice(1).forEach((row, idx) => {
+    const matches = [];
+    for (const kw of activeKws) {
+      const kwLower = kw.text.toLowerCase();
+      for (const ci of colsToSearch) {
+        if (String(row[ci] ?? '').toLowerCase().includes(kwLower)) {
+          matches.push({ keyword: kw.text, colIndex: ci });
+        }
+      }
+    }
+    if (matches.length > 0) {
+      scanResults.push({ originalIndex: idx + 1, row, matches, marked: true });
+    }
+  });
+
+  renderResults();
+}
+
+// ─────────────────────────────────────────────
+// RENDER RESULTS
+// ─────────────────────────────────────────────
+function renderResults() {
+  const container = document.getElementById('resultsContainer');
+  const toolbar   = document.getElementById('toolbar');
+
+  if (scanResults.length === 0) {
+    toolbar.style.display = 'none';
+    container.innerHTML = `<div class="no-matches">
+      <div style="font-size:36px;margin-bottom:10px;">🎉</div>
+      <strong>${t('noMatches')}</strong><br/>
+      <span style="color:#bbb;font-size:12px;">${t('noMatchesSub')}</span>
+    </div>`;
+    return;
+  }
+
+  toolbar.style.display = 'flex';
+  updateStats();
+
+  const colsToSearch = getColsToSearch();
+  let visibleCols = [...colsToSearch];
+  headers.forEach((_, i) => { if (visibleCols.length < 6 && !visibleCols.includes(i)) visibleCols.push(i); });
+  visibleCols.sort((a, b) => a - b);
+
+  let html = `<div class="results-table-wrap"><table class="results"><thead><tr>
+    <th><input type="checkbox" checked onchange="toggleAllMarked(this)"/></th>
+    <th>#</th>`;
+  visibleCols.forEach(ci => { html += `<th>${escHtml(headers[ci] || `Col${ci+1}`)}</th>`; });
+  html += `<th>${t('colHeader')}</th></tr></thead><tbody>`;
+
+  const searchedSet = new Set(getColsToSearch());
+  scanResults.forEach((res, ri) => {
+    html += `<tr class="${res.marked ? 'marked' : 'kept'}" id="resrow-${ri}">
+      <td><input type="checkbox" ${res.marked ? 'checked' : ''} onchange="toggleRow(${ri},this.checked)"/></td>
+      <td><span class="row-num">${t('rowPrefix')}${res.originalIndex + 1}</span></td>`;
+
+    visibleCols.forEach(ci => {
+      const cellVal = String(res.row[ci] ?? '');
+      let display = escHtml(cellVal);
+      if (searchedSet.has(ci)) {
+        res.matches.filter(m => m.colIndex === ci).forEach(m => {
+          display = display.replace(new RegExp(escRegex(m.keyword), 'gi'), match => `<span class="match-highlight">${match}</span>`);
+        });
+      }
+      html += `<td title="${escHtml(cellVal)}">${display}</td>`;
+    });
+
+    const uniqueKws = [...new Set(res.matches.map(m => m.keyword))];
+    html += `<td>${uniqueKws.map(k => `<span class="match-tag">${escHtml(k)}</span>`).join(' ')}</td></tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+  document.getElementById('btnDownload').disabled = false;
+}
+
+function updateStats() {
+  if (scanResults.length === 0) return;
+  const marked = scanResults.filter(r => r.marked).length;
+  const kept   = scanResults.length - marked;
+  document.getElementById('statDel').textContent   = t('statDel',   { n: marked });
+  document.getElementById('statKeep').textContent  = t('statKeep',  { n: kept   });
+  document.getElementById('statTotal').textContent = t('statTotal', { n: scanResults.length });
+  const masterCb = document.querySelector('thead input[type=checkbox]');
+  if (masterCb) {
+    masterCb.indeterminate = marked > 0 && kept > 0;
+    masterCb.checked = marked === scanResults.length;
+  }
+}
+
+function toggleRow(ri, val) {
+  scanResults[ri].marked = val;
+  document.getElementById('resrow-' + ri).className = val ? 'marked' : 'kept';
+  updateStats();
+}
+
+function toggleAllMarked(cb) {
+  scanResults.forEach((r, ri) => {
+    r.marked = cb.checked;
+    const row = document.getElementById('resrow-' + ri);
+    if (row) { row.className = cb.checked ? 'marked' : 'kept'; row.querySelector('input[type=checkbox]').checked = cb.checked; }
+  });
+  updateStats();
+}
+
+function markAll()   { scanResults.forEach(r => r.marked = true);  renderResults(); }
+function unmarkAll() { scanResults.forEach(r => r.marked = false); renderResults(); }
+
+// ─────────────────────────────────────────────
+// DOWNLOAD
+// ─────────────────────────────────────────────
+function downloadCleaned() {
+  if (!workbook) return;
+  const toDelete   = new Set(scanResults.filter(r => r.marked).map(r => r.originalIndex));
+  const cleanedRows = sheetRows.filter((_, i) => i === 0 || !toDelete.has(i));
+  const ws = XLSX.utils.aoa_to_sheet(cleanedRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, workbook.SheetNames[0]);
+  const base     = currentFile ? currentFile.name.replace(/\.[^.]+$/, '') : 'data';
+  const filename = base + (lang === 'tr' ? '_temizlendi' : '_cleaned') + '.xlsx';
+  XLSX.writeFile(wb, filename);
+  showToast(t('toastDownloaded', { file: filename, del: toDelete.size, kept: cleanedRows.length - 1 }));
+}
+
+// ─────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+let toastTimer;
+function showToast(msg) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1a1a1a;color:#FFD700;padding:10px 18px;border-radius:8px;font-size:12px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.3);transition:opacity 0.3s;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+applyLang();
+checkScanReady();
+</script>
+</body>
+</html>

@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Excel Veri Temizleyici — Sun &amp; Sun</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #f2f2f2; color: #1a1a1a; font-size: 13px; line-height: 1.5; min-height: 100vh; }
+
+header { background: #1a1a1a; color: #fff; padding: 0; display: flex; align-items: stretch; }
+.header-bar { background: #c0392b; width: 6px; flex-shrink: 0; }
+.header-content { padding: 14px 22px; flex: 1; display: flex; align-items: center; justify-content: space-between; }
+.header-title { font-size: 16px; font-weight: 700; color: #FFD700; letter-spacing: 0.5px; }
+.header-title span { color: #c0392b; }
+.header-sub { font-size: 11px; color: #999; margin-top: 2px; }
+.header-badge { background: #c0392b; color: #fff; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 12px; letter-spacing: 1px; text-transform: uppercase; }
+
+.main { display: grid; grid-template-columns: 320px 1fr; gap: 0; height: calc(100vh - 53px); }
+
+/* SIDEBAR */
+.sidebar { background: #fff; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-section { border-bottom: 1px solid #eee; }
+.sidebar-section-head { padding: 12px 16px; background: #fafafa; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #888; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+.sidebar-section-head:hover { background: #f5f5f5; }
+.collapse-arrow { font-size: 10px; transition: transform 0.2s; }
+.sidebar-section.collapsed .collapse-arrow { transform: rotate(-90deg); }
+.sidebar-section.collapsed .sidebar-section-body { display: none; }
+.sidebar-section-body { padding: 12px 16px; }
+
+/* Upload area */
+.upload-zone { border: 2px dashed #ccc; border-radius: 8px; padding: 20px 14px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.upload-zone:hover, .upload-zone.drag { border-color: #c0392b; background: #fff5f5; }
+.upload-zone.loaded { border-color: #27ae60; background: #f0fff4; border-style: solid; }
+.upload-zone-icon { font-size: 28px; margin-bottom: 6px; }
+.upload-zone-text { font-size: 12px; color: #666; }
+.upload-zone-text strong { color: #1a1a1a; display: block; font-size: 13px; }
+.upload-zone-filename { font-size: 11px; color: #27ae60; font-weight: 700; margin-top: 4px; word-break: break-all; }
+#fileInput { display: none; }
+
+/* Column selector */
+.col-options { display: flex; flex-direction: column; gap: 6px; }
+.col-option { display: flex; align-items: center; gap: 7px; font-size: 12px; cursor: pointer; }
+.col-option input[type=radio] { accent-color: #c0392b; }
+
+/* Keyword tabs */
+.kw-tabs { display: flex; border-bottom: 1px solid #eee; margin: 0 -16px; }
+.kw-tab { flex: 1; padding: 8px; text-align: center; font-size: 11px; font-weight: 700; color: #888; cursor: pointer; border-bottom: 2px solid transparent; }
+.kw-tab.active { color: #c0392b; border-bottom-color: #c0392b; }
+.kw-panel { display: none; padding-top: 10px; }
+.kw-panel.active { display: block; }
+
+.kw-add-row { display: flex; gap: 6px; margin-bottom: 8px; }
+.kw-add-row input { flex: 1; border: 1px solid #ddd; border-radius: 5px; padding: 5px 8px; font-size: 12px; outline: none; }
+.kw-add-row input:focus { border-color: #c0392b; }
+.btn-add-kw { background: #c0392b; color: #fff; border: none; border-radius: 5px; padding: 5px 10px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.btn-add-kw:hover { background: #a93226; }
+
+.kw-list { max-height: 180px; overflow-y: auto; }
+.kw-item { display: flex; align-items: center; gap: 6px; padding: 4px 2px; border-bottom: 1px solid #f5f5f5; }
+.kw-item:last-child { border-bottom: none; }
+.kw-item input[type=checkbox] { accent-color: #c0392b; flex-shrink: 0; }
+.kw-item-label { flex: 1; font-size: 12px; word-break: break-word; }
+.kw-item-del { background: none; border: none; color: #ccc; cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1; }
+.kw-item-del:hover { color: #c0392b; }
+
+.kw-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.btn-kw-action { background: none; border: 1px solid #ddd; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; color: #555; }
+.btn-kw-action:hover { border-color: #c0392b; color: #c0392b; }
+
+.kw-import-area { margin-top: 8px; display: none; }
+.kw-import-area textarea { width: 100%; border: 1px solid #ddd; border-radius: 5px; padding: 6px 8px; font-size: 11px; height: 80px; resize: vertical; outline: none; }
+.kw-import-area textarea:focus { border-color: #c0392b; }
+.kw-import-btns { display: flex; gap: 6px; margin-top: 4px; }
+
+/* Search button */
+.search-section { padding: 14px 16px; }
+.btn-scan { width: 100%; background: #1a1a1a; color: #FFD700; border: none; border-radius: 7px; padding: 11px; font-size: 13px; font-weight: 700; cursor: pointer; letter-spacing: 0.5px; transition: background 0.2s; }
+.btn-scan:hover { background: #2d2d2d; }
+.btn-scan:disabled { background: #aaa; color: #fff; cursor: not-allowed; }
+
+/* MAIN CONTENT */
+.content { display: flex; flex-direction: column; overflow: hidden; }
+
+.results-toolbar { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 10px 18px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.results-stat { font-size: 12px; }
+.stat-del { font-weight: 700; color: #c0392b; }
+.stat-keep { font-weight: 700; color: #27ae60; }
+.stat-total { color: #555; }
+.toolbar-actions { display: flex; gap: 8px; margin-left: auto; }
+.btn-toolbar { border: 1px solid #ddd; background: #fff; border-radius: 5px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-weight: 600; color: #333; }
+.btn-toolbar:hover { border-color: #c0392b; color: #c0392b; }
+.btn-download { background: #27ae60; color: #fff; border: none; border-radius: 5px; padding: 6px 16px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.btn-download:hover { background: #219a52; }
+.btn-download:disabled { background: #aaa; cursor: not-allowed; }
+
+.results-container { flex: 1; overflow-y: auto; }
+
+.results-table-wrap { min-width: 100%; }
+table.results { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.results thead th { background: #1a1a1a; color: #FFD700; padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 700; position: sticky; top: 0; z-index: 2; white-space: nowrap; }
+table.results thead th:first-child { width: 36px; }
+table.results tbody tr { border-bottom: 1px solid #f0f0f0; }
+table.results tbody tr:hover { background: #fafafa; }
+table.results tbody tr.marked td { background: #fff5f5; }
+table.results tbody tr.marked td:first-child { border-left: 3px solid #c0392b; }
+table.results tbody tr.kept td { background: #f0fff4; }
+table.results tbody tr.kept td:first-child { border-left: 3px solid #27ae60; }
+table.results td { padding: 6px 12px; vertical-align: middle; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-tag { display: inline-block; background: #fde8e8; color: #c0392b; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-left: 4px; white-space: nowrap; }
+.match-highlight { background: #ffd7d7; border-radius: 2px; padding: 0 1px; }
+table.results td input[type=checkbox] { accent-color: #c0392b; cursor: pointer; width: 14px; height: 14px; }
+table.results td .row-num { color: #aaa; font-size: 10px; }
+
+/* Empty state */
+.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #bbb; text-align: center; padding: 40px; }
+.empty-icon { font-size: 48px; margin-bottom: 14px; }
+.empty-title { font-size: 16px; font-weight: 700; color: #999; margin-bottom: 6px; }
+.empty-desc { font-size: 12px; color: #bbb; max-width: 320px; }
+
+/* Column picker pills */
+#columnPickerWrap { display: none; }
+.col-checkboxes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.col-pill { display: flex; align-items: center; gap: 4px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 12px; padding: 2px 8px; font-size: 11px; cursor: pointer; user-select: none; }
+.col-pill input { accent-color: #c0392b; }
+.col-pill.active-pill { background: #fff0f0; border-color: #c0392b; color: #c0392b; font-weight: 700; }
+
+.no-matches { padding: 40px; text-align: center; color: #999; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f5f5f5; }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+@media (max-width: 700px) {
+  .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; }
+  .sidebar { max-height: 60vh; overflow-y: auto; }
+  .content { height: 70vh; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-bar"></div>
+  <div class="header-content">
+    <div>
+      <div class="header-title">Sun &amp; <span>Sun</span> — Excel Veri Temizleyici</div>
+      <div class="header-sub">Anahtar kelimeye göre istenmeyen satırları filtrele ve kaldır · Her şey tarayıcında kalır</div>
+    </div>
+    <div class="header-badge">Bağımsız Araç</div>
+  </div>
+</header>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- DOSYA YÜKLEME -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-head" onclick="toggleSection(this)">
+        📂 &nbsp;1. Excel Dosyası Yükle
+        <span class="collapse-arrow">▾</span>
+      </div>
+      <div class="sidebar-section-body">
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+          <div class="upload-zone-icon" id="uploadIcon">📊</div>
+          <div class="upload-zone-text">
+            <strong id="uploadTitle">Dosya seçmek için tıkla</strong>
+            <span id="uploadHint">veya .xlsx / .xls dosyasını sürükle &amp; bırak</span>
+          </div>
+          <div class="upload-zone-filename" id="uploadFilename"></div>
+        </div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileInput(event)"/>
+      </div>
+    </div>
+
+    <!-- ARAMA KAPSAMI -->
+    <div class="sidebar-section" id="colScopeSection">
+      <div class="sidebar-section-head" onclick="toggleSection(this)">
+        🔍 &nbsp;2. Arama Kapsamı
+        <span class="collapse-arrow">▾</span>
+      </div>
+      <div class="sidebar-section-body">
+        <div class="col-options">
+          <label class="col-option">
+            <input type="radio" name="colScope" value="all" checked onchange="onScopeChange()"/>
+            <strong>Tüm sütunlarda</strong> ara
+          </label>
+          <label class="col-option">
+            <input type="radio" name="colScope" value="first" onchange="onScopeChange()"/>
+            Yalnızca <strong>A sütununda</strong> ara
+          </label>
+          <label class="col-option">
+            <input type="radio" name="colScope" value="pick" onchange="onScopeChange()"/>
+            Belirli sütunları seç…
+          </label>
+        </div>
+        <div id="columnPickerWrap">
+          <div style="font-size:11px; color:#888; margin-top:8px; margin-bottom:4px;">Aranacak sütunları seçin:</div>
+          <div class="col-checkboxes" id="columnPills"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANAHTAR KELİMELER -->
+    <div class="sidebar-section" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+      <div class="sidebar-section-head" onclick="toggleSection(this)">
+        🏷️ &nbsp;3. Anahtar Kelimeler
+        <span class="collapse-arrow">▾</span>
+      </div>
+      <div class="sidebar-section-body" style="flex:1; overflow-y:auto; display:flex; flex-direction:column;">
+        <div class="kw-tabs">
+          <div class="kw-tab active" id="tab-sirket" onclick="switchKwTab('sirket')">🏢 Şirket <span id="cnt-sirket">(0)</span></div>
+          <div class="kw-tab" id="tab-meslek" onclick="switchKwTab('meslek')">👤 Meslek <span id="cnt-meslek">(0)</span></div>
+        </div>
+
+        <!-- Şirket anahtar kelimeleri -->
+        <div class="kw-panel active" id="panel-sirket">
+          <div class="kw-add-row">
+            <input type="text" id="input-sirket" placeholder="Anahtar kelime ekle…" onkeydown="if(event.key==='Enter')addKeyword('sirket')"/>
+            <button class="btn-add-kw" onclick="addKeyword('sirket')">+ Ekle</button>
+          </div>
+          <div class="kw-list" id="list-sirket"></div>
+          <div class="kw-actions">
+            <button class="btn-kw-action" onclick="checkAll('sirket')">✓ Tümü</button>
+            <button class="btn-kw-action" onclick="uncheckAll('sirket')">○ Hiçbiri</button>
+            <button class="btn-kw-action" onclick="toggleImport('sirket')">⬆ İçe Aktar</button>
+            <button class="btn-kw-action" onclick="exportKeywords('sirket')">⬇ Dışa Aktar</button>
+            <button class="btn-kw-action" onclick="clearKeywords('sirket')">🗑 Temizle</button>
+          </div>
+          <div class="kw-import-area" id="import-sirket">
+            <div style="font-size:11px;color:#888;margin-bottom:3px;">Anahtar kelimeleri yapıştır — her satıra bir tane:</div>
+            <textarea id="importText-sirket" placeholder="hastane&#10;jandarma&#10;alışveriş merkezi&#10;üniversite"></textarea>
+            <div class="kw-import-btns">
+              <button class="btn-add-kw" onclick="importKeywords('sirket')">İçe Aktar</button>
+              <button class="btn-kw-action" onclick="toggleImport('sirket')">İptal</button>
+            </div>
+          </div>
+          <div class="kw-count" id="kcount-sirket"></div>
+        </div>
+
+        <!-- Meslek anahtar kelimeleri -->
+        <div class="kw-panel" id="panel-meslek">
+          <div class="kw-add-row">
+            <input type="text" id="input-meslek" placeholder="Anahtar kelime ekle…" onkeydown="if(event.key==='Enter')addKeyword('meslek')"/>
+            <button class="btn-add-kw" onclick="addKeyword('meslek')">+ Ekle</button>
+          </div>
+          <div class="kw-list" id="list-meslek"></div>
+          <div class="kw-actions">
+            <button class="btn-kw-action" onclick="checkAll('meslek')">✓ Tümü</button>
+            <button class="btn-kw-action" onclick="uncheckAll('meslek')">○ Hiçbiri</button>
+            <button class="btn-kw-action" onclick="toggleImport('meslek')">⬆ İçe Aktar</button>
+            <button class="btn-kw-action" onclick="exportKeywords('meslek')">⬇ Dışa Aktar</button>
+            <button class="btn-kw-action" onclick="clearKeywords('meslek')">🗑 Temizle</button>
+          </div>
+          <div class="kw-import-area" id="import-meslek">
+            <div style="font-size:11px;color:#888;margin-bottom:3px;">Anahtar kelimeleri yapıştır — her satıra bir tane:</div>
+            <textarea id="importText-meslek" placeholder="depo müdürü&#10;iş güvenliği uzmanı&#10;temizlik görevlisi"></textarea>
+            <div class="kw-import-btns">
+              <button class="btn-add-kw" onclick="importKeywords('meslek')">İçe Aktar</button>
+              <button class="btn-kw-action" onclick="toggleImport('meslek')">İptal</button>
+            </div>
+          </div>
+          <div class="kw-count" id="kcount-meslek"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TARA DÜĞMESİ -->
+    <div class="search-section">
+      <button class="btn-scan" id="btnScan" onclick="runScan()" disabled>🔍 &nbsp;Eşleşmeleri Tara</button>
+    </div>
+  </div>
+
+  <!-- ANA İÇERİK -->
+  <div class="content">
+    <!-- Araç çubuğu -->
+    <div class="results-toolbar" id="toolbar" style="display:none;">
+      <div class="results-stat">
+        <span class="stat-del" id="statDel">0 silinecek</span>
+        &nbsp;·&nbsp;
+        <span class="stat-keep" id="statKeep">0 korunacak</span>
+        &nbsp;·&nbsp;
+        <span class="stat-total" id="statTotal">0 eşleşme</span>
+      </div>
+      <div class="toolbar-actions">
+        <button class="btn-toolbar" onclick="markAll()">☑ Tümünü sil olarak işaretle</button>
+        <button class="btn-toolbar" onclick="unmarkAll()">☐ Tümünün işaretini kaldır</button>
+        <button class="btn-download" id="btnDownload" onclick="downloadCleaned()" disabled>⬇ Temizlenmiş Dosyayı İndir</button>
+      </div>
+    </div>
+
+    <!-- Sonuçlar -->
+    <div class="results-container" id="resultsContainer">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">Henüz dosya yüklenmedi</div>
+        <div class="empty-desc">Bir Excel dosyası yükle, anahtar kelimelerini ekle ve ardından eşleşmeleri bulmak için "Eşleşmeleri Tara"ya tıkla.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ────────────────────────────────────────────
+// DURUM
+// ────────────────────────────────────────────
+let workbook = null;
+let sheetRows = [];
+let headers = [];
+let scanResults = [];
+let currentFile = null;
+
+const STORAGE_KEY_SIRKET = 'eccleaner_kw_sirket';
+const STORAGE_KEY_MESLEK = 'eccleaner_kw_meslek';
+
+let keywords = {
+  sirket: loadKw(STORAGE_KEY_SIRKET),
+  meslek: loadKw(STORAGE_KEY_MESLEK)
+};
+
+function loadKw(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || []; }
+  catch(e) { return []; }
+}
+function saveKw() {
+  localStorage.setItem(STORAGE_KEY_SIRKET, JSON.stringify(keywords.sirket));
+  localStorage.setItem(STORAGE_KEY_MESLEK, JSON.stringify(keywords.meslek));
+}
+
+// ────────────────────────────────────────────
+// SIDEBAR DARALT/GENIŞLET
+// ────────────────────────────────────────────
+function toggleSection(headEl) {
+  headEl.closest('.sidebar-section').classList.toggle('collapsed');
+}
+
+// ────────────────────────────────────────────
+// DOSYA İŞLEME
+// ────────────────────────────────────────────
+function onDragOver(e) { e.preventDefault(); document.getElementById('uploadZone').classList.add('drag'); }
+function onDragLeave(e) { document.getElementById('uploadZone').classList.remove('drag'); }
+function onDrop(e) { e.preventDefault(); onDragLeave(e); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); }
+function handleFileInput(e) { if (e.target.files[0]) loadFile(e.target.files[0]); }
+
+function loadFile(file) {
+  currentFile = file;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+      const ws = workbook.Sheets[workbook.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      if (!raw || raw.length === 0) { alert('Dosya boş görünüyor.'); return; }
+
+      headers = (raw[0] || []).map((h, i) => h ? String(h) : `Sütun ${i+1}`);
+      sheetRows = raw;
+
+      const zone = document.getElementById('uploadZone');
+      zone.classList.remove('drag');
+      zone.classList.add('loaded');
+      document.getElementById('uploadIcon').textContent = '✅';
+      document.getElementById('uploadTitle').textContent = file.name;
+      document.getElementById('uploadHint').textContent = `${raw.length - 1} satır · ${headers.length} sütun`;
+      document.getElementById('uploadFilename').textContent = `Sayfa: ${workbook.SheetNames[0]}`;
+
+      buildColumnPills();
+      checkScanReady();
+
+      document.getElementById('emptyState').innerHTML = `
+        <div class="empty-icon">✅</div>
+        <div class="empty-title">Dosya yüklendi: ${escHtml(file.name)}</div>
+        <div class="empty-desc">${raw.length - 1} veri satırı · ${headers.length} sütun tespit edildi.<br/>Anahtar kelimelerini ekle ve <strong>Eşleşmeleri Tara</strong>'ya tıkla.</div>`;
+    } catch(err) {
+      alert('Dosya okunamadı: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function buildColumnPills() {
+  const container = document.getElementById('columnPills');
+  container.innerHTML = '';
+  headers.forEach((h, i) => {
+    const label = document.createElement('label');
+    label.className = 'col-pill active-pill';
+    label.innerHTML = `<input type="checkbox" checked data-col="${i}" onchange="pillChange(this)"/> ${escHtml(h)}`;
+    container.appendChild(label);
+  });
+}
+
+function pillChange(cb) {
+  cb.closest('.col-pill').classList.toggle('active-pill', cb.checked);
+}
+
+function onScopeChange() {
+  const val = document.querySelector('input[name=colScope]:checked').value;
+  document.getElementById('columnPickerWrap').style.display = val === 'pick' ? 'block' : 'none';
+}
+
+// ────────────────────────────────────────────
+// ANAHTAR KELİME YÖNETİMİ
+// ────────────────────────────────────────────
+function switchKwTab(cat) {
+  document.querySelectorAll('.kw-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.kw-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + cat).classList.add('active');
+  document.getElementById('panel-' + cat).classList.add('active');
+}
+
+function renderKwList(cat) {
+  const list = document.getElementById('list-' + cat);
+  const kws = keywords[cat];
+  if (kws.length === 0) {
+    list.innerHTML = '<div style="color:#bbb;font-size:11px;padding:6px 0;">Henüz anahtar kelime yok. Yukarıdan ekleyebilirsiniz.</div>';
+  } else {
+    list.innerHTML = kws.map(k => `
+      <div class="kw-item" id="kwitem-${k.id}">
+        <input type="checkbox" ${k.active ? 'checked' : ''} onchange="toggleKw('${cat}','${k.id}',this.checked)"/>
+        <span class="kw-item-label">${escHtml(k.text)}</span>
+        <button class="kw-item-del" title="Sil" onclick="deleteKw('${cat}','${k.id}')">×</button>
+      </div>`).join('');
+  }
+  const active = kws.filter(k => k.active).length;
+  document.getElementById('kcount-' + cat).textContent = `${active} aktif · ${kws.length} toplam`;
+  document.getElementById('cnt-' + cat).textContent = `(${active})`;
+  saveKw();
+  checkScanReady();
+}
+
+function renderAllKwLists() {
+  renderKwList('sirket');
+  renderKwList('meslek');
+}
+
+function addKeyword(cat) {
+  const input = document.getElementById('input-' + cat);
+  const text = input.value.trim();
+  if (!text) return;
+  if (keywords[cat].some(k => k.text.toLowerCase() === text.toLowerCase())) {
+    input.style.borderColor = '#c0392b';
+    setTimeout(() => input.style.borderColor = '', 1000);
+    input.value = '';
+    return;
+  }
+  keywords[cat].push({ id: Date.now() + Math.random(), text, active: true });
+  input.value = '';
+  renderKwList(cat);
+}
+
+function deleteKw(cat, id) {
+  keywords[cat] = keywords[cat].filter(k => String(k.id) !== String(id));
+  renderKwList(cat);
+}
+
+function toggleKw(cat, id, val) {
+  const kw = keywords[cat].find(k => String(k.id) === String(id));
+  if (kw) kw.active = val;
+  renderKwList(cat);
+}
+
+function checkAll(cat) { keywords[cat].forEach(k => k.active = true); renderKwList(cat); }
+function uncheckAll(cat) { keywords[cat].forEach(k => k.active = false); renderKwList(cat); }
+
+function clearKeywords(cat) {
+  if (!confirm(`Tüm ${cat === 'sirket' ? 'şirket' : 'meslek'} anahtar kelimeleri silinsin mi?`)) return;
+  keywords[cat] = [];
+  renderKwList(cat);
+}
+
+function toggleImport(cat) {
+  const area = document.getElementById('import-' + cat);
+  area.style.display = area.style.display === 'block' ? 'none' : 'block';
+}
+
+function importKeywords(cat) {
+  const text = document.getElementById('importText-' + cat).value;
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  let added = 0;
+  lines.forEach(line => {
+    if (!keywords[cat].some(k => k.text.toLowerCase() === line.toLowerCase())) {
+      keywords[cat].push({ id: Date.now() + Math.random(), text: line, active: true });
+      added++;
+    }
+  });
+  document.getElementById('importText-' + cat).value = '';
+  toggleImport(cat);
+  renderKwList(cat);
+  if (added > 0) showToast(`${added} anahtar kelime içe aktarıldı`);
+}
+
+function exportKeywords(cat) {
+  const text = keywords[cat].map(k => k.text).join('\n');
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `anahtar_kelimeler_${cat}.txt`;
+  a.click();
+}
+
+// ────────────────────────────────────────────
+// TARA
+// ────────────────────────────────────────────
+function checkScanReady() {
+  const hasFile = sheetRows.length > 0;
+  const hasKw = (keywords.sirket.some(k => k.active) || keywords.meslek.some(k => k.active));
+  document.getElementById('btnScan').disabled = !(hasFile && hasKw);
+}
+
+function getActiveKeywords() {
+  return [
+    ...keywords.sirket.filter(k => k.active),
+    ...keywords.meslek.filter(k => k.active)
+  ];
+}
+
+function getColsToSearch() {
+  const scope = document.querySelector('input[name=colScope]:checked').value;
+  if (scope === 'all') return headers.map((_, i) => i);
+  if (scope === 'first') return [0];
+  return Array.from(document.querySelectorAll('#columnPills input[type=checkbox]:checked'))
+    .map(cb => parseInt(cb.getAttribute('data-col')));
+}
+
+function runScan() {
+  const activeKws = getActiveKeywords();
+  const colsToSearch = getColsToSearch();
+
+  if (activeKws.length === 0) { alert('Aktif anahtar kelime seçilmedi.'); return; }
+  if (colsToSearch.length === 0) { alert('Aranacak sütun seçilmedi.'); return; }
+
+  scanResults = [];
+  const dataRows = sheetRows.slice(1);
+
+  dataRows.forEach((row, idx) => {
+    const matches = [];
+    for (const kw of activeKws) {
+      const kwLower = kw.text.toLowerCase();
+      for (const ci of colsToSearch) {
+        const cellVal = String(row[ci] ?? '').toLowerCase();
+        if (cellVal.includes(kwLower)) {
+          matches.push({ keyword: kw.text, colIndex: ci, colName: headers[ci] || `Sütun${ci+1}` });
+        }
+      }
+    }
+    if (matches.length > 0) {
+      scanResults.push({
+        originalIndex: idx + 1,
+        row: row,
+        matches: matches,
+        marked: true
+      });
+    }
+  });
+
+  renderResults();
+}
+
+// ────────────────────────────────────────────
+// SONUÇLARI GÖSTER
+// ────────────────────────────────────────────
+function renderResults() {
+  const container = document.getElementById('resultsContainer');
+  const toolbar = document.getElementById('toolbar');
+
+  if (scanResults.length === 0) {
+    toolbar.style.display = 'none';
+    container.innerHTML = `<div class="no-matches"><div style="font-size:36px;margin-bottom:10px;">🎉</div><strong>Eşleşme bulunamadı</strong><br/><span style="color:#bbb;font-size:12px;">Aktif anahtar kelimeler seçili sütunlardaki hiçbir satırla eşleşmedi.</span></div>`;
+    return;
+  }
+
+  toolbar.style.display = 'flex';
+  updateStats();
+
+  const colsToSearch = getColsToSearch();
+  let visibleCols = [];
+  colsToSearch.forEach(c => { if (!visibleCols.includes(c)) visibleCols.push(c); });
+  headers.forEach((_, i) => { if (visibleCols.length < 6 && !visibleCols.includes(i)) visibleCols.push(i); });
+  visibleCols.sort((a, b) => a - b);
+
+  let html = `<div class="results-table-wrap"><table class="results">
+    <thead><tr>
+      <th><input type="checkbox" checked onchange="toggleAllMarked(this)" title="Tümünü seç/kaldır"/></th>
+      <th>#</th>`;
+
+  visibleCols.forEach(ci => {
+    html += `<th>${escHtml(headers[ci] || `Sütun${ci+1}`)}</th>`;
+  });
+  html += `<th>Eşleşen Kelimeler</th></tr></thead><tbody>`;
+
+  scanResults.forEach((res, ri) => {
+    const rowClass = res.marked ? 'marked' : 'kept';
+    html += `<tr class="${rowClass}" id="resrow-${ri}">`;
+    html += `<td><input type="checkbox" ${res.marked ? 'checked' : ''} onchange="toggleRow(${ri},this.checked)"/></td>`;
+    html += `<td><span class="row-num">S${res.originalIndex + 1}</span></td>`;
+
+    const searchedColSet = new Set(getColsToSearch());
+    visibleCols.forEach(ci => {
+      const cellVal = String(res.row[ci] ?? '');
+      let display = escHtml(cellVal);
+      if (searchedColSet.has(ci)) {
+        res.matches.filter(m => m.colIndex === ci).forEach(m => {
+          const re = new RegExp(escRegex(m.keyword), 'gi');
+          display = display.replace(re, match => `<span class="match-highlight">${match}</span>`);
+        });
+      }
+      html += `<td title="${escHtml(cellVal)}">${display}</td>`;
+    });
+
+    const uniqueKws = [...new Set(res.matches.map(m => m.keyword))];
+    html += `<td>${uniqueKws.map(k => `<span class="match-tag">${escHtml(k)}</span>`).join(' ')}</td>`;
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+  document.getElementById('btnDownload').disabled = false;
+}
+
+function updateStats() {
+  const marked = scanResults.filter(r => r.marked).length;
+  const kept = scanResults.length - marked;
+  document.getElementById('statDel').textContent = `${marked} silinecek`;
+  document.getElementById('statKeep').textContent = `${kept} korunacak`;
+  document.getElementById('statTotal').textContent = `${scanResults.length} eşleşme`;
+
+  const masterCb = document.querySelector('thead input[type=checkbox]');
+  if (masterCb) {
+    masterCb.indeterminate = marked > 0 && kept > 0;
+    masterCb.checked = marked === scanResults.length;
+  }
+}
+
+function toggleRow(ri, val) {
+  scanResults[ri].marked = val;
+  const row = document.getElementById('resrow-' + ri);
+  row.className = val ? 'marked' : 'kept';
+  updateStats();
+}
+
+function toggleAllMarked(cb) {
+  scanResults.forEach((r, ri) => {
+    r.marked = cb.checked;
+    const row = document.getElementById('resrow-' + ri);
+    if (row) {
+      row.className = cb.checked ? 'marked' : 'kept';
+      row.querySelector('input[type=checkbox]').checked = cb.checked;
+    }
+  });
+  updateStats();
+}
+
+function markAll() { scanResults.forEach(r => r.marked = true); renderResults(); }
+function unmarkAll() { scanResults.forEach(r => r.marked = false); renderResults(); }
+
+// ────────────────────────────────────────────
+// TEMİZLENMİŞ DOSYAYI İNDİR
+// ────────────────────────────────────────────
+function downloadCleaned() {
+  if (!workbook) return;
+
+  const rowsToDelete = new Set(scanResults.filter(r => r.marked).map(r => r.originalIndex));
+
+  const cleanedRows = sheetRows.filter((_, i) => {
+    if (i === 0) return true;
+    return !rowsToDelete.has(i);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(cleanedRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, workbook.SheetNames[0]);
+
+  const originalName = currentFile ? currentFile.name.replace(/\.[^.]+$/, '') : 'veri';
+  const filename = `${originalName}_temizlendi.xlsx`;
+  XLSX.writeFile(wb, filename);
+
+  const deleted = rowsToDelete.size;
+  const remaining = cleanedRows.length - 1;
+  showToast(`✅ İndirildi: ${filename} — ${deleted} satır silindi, ${remaining} satır kaldı`);
+}
+
+// ────────────────────────────────────────────
+// YARDIMCI FONKSİYONLAR
+// ────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+let toastTimer;
+function showToast(msg) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1a1a1a;color:#FFD700;padding:10px 18px;border-radius:8px;font-size:12px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.3);transition:opacity 0.3s;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
+}
+
+// ────────────────────────────────────────────
+// BAŞLAT
+// ────────────────────────────────────────────
+renderAllKwLists();
+checkScanReady();
+</script>
+</body>
+</html>

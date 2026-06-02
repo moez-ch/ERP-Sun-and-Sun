@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sun &amp; Sun ERP — Yönetici Rehberi</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Nunito', Arial, sans-serif; background: #fff; color: #1a1a1a; font-size: 13pt; line-height: 1.7; }
+  .cover { page-break-after: always; min-height: 100vh; display: flex; flex-direction: column; background: #1a1a1a; }
+  .cover-top { background: #c0392b; color: #fff; padding: 20px 40px; font-size: 14pt; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; }
+  .cover-body { flex: 1; padding: 50px 60px 40px; display: flex; flex-direction: column; justify-content: space-between; }
+  .cover-tag { display: inline-block; background: #c0392b; color: #fff; font-size: 11pt; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; padding: 6px 16px; border-radius: 4px; margin-bottom: 30px; width: fit-content; }
+  .cover-title { font-size: 48pt; font-weight: 900; line-height: 1.05; color: #FFD700; margin-bottom: 16px; }
+  .cover-title span { color: #c0392b; }
+  .cover-subtitle { font-size: 16pt; font-weight: 700; color: #aaa; margin-bottom: 40px; }
+  .cover-desc { font-size: 12pt; color: #ccc; max-width: 520px; line-height: 1.6; border-left: 5px solid #c0392b; padding-left: 18px; }
+  .cover-chapters { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 560px; }
+  .cover-ch { background: rgba(255,255,255,0.07); border-radius: 8px; padding: 7px 13px; font-size: 9.5pt; font-weight: 700; color: #ccc; }
+  .cover-ch span { opacity: 0.5; margin-right: 6px; }
+  .cover-bottom { background: #c0392b; color: #fff; padding: 18px 60px; display: flex; justify-content: space-between; align-items: center; font-size: 11pt; font-weight: 700; }
+  .toc-page { page-break-after: always; padding: 60px 70px; min-height: 100vh; }
+  .toc-header { font-size: 26pt; font-weight: 900; color: #1a1a1a; border-bottom: 4px solid #c0392b; padding-bottom: 12px; margin-bottom: 36px; }
+  .toc-item { display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-bottom: 1px dotted #ccc; font-size: 11.5pt; }
+  .toc-num { font-weight: 900; color: #c0392b; font-size: 10.5pt; width: 100px; flex-shrink: 0; }
+  .toc-title { font-weight: 700; flex: 1; }
+  .toc-sub { font-size: 9.5pt; color: #666; margin-top: 2px; padding-left: 110px; }
+  .chapter { page-break-before: always; min-height: 100vh; padding: 0; }
+  .chapter-header { background: #1a1a1a; color: #FFD700; padding: 36px 60px 28px; }
+  .chapter-header.red { background: #c0392b; color: #fff; }
+  .chapter-num { font-size: 10pt; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; opacity: 0.7; margin-bottom: 6px; }
+  .chapter-title { font-size: 26pt; font-weight: 900; line-height: 1.1; }
+  .chapter-tagline { margin-top: 10px; font-size: 11pt; font-style: italic; opacity: 0.8; }
+  .chapter-body { padding: 36px 60px 50px; }
+  .in-this-chapter { background: #fff5f5; border: 2px solid #c0392b; border-radius: 10px; padding: 16px 22px; margin-bottom: 28px; font-size: 11pt; }
+  .in-this-chapter strong { display: block; font-size: 9.5pt; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; color: #c0392b; margin-bottom: 8px; }
+  .in-this-chapter ul { padding-left: 18px; }
+  .in-this-chapter li { margin-bottom: 3px; }
+  h2 { font-size: 15pt; font-weight: 900; color: #1a1a1a; margin: 26px 0 9px; padding-bottom: 5px; border-bottom: 2px solid #c0392b; }
+  h3 { font-size: 12.5pt; font-weight: 800; color: #333; margin: 18px 0 7px; }
+  p { margin-bottom: 11px; }
+  ol, ul { padding-left: 22px; margin-bottom: 13px; }
+  li { margin-bottom: 5px; }
+  strong { font-weight: 800; }
+  .tip { background: #e8f4fd; border-left: 5px solid #2980b9; border-radius: 10px; padding: 13px 18px 13px 50px; margin: 16px 0; font-size: 11pt; position: relative; }
+  .remember { background: #fef9e7; border-left: 5px solid #f39c12; border-radius: 10px; padding: 13px 18px 13px 50px; margin: 16px 0; font-size: 11pt; position: relative; }
+  .warning { background: #fdf0f0; border-left: 5px solid #c0392b; border-radius: 10px; padding: 13px 18px 13px 50px; margin: 16px 0; font-size: 11pt; position: relative; }
+  .admin-only { background: #1a1a1a; color: #FFD700; border-radius: 10px; padding: 13px 18px 13px 50px; margin: 16px 0; font-size: 11pt; position: relative; }
+  .tip::before { content: "💡"; position: absolute; left: 13px; top: 12px; font-size: 17pt; }
+  .remember::before { content: "☝️"; position: absolute; left: 13px; top: 12px; font-size: 17pt; }
+  .warning::before { content: "🚫"; position: absolute; left: 13px; top: 12px; font-size: 17pt; }
+  .admin-only::before { content: "🔐"; position: absolute; left: 13px; top: 12px; font-size: 17pt; }
+  .tip strong, .remember strong, .warning strong, .admin-only strong { display: block; font-size: 9pt; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; opacity: 0.7; }
+  .steps { background: #f8f8f8; border-radius: 10px; padding: 16px 22px 16px 24px; margin: 14px 0; counter-reset: step; list-style: none; }
+  .steps li { counter-increment: step; position: relative; padding-left: 34px; margin-bottom: 10px; font-size: 11.5pt; }
+  .steps li::before { content: counter(step); position: absolute; left: 0; top: 2px; background: #c0392b; color: #fff; font-weight: 900; font-size: 8.5pt; width: 21px; height: 21px; border-radius: 50%; display: flex; align-items: center; justify-content: center; line-height: 1; }
+  .settings-block { background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 16px 20px; margin: 14px 0; }
+  .settings-block h3 { margin-top: 0; color: #c0392b; }
+  .ref-page { page-break-before: always; padding: 50px 60px; }
+  .ref-header { background: #1a1a1a; color: #FFD700; font-size: 20pt; font-weight: 900; padding: 20px 30px; border-radius: 10px; margin-bottom: 30px; text-align: center; letter-spacing: 1px; }
+  .ref-section { font-size: 12pt; font-weight: 900; color: #c0392b; text-transform: uppercase; letter-spacing: 1px; margin: 24px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #c0392b; }
+  table { width: 100%; border-collapse: collapse; font-size: 10.5pt; margin-bottom: 18px; }
+  th { background: #1a1a1a; color: #FFD700; padding: 9px 13px; text-align: left; font-weight: 900; font-size: 9.5pt; }
+  td { padding: 9px 13px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  code { background: #f0f0f0; padding: 1px 6px; border-radius: 3px; font-size: 9.5pt; font-family: monospace; color: #c0392b; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+  .field-item { background: #f8f8f8; border-radius: 8px; padding: 10px 14px; font-size: 10.5pt; }
+  .field-item .fname { font-weight: 800; color: #1a1a1a; }
+  .field-item .fdesc { color: #555; font-size: 10pt; margin-top: 2px; }
+  @media print {
+    body { font-size: 11pt; }
+    .cover, .chapter, .ref-page { page-break-before: always; }
+    @page { margin: 0; size: A4; }
+  }
+</style>
+</head>
+<body>
+
+<!-- KAPAK -->
+<div class="cover">
+  <div class="cover-top">🔐 Yönetici Sürümü — Kısıtlı Erişim</div>
+  <div class="cover-body">
+    <div>
+      <div class="cover-tag">Yönetici Sürümü</div>
+      <div class="cover-title">Sun &amp; Sun<br/><span>ERP</span><br/>Yönetici Rehberi</div>
+      <div class="cover-subtitle">Platformu Yönetmek, Yapılandırmak ve Çalıştırmak İçin Tam Referans</div>
+      <div class="cover-desc">
+        Bu rehber sistemin tüm özelliklerini kapsar — günlük müşteri yönetiminden arama kampanyalarına, sözleşme şablonlarından fiyat tekliflerine, e-posta kampanyalarından yapay zeka prospecting'e ve tam sistem yapılandırmasına kadar. Sıfır ön bilgi gerektirmeden yazılmıştır.
+      </div>
+      <div class="cover-chapters">
+        <div class="cover-ch"><span>01</span> Yönetici Temelleri</div>
+        <div class="cover-ch"><span>02</span> Dashboard</div>
+        <div class="cover-ch"><span>03</span> Müşteri Adayları &amp; Pipeline</div>
+        <div class="cover-ch"><span>04</span> Soğuk Aramalar</div>
+        <div class="cover-ch"><span>05</span> E-posta Kampanyaları</div>
+        <div class="cover-ch"><span>06</span> Monday.com Entegrasyonu</div>
+        <div class="cover-ch"><span>07</span> Sözleşmeler — Tam Rehber</div>
+        <div class="cover-ch"><span>08</span> Fiyat Teklifi &amp; Canva</div>
+        <div class="cover-ch"><span>09</span> Gelen Kutusu &amp; ML Sınıflandırıcı</div>
+        <div class="cover-ch"><span>10</span> Yapay Zeka Ajanı</div>
+        <div class="cover-ch"><span>11</span> Ayarlar — Tüm Seçenekler</div>
+        <div class="cover-ch"><span>REF</span> Yer Tutucu Referansı</div>
+      </div>
+    </div>
+  </div>
+  <div class="cover-bottom">
+    <span>Sun &amp; Sun Danışmanlık</span>
+    <span>erp.sunandsun.com.tr</span>
+    <span>Yönetici Rehberi — 2026</span>
+  </div>
+</div>
+
+<!-- İÇİNDEKİLER -->
+<div class="toc-page">
+  <div class="toc-header">İçindekiler</div>
+  <div class="toc-item"><div class="toc-num">Bölüm 1</div><div><div class="toc-title">Yönetici Temelleri — Farkınız Nedir?</div><div class="toc-sub">Yönetici ve kullanıcı karşılaştırması · Yönetici özelliklerinin konumu · İlk giriş kontrol listesi</div></div></div>
+  <div class="toc-item"><div class="toc-num">Bölüm 2</div><div><div class="toc-title">Dashboard — Komuta Merkeziniz</div><div class="toc-sub">KPI kartları · Grafikler · Pipeline hunisi · Kaynak dağılımı</div></div></div>
+  <div class="toc-item"><div class="toc-num">Bölüm 3</div><div><div class="toc-title">Müşteri Adayları &amp; Pipeline — Kişi Yönetimi</div><div class="toc-sub">Manuel ekleme · Toplu içe aktarma · Müşteri adayı profili · Pipeline aşamaları · Silme</div></div></div>
+  <div class="toc-item"><div class="toc-num">Bölüm 4</div><div><div class="toc-title">Soğuk Aramalar — Vapi AI &amp; Twilio</div><div class="toc-sub">Vapi AI araması · Twilio geleneksel arama · Arama kayıtları · Mod geçişi</div></div></div>
+  <div class="toc-item"><div class="toc-num">Bölüm 5</div><div><div class="toc-title">E-posta Kampanyaları — SendGrid Entegrasyonu</div><div class="toc-sub">Şablon oluşturma · Kampanya gönderme · Değişkenler · Açılma ve yanıt takibi</div></div></div>
+  <div class="toc-item"><div class="toc-num">Bölüm 6</div><div><div class="toc-title">Monday.com Entegrasyonu</div><div class="toc-sub">Board bağlama · Kişi içe aktarma · Hitap ile toplu e-posta · Geri dönme senkronizasyonu · Etiket güncellemeleri</div></div></div>
+  <div class="toc-item"><div class="toc-num">Bölüm 7</div><div><div class="toc-title">Sözleşmeler — Tam Yönetici Referansı</div><div class="toc-sub">Şablon yükleme · Taraf 1 şirketleri · Görünür alanlar · Açılır menü seçenekleri · Form alanları · Sözleşme oluşturma</div></div></div>
+  <div class="toc-item"><div class="toc-num">Bölüm 8</div><div><div class="toc-title">Fiyat Teklifi — Sunumlar &amp; Canva</div><div class="toc-sub">Sunum ekleme · Tema düzenleyici · Canva bağlantısı · PDF dışa aktarma</div></div></div>
+  <div class="toc-item"><div class="toc-num">Bölüm 9</div><div><div class="toc-title">Gelen Kutusu — E-posta İzleme &amp; ML Sınıflandırıcı</div><div class="toc-sub">Yanıtları okuma · Duygu analizi · Pozitif / negatif etiketler · Yalnızca yönetici erişimi</div></div></div>
+  <div class="toc-item"><div class="toc-num">Bölüm 10</div><div><div class="toc-title">Yapay Zeka Ajanı — Otomatik Prospecting</div><div class="toc-sub">Nasıl çalışır · Lusha prospecting · Snov.io alan adı zenginleştirme · Sonuçları okuma · Müşteri adaylarına aktarma</div></div></div>
+  <div class="toc-item"><div class="toc-num">Bölüm 11</div><div><div class="toc-title">Ayarlar — Tam Yapılandırma</div><div class="toc-sub">API anahtarları · Sun Group şirketleri &amp; IBAN · Kullanıcı yönetimi · Müşteri adayı puanlama · Bildirimler</div></div></div>
+  <div class="toc-item"><div class="toc-num">Referans</div><div><div class="toc-title">Sözleşme Şablonu Yer Tutucu Referansı</div><div class="toc-sub">Tüm @@değişken@@ ve [[değişken]] etiketleri — ne oldukları, nerede göründükleri, ne çıktılar ürettikleri</div></div></div>
+</div>
+
+<!-- BÖLÜM 1 — YÖNETİCİ TEMELLERİ -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Bölüm 1</div>
+    <div class="chapter-title">Yönetici Temelleri —<br/>Farkınız Nedir?</div>
+    <div class="chapter-tagline">"Büyük erişim, büyük sorumluluk getirir."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>Bu bölümde</strong><ul>
+      <li>Yönetici erişiminin sıradan kullanıcıya kıyasla neler sağladığı</li>
+      <li>Arayüzde yönetici özelliklerinin nerede göründüğü</li>
+      <li>Sistemi yayına almadan önce ilk giriş kontrol listesi</li>
+    </ul></div>
+
+    <h2>Yönetici ve Sıradan Kullanıcı</h2>
+    <p>ERP'de iki rol vardır: <strong>yönetici (admin)</strong> ve <strong>kullanıcı (user)</strong>. Her hesap bu iki rolden birine sahiptir. Sistem, giriş yaptıktan sonra rolünüzü otomatik olarak algılar — ayrı bir yönetici portalı yoktur. Normal URL'den giriş yaparsınız ve sıradan kullanıcıdan daha fazla özellik görürsünüz.</p>
+    <p>Sıradan kullanıcılar şunları yapabilir: müşteri adaylarını görüntüleme, pipeline üzerinde çalışma, arama yapma, e-posta gönderme, sözleşme oluşturma (salt okunur şablonlar), fiyat teklifi gönderme ve kendi aktivitelerini görüntüleme. Herhangi bir ayarı değiştiremez, toplu veri ekleyip silemez, Yapay Zeka Ajanı'na veya Gelen Kutusu ML sınıflandırıcısına erişemezler.</p>
+    <p>Yönetici olarak, sıradan kullanıcının yapabildiği her şeyi yapabilir, bunun yanı sıra bu rehberde açıklanan tüm yönetim ve yapılandırma özelliklerine de sahip olursunuz.</p>
+
+    <h2>Yönetici Özellikleri Nerede Görünür?</h2>
+    <ul>
+      <li><strong>Dashboard:</strong> Ek KPI kartları, tam kaynak/durum grafiği ve Müşteri Adayı Ekle + XLS İçe Aktar düğmeleri</li>
+      <li><strong>Müşteri Adayları sekmesi:</strong> Her satırda Müşteri Adayını Sil düğmesi (çöp kutusu simgesi); üstte XLS İçe Aktar düğmesi</li>
+      <li><strong>Soğuk Aramalar sekmesi:</strong> Vapi AI arama ve Twilio geleneksel arama modları arasında geçiş yapabilme</li>
+      <li><strong>E-posta sekmesi:</strong> Şablon Oluştur ve Şablonu Sil düğmeleri</li>
+      <li><strong>Monday.com sekmesi:</strong> Board seçici, toplu e-posta kontrolleri, geri dönme senkronizasyonu, etiket sütunu güncellemeleri</li>
+      <li><strong>Sözleşmeler sekmesi:</strong> Şablon Yükle düğmesi, Taraf 1 şirket yönetimi, Görünür Alanlar düzenleyicisi, Açılır Menü Seçeneği düzenleyicisi</li>
+      <li><strong>Fiyat Teklifi sekmesi:</strong> Sunum Ekle düğmesi, her kartta Sil düğmesi, slayt tema düzenleyicisi, Canva Bağla düğmesi</li>
+      <li><strong>Gelen Kutusu sekmesi:</strong> Tüm sekme — sıradan kullanıcılar göremez</li>
+      <li><strong>Ajan sekmesi:</strong> Tüm sekme — sıradan kullanıcılar göremez</li>
+      <li><strong>Ayarlar sekmesi:</strong> Tüm sekme — sıradan kullanıcılar göremez</li>
+    </ul>
+
+    <div class="admin-only">
+      <strong>Yalnızca Yönetici</strong>
+      Bu rehber boyunca bu gibi kutular, sıradan kullanıcılara tamamen görünmez olan özellikleri vurgular. Yönetici özelliklerini yanlışlıkla paylaşamazsınız — arayüz bunları rolünüze göre gizler.
+    </div>
+
+    <h2>İlk Giriş Kontrol Listesi</h2>
+    <p>Sistem ekibinize hazır olmadan önce <strong>Ayarlar</strong> bölümünde şunları doğrulayın:</p>
+    <ol class="steps">
+      <li><strong>Sun Group şirketlerini</strong> (Taraf 1 tüzel kişileri) vergi dairesi, vergi numarası, adres ve banka IBAN'ı ile birlikte ekleyin.</li>
+      <li>Sözleşmeler sekmesine en az bir <strong>sözleşme şablonu</strong> (.docx dosyası) yükleyin.</li>
+      <li>E-posta kampanyalarının çalışması için <strong>SendGrid API anahtarınızı</strong> girin.</li>
+      <li>Doğru rollerle (yönetici veya kullanıcı) <strong>ekip kullanıcı hesapları</strong> ekleyin.</li>
+      <li>AI arama kullanıyorsanız <strong>Vapi API anahtarını ve asistan ID'sini</strong> girin. Geleneksel arama kullanıyorsanız <strong>Twilio kimlik bilgilerini</strong> girin.</li>
+      <li>Yapay Zeka Ajanı kullanıyorsanız <strong>Lusha API anahtarını</strong> girin (isteğe bağlı olarak Snov.io anahtarı).</li>
+      <li>Monday.com kullanıyorsanız Ayarlar'a <strong>Monday.com API anahtarınızı</strong> girin.</li>
+    </ol>
+
+    <div class="warning">
+      <strong>Güvenlik Uyarısı</strong>
+      Yönetici kimlik bilgilerinizi satış ekibi üyeleriyle paylaşmayın. Her kişiye uygun rolde kendi hesabını verin. Yönetici erişimi; müşteri adaylarını silmeye, API anahtarlarını değiştirmeye, tüm kullanıcıları yönetmeye ve gizli prospect verilerine erişmeye izin verir.
+    </div>
+  </div>
+</div>
+
+<!-- BÖLÜM 2 — DASHBOARD -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 2</div>
+    <div class="chapter-title">Dashboard —<br/>Komuta Merkeziniz</div>
+    <div class="chapter-tagline">"Her şey önemli, bir bakışta."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>Bu bölümde</strong><ul>
+      <li>KPI kartlarının anlamı</li>
+      <li>Pipeline huni grafiğini okuma</li>
+      <li>Kaynak dağılımını anlama</li>
+      <li>Aktivite akışını kullanma</li>
+    </ul></div>
+
+    <h2>Genel Bakış</h2>
+    <p>Dashboard, giriş yaptıktan sonra gördüğünüz ilk ekrandır. Tüm CRM'inizin gerçek zamanlı bir özetini sunar: kaç müşteri adayınız olduğu, pipeline'da nerede oldukları, son aktivite trendleri ve potansiyel müşterilerinizin nereden geldiği.</p>
+    <p>Dashboard'daki tüm sayılar anlık olarak güncellenir — bir müşteri adayı eklerseniz veya birini yeni bir pipeline aşamasına taşırsanız Dashboard yenilemeye gerek kalmadan bunu hemen yansıtır.</p>
+
+    <h2>KPI Kartları (Üst Sıra)</h2>
+    <ul>
+      <li><strong>Toplam Müşteri Adayı:</strong> Tüm durumlardaki toplam kişi sayısı.</li>
+      <li><strong>Aktif Pipeline:</strong> Kazanıldı/Kaybedildi/Nitelendirilemedi dışındaki çalışma aşamalarındaki adaylar.</li>
+      <li><strong>Gönderilen Sözleşmeler:</strong> Pipeline'da "Sözleşme Gönderildi" aşamasına ulaşan adaylar.</li>
+      <li><strong>Kazanıldı / Kapatıldı:</strong> "Kazanıldı" olarak işaretlenen adaylar — başarıyla dönüştürülmüş müşteriler.</li>
+      <li><strong>Bu Hafta Yeniler:</strong> Son 7 günde eklenen veya güncellenen adaylar.</li>
+    </ul>
+
+    <h2>Pipeline Huni Grafiği</h2>
+    <p>Huni, her pipeline aşamasında kaç müşteri adayının bulunduğunu gösterir. Aşamalar soldan sağa akar: Yeni → İletişime Geçildi → İlgili → Toplantı Planlandı → Teklif Gönderildi → Sözleşme Gönderildi → Kazanıldı (veya Kaybedildi / Nitelendirilemedi).</p>
+    <p>Her huni bölümünün genişliği, o aşamadaki müşteri adayı sayısıyla orantılıdır. Çok dar bir bölüm, o noktaya çok az adayın ulaşabildiğini gösterir — ekibinizin potansiyel müşterileri nerede kaybettiğini tespit etmek için kullanışlıdır.</p>
+
+    <h2>Müşteri Adayı Kaynak Dağılımı</h2>
+    <p>Kaynak grafiği, hangi kanalların en fazla müşteri adayı oluşturduğunu gösterir: referans, web sitesi, Monday.com, soğuk erişim vb. Kaynak, bir müşteri adayı oluşturulduğunda ayarlanır (Müşteri Adayı Ekle formundaki <strong>Kaynak</strong> alanı). Bu alanın tutarlı kullanımı size burada doğru veriler sağlar.</p>
+
+    <h2>Son Aktivite Akışı</h2>
+    <p>Dashboard'un sağ tarafındaki aktivite akışı, sistemdeki en son işlemleri gösterir: eklenen yeni adaylar, pipeline aşama değişiklikleri, oluşturulan sözleşmeler, gönderilen e-postalar. Bu sayede tek tek müşteri adayı profillerini kontrol etmeden ekibinizin neler yaptığını takip edebilirsiniz.</p>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      İlk kurulumdan sonra Dashboard sıfır veri gösteriyorsa, henüz müşteri adayı olmadığı içindir. İlk müşteri adayınızı ekleyin (veya bir toplu içe aktarma yapın) ve tüm grafikler hemen dolacaktır.
+    </div>
+  </div>
+</div>
+
+<!-- BÖLÜM 3 — MÜŞTERİ ADAYLARI & PİPELİNE -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Bölüm 3</div>
+    <div class="chapter-title">Müşteri Adayları &amp; Pipeline —<br/>Kişi Yönetimi</div>
+    <div class="chapter-tagline">"CRM'inizin özü."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>Bu bölümde</strong><ul>
+      <li>Manuel olarak müşteri adayı ekleme</li>
+      <li>Excel'den toplu içe aktarma</li>
+      <li>Müşteri adayı profilini görüntüleme ve düzenleme</li>
+      <li>Adayları pipeline aşamalarında ilerleme</li>
+      <li>Müşteri adaylarını silme (yalnızca yönetici)</li>
+      <li>Arama ve filtreleme</li>
+    </ul></div>
+
+    <h2>Manuel Olarak Müşteri Adayı Ekleme</h2>
+    <ol class="steps">
+      <li>Sol kenar çubuğundan <strong>Müşteri Adayları</strong> sekmesine gidin.</li>
+      <li>Sağ üst köşedeki <strong>+ Müşteri Adayı Ekle</strong> düğmesine tıklayın. (Bu düğme yalnızca yöneticilere görünür.)</li>
+      <li>Form alanlarını doldurun. En azından bir isim girin. Diğer tüm alanlar isteğe bağlıdır ancak raporlama ve kişiselleştirilmiş erişim için yardımcı olur.</li>
+      <li><strong>Kaydet</strong>'e tıklayın. Müşteri adayı hemen listenizin üstünde görünür.</li>
+    </ol>
+
+    <h3>Müşteri Adayı Formu Alanları</h3>
+    <div class="field-grid">
+      <div class="field-item"><div class="fname">İsim</div><div class="fdesc">İletişim kişisinin tam adı</div></div>
+      <div class="field-item"><div class="fname">E-posta</div><div class="fdesc">E-posta kampanyaları ve sözleşme gönderimi için kullanılır</div></div>
+      <div class="field-item"><div class="fname">Telefon</div><div class="fdesc">Soğuk arama kampanyaları için kullanılır</div></div>
+      <div class="field-item"><div class="fname">Şirket</div><div class="fdesc">Şirket veya kuruluş adı</div></div>
+      <div class="field-item"><div class="fname">LinkedIn URL</div><div class="fdesc">Profil bağlantısı — Yapay Zeka Ajanı tarafından kullanılır</div></div>
+      <div class="field-item"><div class="fname">Unvan</div><div class="fdesc">Şirketteki rol/pozisyon</div></div>
+      <div class="field-item"><div class="fname">Sektör</div><div class="fdesc">Sektör (imalat, teknoloji vb.)</div></div>
+      <div class="field-item"><div class="fname">Şehir</div><div class="fdesc">Konum — filtreleme için kullanılır</div></div>
+      <div class="field-item"><div class="fname">Şirket Büyüklüğü</div><div class="fdesc">Çalışan sayısı</div></div>
+      <div class="field-item"><div class="fname">Kaynak</div><div class="fdesc">Adayın nereden geldiği — Dashboard grafiğini besler</div></div>
+      <div class="field-item"><div class="fname">Durum</div><div class="fdesc">Pipeline aşaması (pipeline board veya buradan ayarlanır)</div></div>
+      <div class="field-item"><div class="fname">Notlar</div><div class="fdesc">Serbest metin — arama notları, bağlam vb.</div></div>
+    </div>
+
+    <h2>Excel'den Toplu Müşteri Adayı İçe Aktarma</h2>
+    <ol class="steps">
+      <li><strong>Müşteri Adayları</strong> sekmesine gidin.</li>
+      <li><strong>XLS İçe Aktar</strong> düğmesine tıklayın (sağ üst — yalnızca yönetici).</li>
+      <li>Excel dosyanızı seçin (.xls veya .xlsx).</li>
+      <li>Sistem dosyayı okur ve bir önizleme gösterir. Sütun başlıkları alan adlarıyla eşleşmelidir (name, email, phone, company vb.). Büyük/küçük harf duyarsız eşleştirme uygulanır.</li>
+      <li>İçe aktarmayı onaylayın. E-posta adresine göre tekrar algılama çalışır — zaten var olan kişiler atlanır.</li>
+      <li>Kaç müşteri adayının eklendiğini ve kaçının tekrar olarak atlandığını gösteren bir özet belirir.</li>
+    </ol>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      Excel dosyanızı şu başlık satırıyla hazırlayın: name, email, phone, company, job_title, industry, city. Sistem bunları otomatik olarak eşler. Fazladan sütunlar yok sayılır.
+    </div>
+
+    <h2>Müşteri Adayını Görüntüleme ve Düzenleme</h2>
+    <p>Tam müşteri adayı profili panelini açmak için Müşteri Adayları listesindeki herhangi bir satıra tıklayın. Buradan şunları yapabilirsiniz:</p>
+    <ul>
+      <li>Herhangi bir alana tıklayarak satır içi düzenleme</li>
+      <li>Notlar bölümüne arama notları ekleme</li>
+      <li>Bu müşteri adayı için tam aktivite geçmişini görme</li>
+      <li>Pipeline aşamasını değiştirme</li>
+      <li>Profilden doğrudan arama başlatma</li>
+      <li>Profilden doğrudan e-posta gönderme</li>
+    </ul>
+
+    <h2>Pipeline Board'u</h2>
+    <p>Kanban tarzı pipeline board'unu görmek için kenar çubuğundaki <strong>Pipeline</strong> sekmesine tıklayın. Her sütun bir pipeline aşamasıdır. Her kart bir müşteri adayını temsil eder.</p>
+    <p>Bir müşteri adayını farklı bir aşamaya taşımak için kartı yeni bir sütuna sürükleyin. Değişiklik otomatik olarak kaydedilir ve hemen Dashboard'a yansır.</p>
+    <p>Pipeline aşamaları (sırasıyla):</p>
+    <ul>
+      <li><strong>Yeni</strong> — Az önce eklendi, henüz iletişime geçilmedi</li>
+      <li><strong>İletişime Geçildi</strong> — İlk erişim yapıldı</li>
+      <li><strong>İlgili</strong> — İlgi gösterdi, konuşma başladı</li>
+      <li><strong>Toplantı Planlandı</strong> — Randevu alındı</li>
+      <li><strong>Teklif Gönderildi</strong> — Fiyat teklifi veya öneri iletildi</li>
+      <li><strong>Sözleşme Gönderildi</strong> — Sözleşme oluşturuldu ve gönderildi</li>
+      <li><strong>Kazanıldı</strong> — Anlaşma başarıyla kapandı</li>
+      <li><strong>Kaybedildi</strong> — Devam etmemeye karar verdi</li>
+      <li><strong>Nitelendirilemedi</strong> — Uygun bir aday değil</li>
+    </ul>
+
+    <h2>Müşteri Adayı Silme</h2>
+    <div class="admin-only">
+      <strong>Yalnızca Yönetici</strong>
+      Silme düğmesi yalnızca yöneticilere görünür. Sıradan kullanıcılar müşteri adaylarını silemez.
+    </div>
+    <p>Bir müşteri adayını silmek için listedeki satırındaki çöp kutusu simgesine tıklayın. Bir onay iletişim kutusu belirir. Onaylayarak müşteri adayını ve tüm ilişkili verileri (arama kayıtları, e-posta geçmişi, sözleşme taslakları) kalıcı olarak silin.</p>
+
+    <div class="warning">
+      <strong>Uyarı — Kalıcı İşlem</strong>
+      Müşteri adayı silme işlemi geri alınamaz. Tüm ilişkili veriler (notlar, arama kayıtları, e-posta kayıtları) da silinir. Yalnızca kaldırılması gerektiğinden emin olduğunuz müşteri adaylarını silin.
+    </div>
+  </div>
+</div>
+
+<!-- BÖLÜM 4 — SOĞUK ARAMALAR -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 4</div>
+    <div class="chapter-title">Soğuk Aramalar —<br/>Vapi AI &amp; Twilio</div>
+    <div class="chapter-tagline">"İki arama yöntemi. Tek yönetim yeri."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>Bu bölümde</strong><ul>
+      <li>Soğuk Aramalar sekmesinin işlevi</li>
+      <li>Vapi AI araması — otomatik giden aramalar</li>
+      <li>Twilio geleneksel arama</li>
+      <li>Modlar arasında geçiş yapma</li>
+      <li>Arama kayıtlarını okuma</li>
+    </ul></div>
+
+    <h2>Genel Bakış</h2>
+    <p>Soğuk Aramalar sekmesi, doğrudan ERP'den giden arama kampanyaları yürütmenizi sağlar. Bir müşteri adayı (veya toplu adaylar) seçer ve aramaları başlatırsınız. İki arama sistemi desteklenir: <strong>Vapi</strong> (yapay zeka destekli otomatik arama) ve <strong>Twilio</strong> (geleneksel programatik arama). Hangisini kullanacağınızı Ayarlar sekmesinde belirlersiniz.</p>
+
+    <h2>Vapi AI Araması</h2>
+    <p>Vapi, önceden yapılandırılmış bir AI ses asistanını kullanarak müşteri adaylarını arar ve komut dosyalı bir konuşma yürütür. Asistan doğal konuşur, temel soruları yanıtlar ve sonucu kaydeder. Bu, bir satış temsilcisinin her aramayı manuel olarak yapmasına gerek kalmadan çok sayıda müşteriyi aramanızı sağlar.</p>
+    <h3>Vapi Nasıl Kullanılır?</h3>
+    <ol class="steps">
+      <li>Ayarlar → API Entegrasyonları'nda <strong>Vapi API anahtarınızın</strong> ve <strong>Vapi Asistan ID'nizin</strong> kayıtlı olduğundan emin olun.</li>
+      <li><strong>Soğuk Aramalar</strong> sekmesine gidin.</li>
+      <li>Listeden aramak istediğiniz müşteri adaylarını seçin (onay kutuları).</li>
+      <li><strong>AI Arama Kampanyası Başlat</strong>'a tıklayın. Vapi seçilen her müşteriyi sırayla arar.</li>
+      <li>Arama durumu gerçek zamanlı olarak güncellenir — Arıyor, Tamamlandı, Yanıt Yok vb.</li>
+      <li>Aramalar tamamlandıktan sonra arama transkriptleri ve sonuçları her müşteri adayının profiline kaydedilir.</li>
+    </ol>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      Vapi asistanının komut dosyası ve sesi, ERP içinde değil Vapi kontrol panelinde (vapi.ai) yapılandırılır. ERP yalnızca telefon numarasını iletir ve aramayı tetikler. Burada kampanya çalıştırmadan önce asistanınızı Vapi'de kurun ve test edin.
+    </div>
+
+    <h2>Twilio Geleneksel Arama</h2>
+    <p>Twilio, kayıtlı Twilio numaranız üzerinden gerçek telefon görüşmeleri bağlar. Vapi'nin aksine, Twilio aramaları gerçekte konuşması gereken bir insan gerektirir — sistem müşteriyi arar, temsilciniz açar ve canlı konuşma gerçekleşir.</p>
+    <h3>Twilio Nasıl Kullanılır?</h3>
+    <ol class="steps">
+      <li>Ayarlar → API Entegrasyonları'nda <strong>Twilio Hesap SID'i</strong>, <strong>Auth Token'ı</strong> ve <strong>Twilio Telefon Numarasını</strong> kaydedin.</li>
+      <li><strong>Soğuk Aramalar</strong> sekmesine gidin.</li>
+      <li>Aranacak müşteriyi seçin.</li>
+      <li><strong>Ara</strong>'ya tıklayın. Twilio müşterinin telefon numarasını arar.</li>
+      <li>Müşteri yanıtladığında tarayıcınız canlı konuşma için bağlanır.</li>
+      <li>Arama bittikten sonra müşteri adayı profiline sonuç hakkında bir not ekleyin.</li>
+    </ol>
+
+    <h2>Vapi ile Twilio Arasında Geçiş</h2>
+    <ol class="steps">
+      <li><strong>Ayarlar → API Entegrasyonları</strong>'na gidin.</li>
+      <li>Kullanmak istediğiniz sistem için kimlik bilgilerini girin veya doğrulayın.</li>
+      <li>Aktif arama modunu seçin (Vapi veya Twilio). Soğuk Aramalar sekmesi arayüzü seçilen moda göre güncellenir.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- BÖLÜM 5 — E-POSTA KAMPANYALARI -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Bölüm 5</div>
+    <div class="chapter-title">E-posta Kampanyaları —<br/>SendGrid Entegrasyonu</div>
+    <div class="chapter-tagline">"Ölçekte kişiselleştirilmiş erişim."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>Bu bölümde</strong><ul>
+      <li>E-posta gönderimi nasıl çalışır (SendGrid)</li>
+      <li>E-posta şablonları oluşturma ve yönetme</li>
+      <li>Şablonlarda değişken kullanımı</li>
+      <li>Seçilen müşteri adaylarına kampanya gönderme</li>
+      <li>Açılma ve yanıtları takip etme</li>
+    </ul></div>
+
+    <h2>Nasıl Çalışır?</h2>
+    <p>ERP'den gönderilen tüm giden e-postalar <strong>SendGrid</strong> üzerinden gönderilir. Herhangi bir e-postanın gönderilmesi için Ayarlar'da geçerli bir SendGrid API anahtarına ihtiyacınız vardır. E-postalar, SendGrid hesabınızda yapılandırılan gönderici adresinden gönderilir.</p>
+
+    <h2>E-posta Şablonu Oluşturma</h2>
+    <div class="admin-only">
+      <strong>Yalnızca Yönetici</strong>
+      Şablon oluşturma ve silme yalnızca yöneticiler içindir. Sıradan kullanıcılar şablonları görüntüleyip kullanabilir ancak ekleyip kaldıramazlar.
+    </div>
+    <ol class="steps">
+      <li><strong>E-posta</strong> sekmesine gidin.</li>
+      <li><strong>+ Yeni Şablon</strong>'a tıklayın (sağ üst — yalnızca yönetici).</li>
+      <li>Bir <strong>Şablon Adı</strong> girin (yalnızca dahili referans için — alıcıya gösterilmez).</li>
+      <li><strong>Konu Satırını</strong> girin. Konuda <code>{{first_name}}</code> veya <code>{{company}}</code> gibi değişkenler kullanabilirsiniz.</li>
+      <li>Editörde e-posta gövdesini yazın. Kişiselleştirilmiş içerik istediğiniz her yerde değişken kullanın.</li>
+      <li><strong>Şablonu Kaydet</strong>'e tıklayın.</li>
+    </ol>
+
+    <h3>Şablon Değişkenleri</h3>
+    <table>
+      <tr><th>Değişken</th><th>Yerine Geçen</th></tr>
+      <tr><td><code>{{first_name}}</code></td><td>Adayın adı</td></tr>
+      <tr><td><code>{{last_name}}</code></td><td>Adayın soyadı</td></tr>
+      <tr><td><code>{{full_name}}</code></td><td>Adayın tam adı</td></tr>
+      <tr><td><code>{{company}}</code></td><td>Adayın şirket adı</td></tr>
+      <tr><td><code>{{job_title}}</code></td><td>Adayın unvanı</td></tr>
+      <tr><td><code>{{city}}</code></td><td>Adayın şehri</td></tr>
+    </table>
+
+    <h2>Kampanya Gönderme</h2>
+    <ol class="steps">
+      <li><strong>E-posta</strong> sekmesine gidin.</li>
+      <li>E-posta göndermek istediğiniz müşteri adaylarını seçin (müşteri adayları listesinde onay kutuları veya bir segment seçmek için filtreler).</li>
+      <li><strong>Kampanya Gönder</strong>'e tıklayın.</li>
+      <li>Açılır listeden kullanılacak şablonu seçin.</li>
+      <li>Alıcı sayısını inceleyin ve örnek bir e-posta önizleyin.</li>
+      <li><strong>Gönder</strong>'e tıklayın. Kampanya hemen SendGrid üzerinden gönderilir.</li>
+    </ol>
+
+    <div class="remember">
+      <strong>Hatırlatma</strong>
+      E-postalar hemen gider — zamanlama veya gecikme seçeneği yoktur. Göndere tıklamadan önce şablonunuzun hazır olduğundan ve alıcı listenizin doğru olduğundan emin olun.
+    </div>
+  </div>
+</div>
+
+<!-- BÖLÜM 6 — MONDAY.COM -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 6</div>
+    <div class="chapter-title">Monday.com Entegrasyonu</div>
+    <div class="chapter-tagline">"Monday board'unuzu tek tıkla ERP'ye çekin."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>Bu bölümde</strong><ul>
+      <li>Monday.com'u ERP'ye bağlama</li>
+      <li>Board seçme ve kişileri içe aktarma</li>
+      <li>Tekilleştirme — sistem mevcut kişileri nasıl işler</li>
+      <li>Cinsiyete dayalı hitaplarla toplu e-posta</li>
+      <li>Monday.com'a geri dönme senkronizasyonu</li>
+      <li>Etiket sütunlarını güncelleme</li>
+    </ul></div>
+
+    <h2>Monday.com'u Bağlama</h2>
+    <ol class="steps">
+      <li><strong>Ayarlar → API Entegrasyonları</strong>'na gidin.</li>
+      <li><strong>Monday.com API anahtarınızı</strong> girin (Monday.com profilinizde Geliştiriciler → API bölümünde bulunur).</li>
+      <li><strong>Kaydet</strong>'e tıklayın. ERP'deki Monday.com sekmesi artık aktif hale gelir.</li>
+    </ol>
+
+    <h2>Board Seçme ve Kişi İçe Aktarma</h2>
+    <ol class="steps">
+      <li>Kenar çubuğundaki <strong>Monday.com</strong> sekmesine gidin.</li>
+      <li><strong>Board'ları Yükle</strong>'ye tıklayın. Sistem, API anahtarınızla erişilebilen tüm board'ları çeker.</li>
+      <li>Açılır listeden çalışmak istediğiniz board'u seçin.</li>
+      <li><strong>Kişileri İçe Aktar</strong>'a tıklayın. Sistem bu board'daki tüm kişileri çeker.</li>
+      <li>Tekilleştirme otomatik olarak çalışır — e-postası ERP müşteri adayları tablosunda zaten bulunan kişiler atlanır. Yeni kişiler müşteri adayı olarak eklenir.</li>
+    </ol>
+
+    <h2>Cinsiyete Dayalı Hitaplarla Toplu E-posta</h2>
+    <p>Monday.com kişilerine e-posta gönderirken ERP, Monday.com'daki cinsiyet alanına göre otomatik olarak cinsiyete uygun Türkçe hitaplar uygulayabilir (Sayın Bey / Sayın Hanım). Bu, Türk iş yazışmalarında toplu erişimi kişisel hissettirmenizi sağlar.</p>
+    <ol class="steps">
+      <li>Bir board yükledikten sonra onay kutuları kullanarak e-posta göndermek istediğiniz kişileri seçin.</li>
+      <li><strong>E-posta Gönder</strong>'e tıklayın.</li>
+      <li>Şablonunuzu seçin. Şablon <code>{{salutation}}</code> içeriyorsa, her alıcı için otomatik olarak doğru hitapla değiştirilir.</li>
+      <li>İnceleyin ve gönderin.</li>
+    </ol>
+
+    <h2>Geri Dönme (Bounce) Senkronizasyonu</h2>
+    <ol class="steps">
+      <li>Bir kampanyadan sonra <strong>Monday.com</strong> sekmesine gidin.</li>
+      <li><strong>Geri Dönmeleri Senkronize Et</strong>'e tıklayın. Sistem, son kampanyadan tüm dönen e-postaları bulur ve ilgili Monday.com kayıtlarını günceller.</li>
+    </ol>
+
+    <h2>Etiket Sütunlarını Güncelleme</h2>
+    <p>ERP, Monday.com board'unuzdaki belirlenmiş bir "etiket" sütununa geri yazabilir. Örneğin, bir kampanyadan sonra satırları "E-posta Gönderildi — [tarih]" ile işaretleyerek Monday board'unuzun ERP'den gelen aktiviteyi yansıtmasını sağlayabilirsiniz.</p>
+    <p>Hangi sütuna yazılacağını Ayarlar → Monday.com Yapılandırması'nda ayarlayın. Sütun, Monday.com'da bir metin veya etiket sütunu olmalıdır.</p>
+  </div>
+</div>
+
+<!-- BÖLÜM 7 — SÖZLEŞMELER -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Bölüm 7</div>
+    <div class="chapter-title">Sözleşmeler —<br/>Tam Yönetici Referansı</div>
+    <div class="chapter-tagline">"Saniyeler içinde profesyonel sözleşmeler oluşturun."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>Bu bölümde</strong><ul>
+      <li>Sözleşme sisteminin nasıl çalıştığı</li>
+      <li>Sözleşme şablonu yükleme ve yönetme</li>
+      <li>Taraf 1 (Sun Group) şirketlerini yönetme</li>
+      <li>Şablon başına görünür alanları kontrol etme</li>
+      <li>Açılır menü seçeneklerini düzenleme</li>
+      <li>Sözleşme formunu doldurma — her alan açıklandı</li>
+      <li>Sözleşme oluşturma ve indirme</li>
+      <li>Ödeme planı (Ek-1)</li>
+    </ul></div>
+
+    <h2>Sözleşme Sistemi Nasıl Çalışır?</h2>
+    <p>ERP, şablon dosyanızı sözleşme formuna girilen verilerle birleştirerek Word (.docx) sözleşmeleri oluşturur. Bir şablonu bir kez yüklersiniz; o andan itibaren herkes saniyeler içinde doldurulmuş bir sözleşme oluşturmak için bunu kullanabilir.</p>
+    <p>Şablonlar <strong>yer tutucular</strong> içerir — sözleşme oluşturulduğunda gerçek verilerle değiştirilen özel etiketler. İki format desteklenir:</p>
+    <ul>
+      <li><strong><code>@@yer_tutucu_adi@@</code></strong> — Eski format (eski şablonlar)</li>
+      <li><strong><code>[[yer_tutucu_adi]]</code></strong> — Güncel docxtemplater formatı (yeni şablonlar için önerilen)</li>
+    </ul>
+
+    <h2>Sözleşme Şablonu Yükleme</h2>
+    <div class="admin-only">
+      <strong>Yalnızca Yönetici</strong>
+      Yalnızca yöneticiler sözleşme şablonu yükleyebilir, yeniden adlandırabilir veya silebilir.
+    </div>
+    <ol class="steps">
+      <li><strong>Sözleşmeler</strong> sekmesine gidin.</li>
+      <li><strong>Şablon Yükle</strong>'ye tıklayın (sağ üst).</li>
+      <li>.docx dosyanızı seçin. Dosya, <code>@@...@@</code> veya <code>[[...]]</code> formatında yer tutucular içeren geçerli bir Word belgesi olmalıdır.</li>
+      <li>Şablona bir <strong>görünen ad</strong> verin (şablon seçici açılır listesinde gösterilir).</li>
+      <li><strong>Kaydet</strong>'e tıklayın. Şablon sunucuda depolanır ve hemen kullanıma hazır hale gelir.</li>
+    </ol>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      Şablonlarınızı net bir şekilde adlandırın — örneğin "KOSGEB Danışmanlık 2026" veya "TÜBİTAK 3 Taraflı". Kullanıcılar sözleşme oluştururken tam olarak bu adı göreceklerdir.
+    </div>
+
+    <h2>Taraf 1 Şirketlerini Yönetme</h2>
+    <p>Taraf 1, sözleşmedeki hizmet sağlayıcınız olan Sun Group şirketinizdir. Birden fazla tüzel kişiliğiniz olabilir (Sun &amp; Sun Danışmanlık, Sun &amp; Sun Teknoloji vb.). Her birinin kendi vergi bilgileri ve IBAN'ı vardır.</p>
+    <div class="admin-only">
+      <strong>Yalnızca Yönetici</strong>
+      Taraf 1 şirketi ekleme, düzenleme ve silme yalnızca yöneticiler içindir.
+    </div>
+    <ol class="steps">
+      <li><strong>Ayarlar → Sun Group Şirketleri</strong>'ne gidin.</li>
+      <li><strong>+ Şirket Ekle</strong>'ye tıklayın.</li>
+      <li>Şunları doldurun: Şirket Adı, Vergi Dairesi, Vergi Numarası, Tescilli Adres ve IBAN.</li>
+      <li><strong>Kaydet</strong>'e tıklayın. Şirket, sözleşme formundaki Taraf 1 seçicisinde görünür.</li>
+    </ol>
+
+    <h2>Görünür Alanları Kontrol Etme (Şablon Bazında)</h2>
+    <p>Farklı sözleşme şablonları farklı alanlara ihtiyaç duyar. Örneğin, KOSGEB tek programlı bir sözleşme Program 2 veya Program 3 alanlarına ihtiyaç duymaz. Görünür Alanlar, her şablon için alakasız alanları gizlemenize olanak tanır.</p>
+    <div class="admin-only">
+      <strong>Yalnızca Yönetici</strong>
+      Görünür Alanlar düzenleyicisi yalnızca yöneticiler içindir.
+    </div>
+    <ol class="steps">
+      <li><strong>Sözleşmeler</strong> sekmesine gidin.</li>
+      <li>Yapılandırmak istediğiniz şablonu seçin.</li>
+      <li><strong>Alanları Yönet</strong>'e tıklayın (yalnızca yönetici).</li>
+      <li>Tüm sözleşme alanlarının kontrol listesi görünür. Bu şablon için göstermek istediğiniz alanları işaretleyin; gizlemek istediklerinizin işaretini kaldırın.</li>
+      <li><strong>Alan Ayarlarını Kaydet</strong>'e tıklayın.</li>
+    </ol>
+
+    <h2>Açılır Menü Seçeneklerini Düzenleme</h2>
+    <p>Birkaç sözleşme formu alanı, seçeneklerini özelleştirebileceğiniz açılır menüler kullanır. Yöneticiler tarafından düzenlenebilir açılır menüler:</p>
+    <ul>
+      <li><strong>Başarı Primi Türü</strong> — "onaylanan destek", "onaylanan kredi", "sağlanan fayda"</li>
+      <li><strong>Vade Türü</strong> — "Projenin onaylanmasını takip eden", "İmza tarihinden itibaren" vb.</li>
+      <li><strong>Ödeme Konusu</strong> — Ödeme planı satırları için etiketler</li>
+    </ul>
+    <ol class="steps">
+      <li><strong>Sözleşmeler</strong> sekmesine gidin.</li>
+      <li>Açılır menü alanını bulun (örn. Başarı Primi Türü) ve yanındaki kalem/düzenleme simgesine tıklayın (yalnızca yönetici).</li>
+      <li>Açılır menü seçeneği düzenleyicisi açılır. Yeni bir seçenek eklemek için giriş kutusuna yazın ve + işaretine tıklayın. Mevcut bir seçeneği silmek için yanındaki × işaretine tıklayın.</li>
+      <li>Değişiklikler hemen geçerli olur — kaydet düğmesine gerek yoktur.</li>
+    </ol>
+
+    <div class="remember">
+      <strong>Hatırlatma</strong>
+      Başarı Primi Türü açılır menüsündeki "sağlanan fayda" seçeneğinin özel bir etkisi vardır: seçildiğinde, sözleşme şablonundaki <code>@@vakifbank_clause@@</code> yer tutucusu otomatik olarak Vakıfbank madde cümlesiyle değiştirilir. Bu yerleşik olarak mevcuttur — ekstra bir şey yapmanıza gerek yoktur.
+    </div>
+
+    <h2>Sözleşme Formunu Doldurma</h2>
+    <ol class="steps">
+      <li><strong>Sözleşmeler</strong> sekmesine gidin.</li>
+      <li>Üstteki açılır listeden <strong>şablonu</strong> seçin.</li>
+      <li>Açılır listeden <strong>Taraf 1 şirketini</strong> seçin. Bu, tüm Taraf 1 alanlarını otomatik doldurur.</li>
+      <li>Tüm <strong>Taraf 2</strong> (müşteri) alanlarını manuel olarak doldurun.</li>
+      <li>Sözleşme üçüncü bir tarafı kapsıyorsa <strong>Taraf 3</strong> alanlarını da doldurun.</li>
+      <li><strong>Program Detayları</strong> bölümünü doldurun (program adı, ücretler, primler, tarihler).</li>
+      <li>Sözleşme bir ödeme planı içeriyorsa <strong>Ek-1 (Ödeme Planı)</strong> bölümünü doldurun.</li>
+      <li><strong>Sözleşme Oluştur</strong>'a tıklayın. Bir .docx dosyası oluşturulur ve otomatik olarak indirilir.</li>
+    </ol>
+
+    <h3>Program 1 Alanları</h3>
+    <table>
+      <tr><th>Alan</th><th>Açıklama</th><th>Yer Tutucu</th></tr>
+      <tr><td>Finansör</td><td>Fon kuruluşu (KOSGEB, TÜBİTAK, TKDK…)</td><td><code>@@financier@@</code></td></tr>
+      <tr><td>Program Adı</td><td>Belirli hibe/programın adı</td><td><code>@@program_name@@</code></td></tr>
+      <tr><td>Hizmet Bedeli 1</td><td>Sabit hizmet ücreti — Türk sayı biçimiyle otomatik formatlanır</td><td><code>@@down_payment@@</code></td></tr>
+      <tr><td>Hizmet Bedeli 2</td><td>İkinci hizmet ücreti (varsa)</td><td><code>@@down_payment_2@@</code></td></tr>
+      <tr><td>Ödeme Son Tarihi</td><td>Hizmet ücretinin son ödeme tarihi</td><td><code>@@down_payment_deadline@@</code></td></tr>
+      <tr><td>Başarı Primi 1 (%)</td><td>Performans primi yüzdesi</td><td><code>@@success_bonus@@</code></td></tr>
+      <tr><td>Prim Türü 1</td><td>Açılır menü: primin neye dayandığı</td><td><code>@@success_bonus_type@@</code></td></tr>
+      <tr><td>Prim 1 Vadesi (gün)</td><td>Gün sayısı — otomatik boşluk eklenir ("60 gün")</td><td><code>@@sb1ddl@@</code></td></tr>
+      <tr><td>Prim 1 Vade Türü</td><td>Açılır menü: hangi olaydan itibaren sayılır</td><td><code>@@sb1ddl_type@@</code></td></tr>
+      <tr><td>Başarı Primi 2 (%)</td><td>İkinci performans primi (varsa)</td><td><code>@@success_bonus_2@@</code></td></tr>
+      <tr><td>Prim Türü 2</td><td>İkinci prim türü açılır menüsü</td><td><code>@@success_bonus_type_2@@</code></td></tr>
+      <tr><td>Prim 2 Vadesi</td><td>İkinci prim ödemesi için gün sayısı</td><td><code>@@sb1ddl_2@@</code></td></tr>
+      <tr><td>Prim 2 Vade Türü</td><td>Hangi olaydan itibaren sayılır</td><td><code>@@sb1ddl_2_type@@</code></td></tr>
+      <tr><td>Sözleşme Tarihi</td><td>İmzalama tarihi — GG/AA/YYYY formatında</td><td><code>@@contract_date@@</code></td></tr>
+      <tr><td>Notlar</td><td>Ek sözleşme notları</td><td><code>@@notes@@</code></td></tr>
+    </table>
+
+    <h2>Ödeme Planı (Ek-1)</h2>
+    <p>Ödeme planı, sözleşmeye (veya ayrı bir ek olarak) gömülü otomatik oluşturulmuş bir tablodur. Satırları konu, tarih ve tutar ile doldurursunuz. Sistem, biçimlendirilmiş bir Word tablosu oluşturur ve bunu <code>@@payment_schedule@@</code> yer tutucu konumuna sözleşmeye ekler.</p>
+    <p>Ödeme planındaki her satırın üç bölümü vardır:</p>
+    <ul>
+      <li><strong>Konu</strong> — Ödemenin nedeni (örn. "Danışmanlık Hizmeti 1. Taksit")</li>
+      <li><strong>Tarih</strong> — Ödemenin son tarihi</li>
+      <li><strong>Tutar</strong> — TL cinsinden ödeme tutarı</li>
+    </ul>
+    <p>Plan başına en fazla 20 ödeme satırı girebilirsiniz. Kullanılmayan satırlar yok sayılır.</p>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      Ödeme tarihlerini seçmek için özel tarih seçiciyi (takvim simgesi) kullanın — bu, tarihin çıktıda doğru biçimlendirilmesini sağlar. Tarihleri manuel olarak yazmayın.
+    </div>
+  </div>
+</div>
+
+<!-- BÖLÜM 8 — FİYAT TEKLİFİ -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 8</div>
+    <div class="chapter-title">Fiyat Teklifi —<br/>Sunumlar &amp; Canva</div>
+    <div class="chapter-tagline">"İki tıklamayla şık bir fiyatlandırma PDF'i gönderin."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>Bu bölümde</strong><ul>
+      <li>Fiyat Teklifi sekmesinin işlevi</li>
+      <li>Sunum ekleme ve yönetme</li>
+      <li>Sunum kategorileri ve temalar</li>
+      <li>Canva bağlama (OAuth2)</li>
+      <li>Fiyatlandırma PDF'lerini dışa aktarma ve gönderme</li>
+    </ul></div>
+
+    <h2>Genel Bakış</h2>
+    <p>Fiyat Teklifi sekmesi, sunum kütüphanesini yönettiğiniz yerdir — Canva bağlantılı fiyatlandırma ve hizmet sunumlarından oluşan seçilmiş bir set. Bir satış temsilcisi fiyat teklifi göndermek istediğinde kütüphaneden bir sunum seçer, Canva aracılığıyla PDF olarak dışa aktarır ve müşteri adayına gönderir.</p>
+
+    <h2>Sunum Ekleme</h2>
+    <div class="admin-only">
+      <strong>Yalnızca Yönetici</strong>
+      Sunum ekleme ve silme yalnızca yöneticiler içindir. Sıradan kullanıcılar sunumları yalnızca görüntüleyip dışa aktarabilir.
+    </div>
+    <ol class="steps">
+      <li><strong>Fiyat Teklifi</strong> sekmesine gidin.</li>
+      <li><strong>+ Sunum Ekle</strong>'ye tıklayın (sağ üst — yalnızca yönetici).</li>
+      <li><strong>Sunum Adını</strong> girin (kütüphanedeki kartta gösterilir).</li>
+      <li>Açılır listeden bir <strong>Kategori</strong> seçin (örn. KOSGEB, TÜBİTAK, Genel).</li>
+      <li><strong>Canva Bağlantısını</strong> girin — bu sunum için Canva tasarımına doğrudan URL.</li>
+      <li>Bir <strong>Tema</strong> seçin (kütüphanedeki kart için görsel renk şeması).</li>
+      <li><strong>Kaydet</strong>'e tıklayın.</li>
+    </ol>
+
+    <h2>Canva Bağlama (OAuth2)</h2>
+    <p>Sunumları doğrudan ERP içinden PDF olarak dışa aktarmak için Canva hesabını OAuth2 aracılığıyla bağlamalısınız:</p>
+    <ol class="steps">
+      <li>Fiyat Teklifi sekmesinde <strong>Canva'yı Bağla</strong>'ya tıklayın.</li>
+      <li>Canva giriş penceresi açılır. Sunumlara sahip Canva hesabıyla oturum açın.</li>
+      <li>ERP uygulamasının Canva tasarımlarınıza erişmesine izin verin.</li>
+      <li>Bağlantı kurulduğunda düğme bağlı hesabınızın adını gösterir.</li>
+    </ol>
+    <p>Canva bağlantısı kullanıcı başına kaydedilir — PDF'leri dışa aktarmak isteyen her ekip üyesinin kendi Canva hesabını bağlaması gerekir.</p>
+
+    <h2>Fiyat Teklifi Dışa Aktarma ve Gönderme</h2>
+    <ol class="steps">
+      <li>Fiyat Teklifi sekmesinde göndermek istediğiniz sunumu bulun.</li>
+      <li>Sunum kartındaki <strong>PDF Dışa Aktar</strong> düğmesine tıklayın.</li>
+      <li>Sistem, tasarımı PDF dosyası olarak dışa aktarmak için Canva API'sini çağırır.</li>
+      <li>PDF hazır olduğunda indirebilir veya doğrudan bir müşteri adayına e-posta ile gönderebilirsiniz.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- BÖLÜM 9 — GELEN KUTUSU -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Bölüm 9</div>
+    <div class="chapter-title">Gelen Kutusu —<br/>E-posta İzleme &amp; ML Sınıflandırıcı</div>
+    <div class="chapter-tagline">"Bir yanıtın iyi haber mi kötü haber mi olduğunu anında bilin."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>Bu bölümde</strong><ul>
+      <li>Gelen Kutusu sekmesi nedir ve kim görebilir</li>
+      <li>ML duygu sınıflandırıcısı nasıl çalışır</li>
+      <li>Pozitif / negatif etiketleri okuma</li>
+      <li>Gelen Kutusu'ndan yanıtlara göre işlem yapma</li>
+    </ul></div>
+
+    <div class="admin-only">
+      <strong>Yalnızca Yönetici — Tüm Sekme</strong>
+      Gelen Kutusu sekmesi sıradan kullanıcılara tamamen görünmezdir. Yalnızca yönetici hesapları bunu kenar çubuğunda görür.
+    </div>
+
+    <h2>Gelen Kutusu Ne Yapar?</h2>
+    <p>Gelen Kutusu sekmesi, giden kampanyalarınızdan alınan e-posta yanıtlarını bir araya getirir. Gmail veya Outlook'a gidip yanıtları okumak yerine, onları burada ERP içinde, müşteri adayının tam profiliyle birlikte görürsünüz.</p>
+    <p>Temel özellik <strong>ML duygu sınıflandırıcısıdır</strong>: gelen her yanıt, onu <strong>Pozitif</strong> veya <strong>Negatif</strong> olarak sınıflandıran bir makine öğrenmesi modeli (BERTurk / XLM-RoBERTa) tarafından otomatik olarak analiz edilir. Pozitif bir yanıt genellikle ilgiyi; negatif bir yanıt reddi, abonelikten çıkma isteğini veya şikayeti gösterir.</p>
+
+    <h2>Gelen Kutusunu Okuma</h2>
+    <p>Gelen Kutusu sekmesi, tarihe göre sıralanmış (en yenisi önce) yanıtların listesini gösterir. Her satır şunları gösterir:</p>
+    <ul>
+      <li>Gönderenin adı ve e-postası</li>
+      <li>Konu satırı</li>
+      <li>Yanıtın ilk satırından önizleme</li>
+      <li>Renk kodlamalı duygu etiketi (Pozitif / Negatif)</li>
+      <li>Güven yüzdesi</li>
+      <li>Alınan tarih ve saat</li>
+    </ul>
+
+    <h2>Yanıtlara Göre İşlem Yapma</h2>
+    <p>Açık yanıt görünümünden şunları yapabilirsiniz:</p>
+    <ul>
+      <li><strong>Müşteriyi yeni bir pipeline aşamasına taşıma</strong> — örneğin "Pozitif" yanıt veren adayı "İlgili" veya "Toplantı Planlandı" aşamasına taşıma</li>
+      <li><strong>Doğrudan yanıt verme</strong> — bağlı e-postanızdan giden bir yanıt oluşturma</li>
+      <li>Müşteri adayının profiline <strong>not ekleme</strong></li>
+      <li>Aktif gelen kutusu görünümünden kaldırmak için <strong>İşlendi olarak işaretleme</strong></li>
+    </ul>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      Gelen Kutusu'nu sabah rutininiz olarak kullanın — gece gelen tüm yanıtları inceleyin, önce pozitif olanlara göre hareket edin ve negatifleri işlendi olarak işaretleyin. Bu yaklaşık 5 dakika sürer ve hiçbir sıcak adayın gözden kaçmamasını sağlar.
+    </div>
+  </div>
+</div>
+
+<!-- BÖLÜM 10 — YAPAY ZEKA AJANI -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 10</div>
+    <div class="chapter-title">Yapay Zeka Ajanı —<br/>Otomatik Prospecting</div>
+    <div class="chapter-tagline">"Sistemin sizin için yeni müşteri adayları bulmasına izin verin."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>Bu bölümde</strong><ul>
+      <li>Ajan ne yapar?</li>
+      <li>Lusha prospecting nasıl çalışır?</li>
+      <li>Snov.io alan adı zenginleştirme</li>
+      <li>Ajan oturumu çalıştırma</li>
+      <li>Sonuçları okuma ve müşteri adaylarına aktarma</li>
+    </ul></div>
+
+    <div class="admin-only">
+      <strong>Yalnızca Yönetici — Tüm Sekme</strong>
+      Ajan sekmesi sıradan kullanıcılara tamamen görünmezdir.
+    </div>
+
+    <h2>Ajan Ne Yapar?</h2>
+    <p>Yapay Zeka Ajanı, otomatik bir prospecting aracıdır. Arama kriterleri verirsiniz (sektör, konum, unvan, şirket büyüklüğü) ve harici API'leri kullanarak eşleşen kişileri bulur, e-posta adresleri ve telefon numaralarıyla zenginleştirir ve sonuçları incelemeniz için sunar. Ardından hangilerini müşteri adayı olarak içe aktaracağınıza siz karar verirsiniz.</p>
+    <p>İki veri kaynağı entegre edilmiştir:</p>
+    <ul>
+      <li><strong>Lusha</strong> — B2B iletişim veritabanı. Kriterlerinize uyan kişileri profesyonel e-postalar ve doğrudan telefon numaralarıyla bulur.</li>
+      <li><strong>Snov.io</strong> — Alan adı tabanlı e-posta zenginleştirme. Bir şirket alan adı verildiğinde, o alan adıyla ilişkili tüm e-postaları bulur.</li>
+    </ul>
+
+    <h2>Lusha Prospecting Araması Çalıştırma</h2>
+    <ol class="steps">
+      <li><strong>Ajan</strong> sekmesine gidin.</li>
+      <li>Arama filtrelerini doldurun:
+        <ul>
+          <li><strong>Unvan</strong> — örn. "CEO", "Genel Müdür", "Ar-Ge Müdürü"</li>
+          <li><strong>Sektör</strong> — örn. "İmalat", "Teknoloji"</li>
+          <li><strong>Ülke / Şehir</strong> — Coğrafi filtre</li>
+          <li><strong>Şirket Büyüklüğü</strong> — Çalışan sayısı aralığı</li>
+        </ul>
+      </li>
+      <li><strong>Ara</strong>'ya tıklayın. Ajan, filtrelerinizle Lusha API'sini çağırır.</li>
+      <li>Sonuçlar kişilerin listesi olarak görünür: ad, unvan, şirket, e-posta, telefon.</li>
+      <li>Sonuçları inceleyin. Müşteri adayı olarak eklemek istediğiniz kişileri işaretleyin.</li>
+      <li><strong>Seçilenleri İçe Aktar</strong>'a tıklayın. Seçilen kişiler müşteri adayları tablonuza eklenir (tekrarlar otomatik olarak atlanır).</li>
+    </ol>
+
+    <div class="remember">
+      <strong>Hatırlatma</strong>
+      Lusha, açıklanan kişi başına kredi talep eder. Ajan, arama sonuçlarında görüntülendiğinde değil, yalnızca içe aktardığınızda bir kişiyi "açar" (kredi tüketir). Büyük aramalar çalıştırmadan önce Lusha kredi bakiyenizi kontrol edin.
+    </div>
+
+    <h2>Snov.io Alan Adı Zenginleştirme</h2>
+    <ol class="steps">
+      <li><strong>Ajan</strong> sekmesinde <strong>Alan Adı Zenginleştirme</strong> moduna geçin.</li>
+      <li>Bir veya daha fazla şirket alan adı girin (örn. <code>example.com.tr</code>).</li>
+      <li><strong>E-postaları Bul</strong>'a tıklayın. Snov.io bu alan adlarıyla ilişkili tüm e-posta adreslerini arar.</li>
+      <li>Sonuçlar e-posta adreslerini ve (mevcut olduğunda) ilişkili adları ve rolleri gösterir.</li>
+      <li>Lusha sonuçlarında olduğu gibi seçin ve içe aktarın.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- BÖLÜM 11 — AYARLAR -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Bölüm 11</div>
+    <div class="chapter-title">Ayarlar —<br/>Tam Yapılandırma</div>
+    <div class="chapter-tagline">"Her şeyi kontrol etmek için tek yer."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>Bu bölümde</strong><ul>
+      <li>API Entegrasyonları — tüm anahtarlar açıklandı</li>
+      <li>Sun Group Şirketleri ve IBAN'lar</li>
+      <li>Kullanıcı yönetimi — ekleme, düzenleme, kaldırma</li>
+      <li>Müşteri adayı puanlama yapılandırması</li>
+      <li>Bildirimler</li>
+    </ul></div>
+
+    <div class="admin-only">
+      <strong>Yalnızca Yönetici — Tüm Ayarlar Sekmesi</strong>
+      Ayarlar sekmesi sıradan kullanıcılara tamamen görünmezdir.
+    </div>
+
+    <h2>API Entegrasyonları</h2>
+
+    <div class="settings-block">
+      <h3>SendGrid</h3>
+      <ul>
+        <li><strong>API Anahtarı</strong> — SendGrid API anahtarınız (SG. ile başlar). Tüm e-posta gönderimi için gereklidir.</li>
+        <li><strong>Gönderen E-posta</strong> — Alıcıların gelen kutusunda görünen gönderici adres (SendGrid'de doğrulanmış olmalıdır).</li>
+        <li><strong>Gönderen Adı</strong> — Gönderici görünen adı (örn. "Sun &amp; Sun Danışmanlık").</li>
+      </ul>
+    </div>
+
+    <div class="settings-block">
+      <h3>Monday.com</h3>
+      <ul>
+        <li><strong>API Anahtarı</strong> — Monday.com API v2 token'ınız. Monday.com'da avatarınız → Geliştiriciler → Erişim Token'larım bölümünde bulunur.</li>
+      </ul>
+    </div>
+
+    <div class="settings-block">
+      <h3>Twilio (Geleneksel Arama)</h3>
+      <ul>
+        <li><strong>Hesap SID</strong> — Twilio hesap tanımlayıcınız.</li>
+        <li><strong>Auth Token</strong> — Twilio gizli token'ınız.</li>
+        <li><strong>Telefon Numarası</strong> — E.164 formatında Twilio giden numaranız (örn. +905XXXXXXXXX).</li>
+      </ul>
+    </div>
+
+    <div class="settings-block">
+      <h3>Vapi (AI Arama)</h3>
+      <ul>
+        <li><strong>API Anahtarı</strong> — vapi.ai'deki Vapi API anahtarınız.</li>
+        <li><strong>Asistan ID</strong> — Aramalar için kullanılacak Vapi asistanının ID'si. Asistanı vapi.ai'de kurun ve test edin, ardından ID'sini buraya yapıştırın.</li>
+        <li><strong>Telefon Numarası ID</strong> — Aramada kullanılacak Vapi telefon numarası kaynağının ID'si.</li>
+      </ul>
+    </div>
+
+    <div class="settings-block">
+      <h3>Lusha (Yapay Zeka Ajanı prospecting)</h3>
+      <ul>
+        <li><strong>API Anahtarı</strong> — lusha.com kontrol panelindeki Lusha API anahtarınız.</li>
+      </ul>
+    </div>
+
+    <div class="settings-block">
+      <h3>Snov.io (Alan adı zenginleştirme)</h3>
+      <ul>
+        <li><strong>İstemci ID</strong> — Snov.io uygulama istemci ID'niz.</li>
+        <li><strong>İstemci Gizli Anahtarı</strong> — Snov.io uygulama gizli anahtarınız. Her ikisi de Snov.io hesabınızda API ayarları bölümünde bulunur.</li>
+      </ul>
+    </div>
+
+    <h2>Sun Group Şirketleri &amp; IBAN'lar</h2>
+    <p>Bu bölüm tüzel kişiliklerinizi saklar — sözleşmelerde Taraf 1 olarak görünen şirketler. Her şirket kaydı şunları içerir: Şirket Adı, Vergi Dairesi, Vergi Numarası, Tescilli Adres, IBAN.</p>
+    <p>Eklemek için: <strong>+ Şirket Ekle</strong>'ye tıklayın, formu doldurun, Kaydet. Düzenlemek için: şirket satırındaki kalem simgesine tıklayın. Silmek için: çöp kutusu simgesine tıklayın (onay gerektirir).</p>
+
+    <h2>Kullanıcı Yönetimi</h2>
+    <h3>Yeni Kullanıcı Ekleme</h3>
+    <ol class="steps">
+      <li><strong>Ayarlar → Kullanıcılar</strong>'a gidin.</li>
+      <li><strong>+ Kullanıcı Ekle</strong>'ye tıklayın.</li>
+      <li>Yeni kullanıcının <strong>adını</strong>, <strong>e-posta adresini</strong> ve geçici bir <strong>şifreyi</strong> girin.</li>
+      <li><strong>Rolü</strong> seçin: <strong>yönetici</strong> (tam erişim) veya <strong>kullanıcı</strong> (standart erişim, ayar yok).</li>
+      <li><strong>Kaydet</strong>'e tıklayın. Kullanıcı hemen belirlediğiniz kimlik bilgileriyle giriş yapabilir.</li>
+    </ol>
+    <h3>Şifre Değiştirme</h3>
+    <ol class="steps">
+      <li>Kullanıcılar listesinde kullanıcının yanındaki kalem simgesine tıklayın.</li>
+      <li>Şifre alanına yeni şifreyi girin.</li>
+      <li><strong>Kaydet</strong>'e tıklayın. Şifre hemen güncellenir.</li>
+    </ol>
+    <h3>Kullanıcı Rolü Değiştirme</h3>
+    <ol class="steps">
+      <li>Kullanıcının yanındaki kalem simgesine tıklayın.</li>
+      <li>Rol açılır menüsünü "kullanıcı"dan "yönetici"ye veya tersine değiştirin.</li>
+      <li><strong>Kaydet</strong>'e tıklayın. Değişiklik bir sonraki girişlerinde (veya hemen yenileme yapıldığında) geçerli olur.</li>
+    </ol>
+    <h3>Kullanıcı Kaldırma</h3>
+    <p>Kullanıcının yanındaki çöp kutusu simgesine tıklayın ve onaylayın. Hesap devre dışı bırakılır ve giriş yapamazlar. Geçmiş verileri (ekledikleri müşteri adayları, yaptıkları aramalar) sistemde kalır.</p>
+
+    <h2>Müşteri Adayı Puanlama Yapılandırması</h2>
+    <p>ERP, her müşteri adayına profilinin ne kadar eksiksiz olduğuna ve ne kadar aktivite kaydedildiğine göre bir puan atar. Ayarlar → Müşteri Adayı Puanlama bölümünde her puanlama faktörüne atanan ağırlığı ayarlayabilirsiniz. Puanlar Pipeline board'undaki müşteri adayı kartlarında görünür.</p>
+
+    <h2>Bildirimler</h2>
+    <p>Bildirimler bölümü sistem düzeyinde uyarıları yapılandırmanıza olanak tanır:</p>
+    <ul>
+      <li><strong>Yeni Müşteri Adayı Uyarısı</strong> — Yapay Zeka Ajanı veya toplu içe aktarma ile yeni müşteri adayı eklendiğinde bildir</li>
+      <li><strong>Pozitif Yanıt Uyarısı</strong> — Gelen Kutusu ML sınıflandırıcısı pozitif yanıt tespit ettiğinde bildir</li>
+      <li><strong>Pipeline Değişikliği Uyarısı</strong> — Bir müşteri adayı belirli bir pipeline aşamasına geçtiğinde bildir</li>
+    </ul>
+    <p>Bildirimler uygulama içinde (başlıktaki zil simgesi) ve yapılandırılmışsa isteğe bağlı olarak e-posta yoluyla iletilir.</p>
+  </div>
+</div>
+
+<!-- YER TUTUCU REFERANSI -->
+<div class="ref-page">
+  <div class="ref-header">Sözleşme Şablonu Yer Tutucu Referansı</div>
+  <p style="margin-bottom:20px; font-size:11.5pt;">Bir sözleşme şablonunda (.docx dosyası) yer alabilecek her yer tutucu burada listelenmiştir. Eski şablonlar için <code>@@ad@@</code> formatını, güncel docxtemplater şablonları için <code>[[ad]]</code> formatını kullanın. Her iki format da aynı adları kullanır — yalnızca sınırlayıcılar farklıdır.</p>
+
+  <div class="ref-section">Taraf 1 — Sun Group Şirketi (Ayarlar'dan otomatik doldurulur)</div>
+  <table>
+    <tr><th>Yer Tutucu</th><th>Çıktısı</th><th>Kaynak</th></tr>
+    <tr><td><code>@@party1_name@@</code></td><td>Sun Group şirketinin tam yasal adı</td><td>Ayarlar → Şirketler'den seçilir</td></tr>
+    <tr><td><code>@@party1_tax_office@@</code></td><td>Taraf 1'in vergi dairesi</td><td>Ayarlar → Şirketler</td></tr>
+    <tr><td><code>@@party1_tax_no@@</code></td><td>Taraf 1'in vergi numarası (VKN)</td><td>Ayarlar → Şirketler</td></tr>
+    <tr><td><code>@@party1_address@@</code></td><td>Taraf 1'in tescilli adresi</td><td>Ayarlar → Şirketler</td></tr>
+    <tr><td><code>@@iban@@</code></td><td>Taraf 1'in banka IBAN'ı</td><td>Ayarlar → Şirketler</td></tr>
+  </table>
+
+  <div class="ref-section">Taraf 2 — Müşteri (Sözleşme formuna girilir)</div>
+  <table>
+    <tr><th>Yer Tutucu</th><th>Çıktısı</th></tr>
+    <tr><td><code>@@party2_name@@</code></td><td>Müşteri şirketinin yasal adı</td></tr>
+    <tr><td><code>@@party2_tax_office@@</code></td><td>Müşterinin vergi dairesi</td></tr>
+    <tr><td><code>@@party2_tax_no@@</code></td><td>Müşterinin vergi numarası (VKN veya TC)</td></tr>
+    <tr><td><code>@@party2_address@@</code></td><td>Müşterinin tescilli adresi</td></tr>
+  </table>
+
+  <div class="ref-section">Taraf 3 — İsteğe Bağlı Üçüncü Taraf</div>
+  <table>
+    <tr><th>Yer Tutucu</th><th>Çıktısı</th></tr>
+    <tr><td><code>@@party3_name@@</code></td><td>Üçüncü taraf şirket adı (varsa)</td></tr>
+    <tr><td><code>@@party3_tax_office@@</code></td><td>Üçüncü taraf vergi dairesi</td></tr>
+    <tr><td><code>@@party3_tax_no@@</code></td><td>Üçüncü taraf vergi numarası</td></tr>
+    <tr><td><code>@@party3_address@@</code></td><td>Üçüncü taraf tescilli adresi</td></tr>
+  </table>
+
+  <div class="ref-section">Program 1 — Ana Program Detayları</div>
+  <table>
+    <tr><th>Yer Tutucu</th><th>Çıktısı</th><th>Notlar</th></tr>
+    <tr><td><code>@@financier@@</code></td><td>Fon kuruluşu adı (KOSGEB, TÜBİTAK, TKDK…)</td><td>Serbest metin</td></tr>
+    <tr><td><code>@@program_name@@</code></td><td>Belirli hibe/programın adı</td><td>Serbest metin</td></tr>
+    <tr><td><code>@@down_payment@@</code></td><td>Hizmet bedeli 1 — Türk sayı stiliyle biçimlendirilir (1.000,00 TL)</td><td>Otomatik biçimlendirilir</td></tr>
+    <tr><td><code>@@down_payment_2@@</code></td><td>Hizmet bedeli 2</td><td>Otomatik biçimlendirilir</td></tr>
+    <tr><td><code>@@down_payment_deadline@@</code></td><td>Hizmet bedeli son ödeme tarihi</td><td>GG/AA/YYYY formatı</td></tr>
+    <tr><td><code>@@success_bonus@@</code></td><td>Başarı primi 1 yüzdesi</td><td>Sayısal, örn. "8"</td></tr>
+    <tr><td><code>@@success_bonus_type@@</code></td><td>Prim türü 1 etiketi (açılır menü seçeneği)</td><td>"onaylanan destek" / "onaylanan kredi" / "sağlanan fayda"</td></tr>
+    <tr><td><code>@@sb1ddl@@</code></td><td>Prim 1 vadesi — gün sayısı, "gün"den önce otomatik boşluk</td><td>örn. "60" girişi → "60 gün" çıktısı</td></tr>
+    <tr><td><code>@@sb1ddl_type@@</code></td><td>Prim 1 vade türü (açılır menü)</td><td>örn. "Projenin onaylanmasını takip eden"</td></tr>
+    <tr><td><code>@@success_bonus_2@@</code></td><td>Başarı primi 2 yüzdesi</td><td></td></tr>
+    <tr><td><code>@@success_bonus_type_2@@</code></td><td>Prim türü 2 etiketi</td><td></td></tr>
+    <tr><td><code>@@sb1ddl_2@@</code></td><td>Prim 2 vade günleri</td><td></td></tr>
+    <tr><td><code>@@sb1ddl_2_type@@</code></td><td>Prim 2 vade türü (açılır menü)</td><td></td></tr>
+    <tr><td><code>@@contract_date@@</code></td><td>Sözleşme imzalama tarihi</td><td>Otomatik GG/AA/YYYY formatı</td></tr>
+    <tr><td><code>@@notes@@</code></td><td>Ek sözleşme notları / özel maddeler</td><td>Serbest metin</td></tr>
+  </table>
+
+  <div class="ref-section">Program 2 — İkinci Program (varsa)</div>
+  <table>
+    <tr><th>Yer Tutucu</th><th>Çıktısı</th></tr>
+    <tr><td><code>@@program2_name@@</code></td><td>Program 2 adı</td></tr>
+    <tr><td><code>@@program2_fee@@</code></td><td>Program 2 hizmet bedeli 1</td></tr>
+    <tr><td><code>@@program2_fee_2@@</code></td><td>Program 2 hizmet bedeli 2</td></tr>
+    <tr><td><code>@@program2_fee_deadline@@</code></td><td>Program 2 ücret son tarihi</td></tr>
+    <tr><td><code>@@program2_bonus@@</code></td><td>Program 2 başarı primi 1 (%)</td></tr>
+    <tr><td><code>@@program2_bonus_2@@</code></td><td>Program 2 başarı primi 2 (%)</td></tr>
+    <tr><td><code>@@program2_bonus_deadline@@</code></td><td>Program 2 prim 1 vadesi</td></tr>
+    <tr><td><code>@@program2_bonus_2_deadline@@</code></td><td>Program 2 prim 2 vadesi</td></tr>
+  </table>
+
+  <div class="ref-section">Program 3 — Üçüncü Program (varsa)</div>
+  <table>
+    <tr><th>Yer Tutucu</th><th>Çıktısı</th></tr>
+    <tr><td><code>@@program3_name@@</code></td><td>Program 3 adı</td></tr>
+    <tr><td><code>@@program3_fee@@</code></td><td>Program 3 hizmet bedeli 1</td></tr>
+    <tr><td><code>@@program3_fee_2@@</code></td><td>Program 3 hizmet bedeli 2</td></tr>
+    <tr><td><code>@@program3_fee_deadline@@</code></td><td>Program 3 ücret son tarihi</td></tr>
+    <tr><td><code>@@program3_bonus@@</code></td><td>Program 3 başarı primi 1 (%)</td></tr>
+    <tr><td><code>@@program3_bonus_2@@</code></td><td>Program 3 başarı primi 2 (%)</td></tr>
+    <tr><td><code>@@program3_bonus_deadline@@</code></td><td>Program 3 prim 1 vadesi</td></tr>
+    <tr><td><code>@@program3_bonus_2_deadline@@</code></td><td>Program 3 prim 2 vadesi</td></tr>
+  </table>
+
+  <div class="ref-section">Ödeme Planı (Ek-1) — Otomatik Oluşturulan Tablo</div>
+  <table>
+    <tr><th>Yer Tutucu</th><th>Çıktısı</th><th>Notlar</th></tr>
+    <tr><td><code>@@payment_schedule@@</code></td><td>XML olarak eklenen tam Word tablosu (tüm ödeme satırları)</td><td>Tüm Ek-1 tablosu. Şablonda kendi paragrafında tek başına yer almalıdır.</td></tr>
+    <tr><td><code>@@payment_subject1@@</code> … <code>@@payment_subject20@@</code></td><td>Her ödeme satırı için etiket/açıklama</td><td>20 satıra kadar desteklenir</td></tr>
+    <tr><td><code>@@payment_date1@@</code> … <code>@@payment_date20@@</code></td><td>Her ödeme satırı için son tarih</td><td>GG/AA/YYYY formatı</td></tr>
+    <tr><td><code>@@down_payment1@@</code> … <code>@@down_payment20@@</code></td><td>Her ödeme satırı için tutar (TL, biçimlendirilmiş)</td><td>Türk sayı stiliyle otomatik biçimlendirilir</td></tr>
+  </table>
+
+  <div class="ref-section">Otomatik Eklenen Maddeler</div>
+  <table>
+    <tr><th>Yer Tutucu</th><th>Çıktısı</th><th>Ne Zaman Eklenir</th></tr>
+    <tr><td><code>@@vakifbank_clause@@</code></td><td>Program kuralları tarafından zorunlu kılınan Vakıfbank'a özgü ödeme cümlesi</td><td>Seçilen Başarı Primi Türü "sağlanan fayda" olduğunda otomatik olarak eklenir. Farklı bir prim türü seçilirse bu yer tutucu kaldırılır (boş dizeyle değiştirilir).</td></tr>
+  </table>
+
+  <div style="background:#fff5f5; border:2px solid #c0392b; border-radius:10px; padding:18px 22px; margin-top:28px;">
+    <strong style="display:block; font-size:10pt; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:#c0392b; margin-bottom:10px;">Word Şablonunuzda Yer Tutucuları Nasıl Kullanırsınız?</strong>
+    <p style="font-size:11pt; margin-bottom:8px;">.docx dosyanızda yer tutucuları gösterildiği gibi tam olarak yazın — çift <code>@@</code> sınırlayıcıları veya çift köşeli parantezler <code>[[</code> ve <code>]]</code> dahil. Yer tutucunun Word'de tek ve kesintisiz bir metin akışı olarak yazıldığından emin olun (biçimlendirme akışları arasında bölmeyin — bir yer tutucunun bir bölümünü farklı biçimlendirmeyin). Word'ün otomatik düzeltmesi bir yer tutucu içindeki karakterleri büyük harfe çevirirse veya değiştirirse, o bölüm için otomatik düzeltmeyi kapatın.</p>
+    <p style="font-size:11pt; margin-bottom:0;"><code>@@payment_schedule@@</code> yer tutucusu için özellikle: Word belgesinde kendi paragrafında (satırında) tek başına içerik olarak yer almalıdır. Aynı satıra başka metin koymayın — sunucu, oluşturulan tabloyla tüm paragrafı değiştirir.</p>
+  </div>
+</div>
+
+</body>
+</html>

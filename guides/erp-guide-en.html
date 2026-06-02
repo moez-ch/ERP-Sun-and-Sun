@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sun & Sun ERP — User Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Nunito', Arial, sans-serif;
+    background: #fff;
+    color: #1a1a1a;
+    font-size: 13pt;
+    line-height: 1.7;
+  }
+
+  /* ── COVER PAGE ─────────────────────────────── */
+  .cover {
+    page-break-after: always;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFD700;
+  }
+  .cover-top {
+    background: #1a1a1a;
+    color: #FFD700;
+    padding: 20px 40px;
+    font-size: 14pt;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .cover-body {
+    flex: 1;
+    padding: 50px 60px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .cover-tag {
+    display: inline-block;
+    background: #1a1a1a;
+    color: #FFD700;
+    font-size: 11pt;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border-radius: 4px;
+    margin-bottom: 30px;
+    width: fit-content;
+  }
+  .cover-title {
+    font-size: 48pt;
+    font-weight: 900;
+    line-height: 1.05;
+    color: #1a1a1a;
+    margin-bottom: 16px;
+  }
+  .cover-title span { color: #c0392b; }
+  .cover-subtitle {
+    font-size: 16pt;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 40px;
+  }
+  .cover-desc {
+    font-size: 12pt;
+    color: #444;
+    max-width: 480px;
+    line-height: 1.6;
+    border-left: 5px solid #1a1a1a;
+    padding-left: 18px;
+  }
+  .cover-bottom {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 18px 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11pt;
+    font-weight: 700;
+  }
+  .cover-chapters {
+    margin-top: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    max-width: 500px;
+  }
+  .cover-ch {
+    background: rgba(0,0,0,0.08);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 10pt;
+    font-weight: 700;
+    color: #1a1a1a;
+  }
+  .cover-ch span { opacity: 0.6; margin-right: 6px; }
+
+  /* ── TOC PAGE ───────────────────────────────── */
+  .toc-page {
+    page-break-after: always;
+    padding: 60px 70px;
+    min-height: 100vh;
+  }
+  .toc-header {
+    font-size: 26pt;
+    font-weight: 900;
+    color: #1a1a1a;
+    border-bottom: 4px solid #FFD700;
+    padding-bottom: 12px;
+    margin-bottom: 36px;
+  }
+  .toc-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px dotted #ccc;
+    font-size: 12pt;
+  }
+  .toc-num {
+    font-weight: 900;
+    color: #c0392b;
+    font-size: 11pt;
+    width: 90px;
+    flex-shrink: 0;
+  }
+  .toc-title { font-weight: 700; flex: 1; }
+  .toc-sub {
+    font-size: 10pt;
+    color: #666;
+    margin-top: 3px;
+    padding-left: 100px;
+  }
+
+  /* ── CHAPTER PAGES ──────────────────────────── */
+  .chapter {
+    page-break-before: always;
+    min-height: 100vh;
+    padding: 0;
+  }
+  .chapter-header {
+    background: #1a1a1a;
+    color: #FFD700;
+    padding: 36px 60px 28px;
+  }
+  .chapter-num {
+    font-size: 10pt;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-bottom: 6px;
+  }
+  .chapter-title {
+    font-size: 28pt;
+    font-weight: 900;
+    line-height: 1.1;
+  }
+  .chapter-tagline {
+    margin-top: 10px;
+    font-size: 11pt;
+    font-style: italic;
+    opacity: 0.8;
+  }
+  .chapter-body {
+    padding: 40px 60px 50px;
+  }
+
+  /* ── IN THIS CHAPTER BOX ───────────────────── */
+  .in-this-chapter {
+    background: #fffbea;
+    border: 2px solid #FFD700;
+    border-radius: 10px;
+    padding: 18px 24px;
+    margin-bottom: 30px;
+    font-size: 11pt;
+  }
+  .in-this-chapter strong {
+    display: block;
+    font-size: 10pt;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #c0392b;
+    margin-bottom: 8px;
+  }
+  .in-this-chapter ul { padding-left: 18px; }
+  .in-this-chapter li { margin-bottom: 4px; }
+
+  /* ── BODY TEXT ──────────────────────────────── */
+  h2 {
+    font-size: 16pt;
+    font-weight: 900;
+    color: #1a1a1a;
+    margin: 28px 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #FFD700;
+  }
+  h3 {
+    font-size: 13pt;
+    font-weight: 800;
+    color: #333;
+    margin: 20px 0 8px;
+  }
+  p { margin-bottom: 12px; }
+  ol, ul { padding-left: 22px; margin-bottom: 14px; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 800; }
+
+  /* ── CALLOUT BOXES ──────────────────────────── */
+  .tip, .remember, .warning {
+    border-radius: 10px;
+    padding: 14px 18px 14px 52px;
+    margin: 18px 0;
+    font-size: 11.5pt;
+    position: relative;
+  }
+  .tip { background: #e8f4fd; border-left: 5px solid #2980b9; }
+  .remember { background: #fef9e7; border-left: 5px solid #f39c12; }
+  .warning { background: #fdf0f0; border-left: 5px solid #c0392b; }
+  .tip::before { content: "💡"; position: absolute; left: 14px; top: 13px; font-size: 18pt; }
+  .remember::before { content: "☝️"; position: absolute; left: 14px; top: 13px; font-size: 18pt; }
+  .warning::before { content: "🚫"; position: absolute; left: 14px; top: 13px; font-size: 18pt; }
+  .tip strong, .remember strong, .warning strong {
+    display: block;
+    font-size: 9pt;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    color: #555;
+  }
+
+  /* ── STEPS ──────────────────────────────────── */
+  .steps {
+    background: #f8f8f8;
+    border-radius: 10px;
+    padding: 18px 24px;
+    margin: 16px 0;
+    counter-reset: step;
+    list-style: none;
+    padding-left: 24px;
+  }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 36px;
+    margin-bottom: 12px;
+    font-size: 12pt;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 2px;
+    background: #1a1a1a;
+    color: #FFD700;
+    font-weight: 900;
+    font-size: 9pt;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  /* ── QUICK REF TABLE ────────────────────────── */
+  .ref-page {
+    page-break-before: always;
+    padding: 50px 60px;
+  }
+  .ref-header {
+    background: #1a1a1a;
+    color: #FFD700;
+    font-size: 20pt;
+    font-weight: 900;
+    padding: 20px 30px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11pt;
+  }
+  th {
+    background: #1a1a1a;
+    color: #FFD700;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 900;
+    font-size: 10pt;
+    letter-spacing: 0.5px;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #fafafa; }
+  .badge {
+    display: inline-block;
+    background: #FFD700;
+    color: #1a1a1a;
+    font-size: 9pt;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 20px;
+    vertical-align: middle;
+  }
+
+  /* ── PRINT ──────────────────────────────────── */
+  @media print {
+    body { font-size: 11pt; }
+    .cover { min-height: 100vh; page-break-after: always; }
+    .chapter { page-break-before: always; }
+    @page { margin: 0; size: A4; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  COVER                                     -->
+<!-- ══════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-top">☆ Sun &amp; Sun Consulting — Internal Use Only ☆</div>
+  <div class="cover-body">
+    <div>
+      <div class="cover-tag">Sales Rep Edition</div>
+      <div class="cover-title">Sun &amp; Sun<br/><span>ERP</span><br/>For Beginners</div>
+      <div class="cover-subtitle">The Complete No-Nonsense Guide to Your Sales Platform</div>
+      <div class="cover-desc">
+        Everything you need to know to use the ERP — from logging in to generating contracts and price quotes — written in plain English, without the tech-speak.
+      </div>
+      <div class="cover-chapters">
+        <div class="cover-ch"><span>01</span>Logging In</div>
+        <div class="cover-ch"><span>02</span>Dashboard</div>
+        <div class="cover-ch"><span>03</span>Leads</div>
+        <div class="cover-ch"><span>04</span>Pipeline</div>
+        <div class="cover-ch"><span>05</span>Cold Calls</div>
+        <div class="cover-ch"><span>06</span>Email</div>
+        <div class="cover-ch"><span>07</span>Monday.com CRM</div>
+        <div class="cover-ch"><span>08</span>Contracts</div>
+        <div class="cover-ch"><span>09</span>Price Quote</div>
+      </div>
+    </div>
+  </div>
+  <div class="cover-bottom">
+    <span>Sun &amp; Sun Consulting</span>
+    <span>erp.sunandsun.com.tr</span>
+    <span>User Access Guide — 2026</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  TABLE OF CONTENTS                         -->
+<!-- ══════════════════════════════════════════ -->
+<div class="toc-page">
+  <div class="toc-header">Table of Contents</div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 1</div>
+    <div>
+      <div class="toc-title">Logging In &amp; Finding Your Way Around</div>
+      <div class="toc-sub">How to access the system · The layout · Switching languages</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 2</div>
+    <div>
+      <div class="toc-title">The Dashboard — Your Morning Briefing</div>
+      <div class="toc-sub">Understanding the numbers · Hot leads · Conversion funnel</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 3</div>
+    <div>
+      <div class="toc-title">Leads — Your Contact List</div>
+      <div class="toc-sub">Searching &amp; filtering · Lead profiles · Updating status · Adding notes</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 4</div>
+    <div>
+      <div class="toc-title">The Pipeline — Following the Deal</div>
+      <div class="toc-sub">The Kanban board · What each column means · Reading the board</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 5</div>
+    <div>
+      <div class="toc-title">Cold Calls — Automated Outreach</div>
+      <div class="toc-sub">Making a call · Reading transcripts · Understanding status badges</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 6</div>
+    <div>
+      <div class="toc-title">Email — Campaigns &amp; Templates</div>
+      <div class="toc-sub">Picking a template · Choosing recipients · Sending · Checking history</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 7</div>
+    <div>
+      <div class="toc-title">Monday.com CRM — The Big Contact Database</div>
+      <div class="toc-sub">Contacts vs. Companies · Filtering · Sending bulk email · Syncing bounces</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 8</div>
+    <div>
+      <div class="toc-title">Contracts — Generating Client Agreements</div>
+      <div class="toc-sub">Selecting a template · Filling the form · OCR scanning · Payment schedule · Downloading PDF</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 9</div>
+    <div>
+      <div class="toc-title">Price Quote — Building a Proposal</div>
+      <div class="toc-sub">Picking a presentation · Standard vs. discount · Building cards · Downloading PDF</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Quick Ref</div>
+    <div>
+      <div class="toc-title">Cheat Sheet — Everything at a Glance</div>
+      <div class="toc-sub">Tab summary · Key actions · Access URL</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  CHAPTER 1 — LOGGING IN                    -->
+<!-- ══════════════════════════════════════════ -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 1</div>
+    <div class="chapter-title">Logging In &amp; Finding<br/>Your Way Around</div>
+    <div class="chapter-tagline">"Every journey begins with a single login."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>In this chapter</strong>
+      <ul>
+        <li>How to open the ERP in your browser</li>
+        <li>Logging in with your credentials</li>
+        <li>The two parts of the screen</li>
+        <li>Switching between English and Turkish</li>
+      </ul>
+    </div>
+
+    <h2>Opening the ERP</h2>
+    <p>The ERP lives in your browser — no installation needed. Open any browser (Chrome recommended) and type in the address bar:</p>
+    <ul>
+      <li><strong>At the office (on office Wi-Fi):</strong> <code>http://192.168.1.135</code></li>
+      <li><strong>From anywhere else:</strong> <code>https://erp.sunandsun.com.tr</code></li>
+    </ul>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Bookmark the address so you don't have to type it every time. In Chrome: press the ★ icon in the address bar.
+    </div>
+
+    <h2>Logging In</h2>
+    <p>You'll see a login screen. Enter your <strong>email address</strong> and <strong>password</strong>, then click <strong>Sign In</strong>.</p>
+    <p>Your credentials are provided by your admin. If you've forgotten your password, ask them to reset it — there is no self-service password reset.</p>
+
+    <div class="remember">
+      <strong>Remember</strong>
+      Your account is personal. Don't share your password with colleagues — each person has their own login.
+    </div>
+
+    <h2>The Layout — Two Areas</h2>
+    <p>Once logged in, the screen splits into two parts:</p>
+    <ul>
+      <li><strong>Left sidebar:</strong> the navigation menu. Click the icons to switch between tabs.</li>
+      <li><strong>Main area (right):</strong> where everything happens — this changes depending on which tab you're on.</li>
+    </ul>
+
+    <h2>The 9 Tabs</h2>
+    <p>The sidebar has these tabs (top to bottom):</p>
+    <ol>
+      <li><strong>Dashboard</strong> — daily overview and stats</li>
+      <li><strong>Leads</strong> — your contact list</li>
+      <li><strong>Pipeline</strong> — visual deal tracker</li>
+      <li><strong>Cold Calls</strong> — automated phone outreach</li>
+      <li><strong>Email</strong> — bulk email campaigns</li>
+      <li><strong>Monday.com</strong> — full CRM contact database</li>
+      <li><strong>Contracts</strong> — PDF contract generator</li>
+      <li><strong>Price Quote</strong> — proposal builder</li>
+      <li><strong>Settings</strong> — (admin only)</li>
+    </ol>
+
+    <h2>Switching Languages</h2>
+    <p>The ERP supports both Turkish and English. Look for the language toggle button at the top of the sidebar (it shows "TR" or "EN"). Click it to switch at any time — your preference is saved.</p>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  CHAPTER 2 — DASHBOARD                     -->
+<!-- ══════════════════════════════════════════ -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 2</div>
+    <div class="chapter-title">The Dashboard —<br/>Your Morning Briefing</div>
+    <div class="chapter-tagline">"Know the numbers before you pick up the phone."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>In this chapter</strong>
+      <ul>
+        <li>What the stat cards show you</li>
+        <li>Reading the conversion funnel</li>
+        <li>Finding your hottest leads quickly</li>
+      </ul>
+    </div>
+
+    <h2>What You See When You Land Here</h2>
+    <p>The Dashboard is the first thing you see after logging in. Think of it as your daily newspaper — all the important headlines in one place, before you dive into the detail.</p>
+
+    <h2>The Stat Cards (Top Row)</h2>
+    <p>Four big numbers greet you at the top:</p>
+    <ul>
+      <li><strong>Total Leads</strong> — every contact currently in the system</li>
+      <li><strong>Qualified Leads</strong> — contacts confirmed as potential clients</li>
+      <li><strong>Won Deals</strong> — closed sales</li>
+      <li><strong>Average Score</strong> — the average lead quality score (0–100)</li>
+    </ul>
+    <p>Below those you'll also see <strong>Win Rate</strong> (percentage of leads converted), <strong>Score Distribution</strong> (how many leads are hot/warm/cold), and <strong>Call Activity</strong>.</p>
+
+    <h2>The Conversion Funnel</h2>
+    <p>The funnel chart shows how leads move through the sales stages. The top is wide (lots of new leads), and it narrows as you go down to "Won". A very narrow funnel means many leads are dropping off early — worth investigating.</p>
+
+    <h2>Hot Leads</h2>
+    <p>Scroll to the bottom of the Dashboard to find the <strong>Hot Leads</strong> section — these are the contacts with the highest lead scores. They should be your priority calls of the day. Click any card to open their full profile.</p>
+
+    <div class="remember">
+      <strong>Remember</strong>
+      The Dashboard is read-only. You can see everything but change nothing here. To update a lead, go to the Leads tab.
+    </div>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Make it a habit to check the Dashboard every morning before anything else. It takes 30 seconds and keeps you focused on the right leads.
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  CHAPTER 3 — LEADS                         -->
+<!-- ══════════════════════════════════════════ -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 3</div>
+    <div class="chapter-title">Leads —<br/>Your Contact List</div>
+    <div class="chapter-tagline">"Your leads are your livelihood."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>In this chapter</strong>
+      <ul>
+        <li>Searching for a lead</li>
+        <li>What's inside a lead profile</li>
+        <li>Updating a lead's status</li>
+        <li>Adding notes after a call or meeting</li>
+        <li>Understanding lead scores</li>
+      </ul>
+    </div>
+
+    <h2>Finding a Lead</h2>
+    <p>The Leads tab shows all contacts in the system. The list can be long — here's how to find who you're looking for fast:</p>
+    <ol class="steps">
+      <li>Click <strong>Leads</strong> in the sidebar.</li>
+      <li>Type a name or company in the <strong>search bar</strong> at the top.</li>
+      <li>Use the filter dropdowns (Industry, Status, City) to narrow things down further.</li>
+      <li>Click any row to open that contact's full profile.</li>
+    </ol>
+
+    <h2>Inside a Lead Profile</h2>
+    <p>When you open a lead, you see their complete card:</p>
+    <ul>
+      <li><strong>Contact info:</strong> email, phone, LinkedIn URL</li>
+      <li><strong>Company details:</strong> industry, city, company size, source</li>
+      <li><strong>Lead Score:</strong> a number from 0–100. Higher = hotter. Scores above 70 are your priority.</li>
+      <li><strong>Status:</strong> where this lead is in the sales process</li>
+      <li><strong>Client Needs:</strong> a checklist of what they're looking for</li>
+      <li><strong>Notes:</strong> a free-text area for logging everything you know</li>
+      <li><strong>Call History:</strong> a log of past automated calls</li>
+    </ul>
+
+    <h2>Updating a Lead's Status</h2>
+    <p>This is the most important thing you do in the Leads tab. Always update it after each interaction:</p>
+    <ol class="steps">
+      <li>Open the lead profile.</li>
+      <li>Find the <strong>Status</strong> dropdown inside the profile.</li>
+      <li>Select the new stage from the list.</li>
+      <li>The Pipeline board updates automatically.</li>
+    </ol>
+
+    <p>The status stages in order are:</p>
+    <ul>
+      <li><strong>New</strong> → <strong>Contacted</strong> → <strong>Qualified</strong> → <strong>Proposal Sent</strong> → <strong>Negotiation</strong> → <strong>Won</strong> or <strong>Lost</strong></li>
+    </ul>
+
+    <h2>Adding Notes</h2>
+    <p>The Notes field is your memory. After every call, email, or meeting, write a quick summary here. Future you — and your colleagues — will thank you.</p>
+    <ol class="steps">
+      <li>Open the lead profile.</li>
+      <li>Click inside the <strong>Notes</strong> text area.</li>
+      <li>Type your note. Be specific: date, what was discussed, next step.</li>
+      <li>Click <strong>Save</strong> (or it may auto-save — look for the confirmation).</li>
+    </ol>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      A good note looks like this: <em>"02/06/2026 — Called, spoke to Mehmet. Interested in KOSGEB support. Will send proposal by Friday. Follow up Monday."</em>
+    </div>
+
+    <div class="warning">
+      <strong>Don't Do This</strong>
+      You cannot delete leads — that's an admin action. If a lead needs to be removed, contact your admin.
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  CHAPTER 4 — PIPELINE                      -->
+<!-- ══════════════════════════════════════════ -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 4</div>
+    <div class="chapter-title">The Pipeline —<br/>Following the Deal</div>
+    <div class="chapter-tagline">"A pipeline without movement is just a pipe."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>In this chapter</strong>
+      <ul>
+        <li>What the Kanban board is</li>
+        <li>What each column means</li>
+        <li>Using the Pipeline in team meetings</li>
+      </ul>
+    </div>
+
+    <h2>What Is a Kanban Board?</h2>
+    <p>The Pipeline is a visual board where each column represents a stage in your sales process. Each lead appears as a card in the column that matches their current status. You can see at a glance exactly where every deal stands.</p>
+
+    <h2>The 7 Columns (Left to Right)</h2>
+    <ul>
+      <li><strong>New</strong> — just added to the system, no contact made yet</li>
+      <li><strong>Contacted</strong> — you've reached out at least once</li>
+      <li><strong>Qualified</strong> — confirmed they have a real need and budget</li>
+      <li><strong>Proposal Sent</strong> — a quote or contract has been sent</li>
+      <li><strong>Negotiation</strong> — actively discussing terms</li>
+      <li><strong>Won</strong> — deal closed, contract signed 🎉</li>
+      <li><strong>Lost</strong> — didn't close, for now</li>
+    </ul>
+
+    <h2>Reading the Cards</h2>
+    <p>Each card shows the lead's <strong>name</strong>, <strong>company</strong>, and their top <strong>needs</strong> as small badges. Click any card to go straight to their full profile.</p>
+    <p>Each column also shows a <strong>count</strong> of how many leads are in that stage. If "Proposal Sent" has 8 leads and "Won" has 1, that's a conversation worth having.</p>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Use the Pipeline view during weekly team meetings. It takes one look to see who's stuck and who's moving forward.
+    </div>
+
+    <div class="remember">
+      <strong>Remember</strong>
+      Cards only move when you update the lead's Status in the lead profile. The pipeline reflects the status — it doesn't update itself automatically.
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  CHAPTER 5 — COLD CALLS                    -->
+<!-- ══════════════════════════════════════════ -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 5</div>
+    <div class="chapter-title">Cold Calls —<br/>Automated Outreach</div>
+    <div class="chapter-tagline">"Let the system dial while you focus on the pitch."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>In this chapter</strong>
+      <ul>
+        <li>What the Cold Calls tab does</li>
+        <li>Initiating a call</li>
+        <li>Reading the call window and transcript</li>
+        <li>Understanding call status badges</li>
+      </ul>
+    </div>
+
+    <h2>What Are Automated Cold Calls?</h2>
+    <p>The Cold Calls tab connects to an automated calling system. When you click the Call button next to a lead, the system places the call on your behalf. You can monitor the call in real time and, if a transcript is captured, read it afterwards.</p>
+
+    <h2>The Stats at the Top</h2>
+    <p>Four counters at the top of the page tell you:</p>
+    <ul>
+      <li><strong>Total Calls</strong> — all calls ever made</li>
+      <li><strong>Completed</strong> — calls that connected and finished</li>
+      <li><strong>No Answer</strong> — calls with no pick-up</li>
+      <li><strong>Voicemail</strong> — calls that went to voicemail</li>
+    </ul>
+
+    <h2>Making a Call</h2>
+    <ol class="steps">
+      <li>Click <strong>Cold Calls</strong> in the sidebar.</li>
+      <li>Find the lead in the list (only leads with phone numbers appear here).</li>
+      <li>Check the <strong>Call</strong> count next to their name — it shows how many times they've been called and the last call result.</li>
+      <li>Click the <strong>Call</strong> button.</li>
+      <li>A call window pops up showing the lead's name, phone number, and live status.</li>
+      <li>When the call ends, any captured transcript appears in the window.</li>
+      <li>Close the window when you're done.</li>
+    </ol>
+
+    <h2>Call Status Badges</h2>
+    <p>Each lead in the list shows a colored badge for their last call result:</p>
+    <ul>
+      <li><span class="badge">Completed</span> — successful call</li>
+      <li><span class="badge" style="background:#e74c3c;color:white">No Answer</span> — no pick-up</li>
+      <li><span class="badge" style="background:#95a5a6;color:white">Voicemail</span> — left voicemail</li>
+      <li><em>No badge</em> — not yet called</li>
+    </ul>
+
+    <div class="warning">
+      <strong>Don't Do This</strong>
+      If you see a warning banner saying the calling system isn't configured, don't try to make calls — contact your admin to set it up first.
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  CHAPTER 6 — EMAIL                         -->
+<!-- ══════════════════════════════════════════ -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 6</div>
+    <div class="chapter-title">Email —<br/>Campaigns &amp; Templates</div>
+    <div class="chapter-tagline">"Write once, send to hundreds."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>In this chapter</strong>
+      <ul>
+        <li>Composing an email or using a template</li>
+        <li>Choosing your signature</li>
+        <li>Filtering and selecting recipients</li>
+        <li>Previewing before sending</li>
+        <li>Checking past campaign results</li>
+      </ul>
+    </div>
+
+    <h2>The Email Tab at a Glance</h2>
+    <p>The Email tab lets you send one message to many contacts at once. You can write a custom email or use a pre-written template. The system tracks who received it and the success rate.</p>
+
+    <h2>Sending a Campaign — Step by Step</h2>
+    <ol class="steps">
+      <li>Click <strong>Email</strong> in the sidebar.</li>
+      <li>Use a <strong>Quick Reply Template</strong> button to auto-fill a pre-written message, or type your own <strong>Subject</strong> and <strong>Body</strong>.</li>
+      <li>Select your <strong>Signature</strong> from the dropdown (Merve, Şura, Ahmet, or Esra). The signature is appended automatically.</li>
+      <li>Filter your <strong>Recipients</strong>: choose by Status, Industry, and whether they have a valid email address.</li>
+      <li>Click <strong>Preview</strong> to see exactly how the email will look before it goes out.</li>
+      <li>Click <strong>Send</strong>.</li>
+    </ol>
+
+    <h2>Filtering Recipients</h2>
+    <p>You'll almost never want to email every single lead. Use the filters to target the right group:</p>
+    <ul>
+      <li><strong>Status filter:</strong> for example, only email "Qualified" leads</li>
+      <li><strong>Industry filter:</strong> target a specific sector</li>
+      <li><strong>Valid email only:</strong> check this to skip contacts with no email address</li>
+    </ul>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Always filter out "Lost" leads before sending. Emailing people who already said no is bad for your sender reputation and annoying for them.
+    </div>
+
+    <h2>Checking Campaign History</h2>
+    <p>Scroll down on the Email page to see <strong>Campaign History</strong>. Each past campaign shows:</p>
+    <ul>
+      <li>Date sent</li>
+      <li>Number of recipients</li>
+      <li>Success rate (delivered vs. bounced)</li>
+    </ul>
+
+    <div class="warning">
+      <strong>Don't Do This</strong>
+      You cannot unsend an email. Always click Preview before Send. Double-check the subject line especially — a typo in the subject line goes to everyone.
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  CHAPTER 7 — MONDAY.COM                    -->
+<!-- ══════════════════════════════════════════ -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 7</div>
+    <div class="chapter-title">Monday.com CRM —<br/>The Big Contact Database</div>
+    <div class="chapter-tagline">"All your clients, one place."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>In this chapter</strong>
+      <ul>
+        <li>Contacts view vs. Companies view</li>
+        <li>Searching and filtering</li>
+        <li>Sending a bulk email directly from CRM</li>
+        <li>Syncing bounces</li>
+      </ul>
+    </div>
+
+    <h2>What Is the Monday.com Tab?</h2>
+    <p>This tab connects directly to the company's Monday.com account. It shows your full client and prospect database — contacts (individual people) and companies (organizations). It's a bigger, richer database than the Leads tab.</p>
+
+    <h2>Contacts vs. Companies</h2>
+    <p>At the top of the tab, two buttons let you switch:</p>
+    <ul>
+      <li><strong>Contacts</strong> — individual people (name, email, phone, job title)</li>
+      <li><strong>Companies</strong> — organizations (company name, email, employee count)</li>
+    </ul>
+
+    <h2>Searching &amp; Filtering</h2>
+    <p>Use the filter panel to find exactly who you need:</p>
+    <ul>
+      <li>Type in <strong>Name</strong>, <strong>Email</strong>, or <strong>Phone</strong> to search</li>
+      <li>Set an <strong>Employee Count</strong> range to filter companies by size</li>
+      <li>Check <strong>Show Only Valid Email</strong> to hide contacts without a working email</li>
+    </ul>
+
+    <h2>Sending a Bulk Email from CRM</h2>
+    <p>You can email a selected group directly from this tab:</p>
+    <ol class="steps">
+      <li>Check the box next to each contact (or company) you want to email. You can check multiple.</li>
+      <li>Click the <strong>Send Bulk</strong> button that appears.</li>
+      <li>A compose window opens — fill in Subject, Body (or pick a template), and choose a Signature.</li>
+      <li>Click <strong>Send</strong>.</li>
+    </ol>
+
+    <h2>Syncing Bounces</h2>
+    <p>Sometimes emails bounce (invalid addresses). Click <strong>Sync Bounces</strong> to pull in the latest bounce data from the email system. Bounced addresses get flagged so they don't receive future campaigns.</p>
+
+    <div class="remember">
+      <strong>Remember</strong>
+      Contacts in this tab come from Monday.com. If someone you expect to see is missing, they need to be added in Monday.com first — the ERP syncs from there.
+    </div>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Use the <strong>Find Duplicates</strong> button occasionally to clean up the database. It highlights contacts that appear more than once.
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  CHAPTER 8 — CONTRACTS                     -->
+<!-- ══════════════════════════════════════════ -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 8</div>
+    <div class="chapter-title">Contracts —<br/>Generating Client Agreements</div>
+    <div class="chapter-tagline">"From handshake to signature in minutes."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>In this chapter</strong>
+      <ul>
+        <li>Selecting a company and template</li>
+        <li>Filling in the contract form</li>
+        <li>Using OCR to scan a tax certificate</li>
+        <li>Adding a payment schedule</li>
+        <li>Downloading the finished PDF</li>
+      </ul>
+    </div>
+
+    <h2>What the Contracts Tab Does</h2>
+    <p>The Contracts tab lets you fill out a pre-built contract template and download a ready-to-sign PDF in minutes. All the legal text is already written — you just fill in the blanks.</p>
+
+    <h2>Generating a Contract — Step by Step</h2>
+    <ol class="steps">
+      <li>Click <strong>Contracts</strong> in the sidebar.</li>
+      <li>Select the <strong>Company</strong> from the dropdown. Type to search if the list is long.</li>
+      <li>Select the <strong>Template</strong> — for example "KOSGEB Dijital Dönüşüm" or "Tekil Danışmanlık".</li>
+      <li>The form updates to show the fields for that template. Fill them all in (see below).</li>
+      <li>Click <strong>Generate PDF</strong> (or <strong>Generate Word</strong> if you need an editable file).</li>
+      <li>The file downloads automatically to your Downloads folder.</li>
+    </ol>
+
+    <h2>The Form Fields — What You'll Fill In</h2>
+    <p>Depending on the template, you'll see fields like:</p>
+    <ul>
+      <li><strong>Party 1 / Party 2 / Party 3:</strong> name, tax number, tax office, address — the signing parties</li>
+      <li><strong>Program Name:</strong> what service/program the contract covers</li>
+      <li><strong>Financier:</strong> the funding body (e.g., KOSGEB)</li>
+      <li><strong>Service Fee:</strong> the amount in Turkish Lira</li>
+      <li><strong>Deadline:</strong> number of days (type just the number, e.g., <em>60</em>)</li>
+      <li><strong>Success Bonus:</strong> percentage fee upon project approval</li>
+      <li><strong>Success Bonus Type:</strong> whether the bonus is "approved support", "approved loan", or "provided benefit"</li>
+      <li><strong>Contract Date:</strong> select from the calendar</li>
+    </ul>
+
+    <h2>Using OCR to Scan a Document</h2>
+    <p>For Party 2 and Party 3, instead of typing manually you can scan a tax certificate or ID document:</p>
+    <ol class="steps">
+      <li>Click <strong>Upload Image</strong> next to Party 2 (or Party 3).</li>
+      <li>Select a photo or scanned image of the document (JPG, PNG).</li>
+      <li>Wait a few seconds — the system reads the document and auto-fills the fields.</li>
+      <li>Review every field carefully and correct any mistakes before proceeding.</li>
+    </ol>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      OCR is very accurate but not perfect. Always read through the auto-filled fields before generating the contract — especially tax numbers and addresses.
+    </div>
+
+    <h2>Adding a Payment Schedule (Annex-1)</h2>
+    <p>Most contracts include a payment schedule table. Here's how to add it:</p>
+    <ol class="steps">
+      <li>Scroll to the <strong>Annex-1 / Payment Schedule</strong> section on the right side of the form.</li>
+      <li>Click <strong>+ Add Row</strong> to add a payment installment.</li>
+      <li>For each row: select the <strong>Subject</strong> (type of payment) from the dropdown, pick the <strong>Date</strong>, and type the <strong>Amount</strong>.</li>
+      <li>Add as many rows as needed.</li>
+      <li>The table will be included in the generated PDF automatically.</li>
+    </ol>
+
+    <div class="remember">
+      <strong>Remember</strong>
+      Enter dates in the format <strong>dd/mm/yyyy</strong>. Enter amounts as numbers only — no "TL" or commas needed, the system formats them automatically.
+    </div>
+
+    <div class="warning">
+      <strong>Don't Do This</strong>
+      You cannot upload new templates or delete existing ones — that's an admin task. If you need a new contract template, ask your admin.
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  CHAPTER 9 — PRICE QUOTE                   -->
+<!-- ══════════════════════════════════════════ -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 9</div>
+    <div class="chapter-title">Price Quote —<br/>Building a Proposal</div>
+    <div class="chapter-tagline">"A great pitch starts with a great-looking quote."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>In this chapter</strong>
+      <ul>
+        <li>Selecting a presentation</li>
+        <li>Standard mode vs. Discount mode</li>
+        <li>Filling in the quote cards</li>
+        <li>Downloading the PDF</li>
+      </ul>
+    </div>
+
+    <h2>What the Price Quote Tab Does</h2>
+    <p>The Price Quote tab (called <strong>Fiyat Teklifi</strong> in Turkish) builds a professional, Canva-powered proposal PDF. You pick a presentation design, fill in your pricing, and download a polished PDF to share with the client — all in under 5 minutes.</p>
+
+    <h2>Building a Quote — Step by Step</h2>
+    <ol class="steps">
+      <li>Click <strong>Price Quote</strong> (or <strong>Fiyat Teklifi</strong>) in the sidebar.</li>
+      <li>Select a <strong>Presentation</strong> from the category buttons. Each one is a different Canva design.</li>
+      <li>Type the <strong>Client Name</strong> — this becomes the filename of the downloaded PDF (e.g., "Acme_Corp" → <em>Acme_Corp.pdf</em>).</li>
+      <li>Choose a <strong>Theme</strong>: Blue or Green.</li>
+      <li>Choose a <strong>Mode</strong>: Standard or With Discount (see below).</li>
+      <li>Fill in the <strong>quote cards</strong> (up to 3 options).</li>
+      <li>Click <strong>Generate PDF</strong>.</li>
+    </ol>
+
+    <h2>Standard Mode vs. Discount Mode</h2>
+    <ul>
+      <li><strong>Standard:</strong> shows your regular prices straightforwardly.</li>
+      <li><strong>With Discount:</strong> shows a crossed-out original price and the discounted price side-by-side. Great for showing a client they're getting a deal.</li>
+    </ul>
+
+    <h2>The Quote Cards</h2>
+    <p>You can include up to 3 service options in one quote. Each card has:</p>
+    <ul>
+      <li><strong>Title</strong> — the name of the service/program</li>
+      <li><strong>Down Payment</strong> — upfront fee (or discounted price in Discount mode)</li>
+      <li><strong>Original Price</strong> — (Discount mode only) the price before discount</li>
+      <li><strong>Success Fee 1 &amp; 2</strong> — percentage fee upon project success</li>
+      <li><strong>Note</strong> — any extra info for this option</li>
+    </ul>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Offering two options (e.g., a basic and a premium package) gives clients a sense of choice and often leads to better conversions than a single take-it-or-leave-it price.
+    </div>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Use the Client Name field carefully — avoid special characters. Type the company name as you want it to appear in the filename.
+    </div>
+
+    <div class="warning">
+      <strong>Don't Do This</strong>
+      You cannot add or remove presentations from the list — that's an admin task. If you need a new presentation type, ask your admin.
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  QUICK REFERENCE                           -->
+<!-- ══════════════════════════════════════════ -->
+<div class="ref-page">
+  <div class="ref-header">⚡ Cheat Sheet — Sun &amp; Sun ERP Quick Reference</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Tab</th>
+        <th>What it's for</th>
+        <th>Your main actions</th>
+        <th>Can't do (admin only)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Dashboard</strong></td>
+        <td>Daily overview &amp; stats</td>
+        <td>Review hot leads, read numbers</td>
+        <td>Add leads, run AI agent</td>
+      </tr>
+      <tr>
+        <td><strong>Leads</strong></td>
+        <td>Contact profiles</td>
+        <td>Search, update status, add notes</td>
+        <td>Delete leads, import XLS</td>
+      </tr>
+      <tr>
+        <td><strong>Pipeline</strong></td>
+        <td>Visual deal tracker</td>
+        <td>Monitor stage distribution</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><strong>Cold Calls</strong></td>
+        <td>Automated phone outreach</td>
+        <td>Initiate calls, read transcripts</td>
+        <td>Configure calling system</td>
+      </tr>
+      <tr>
+        <td><strong>Email</strong></td>
+        <td>Bulk campaigns</td>
+        <td>Pick template, filter, send</td>
+        <td>Create/delete templates</td>
+      </tr>
+      <tr>
+        <td><strong>Monday.com</strong></td>
+        <td>Full CRM database</td>
+        <td>Search, filter, bulk email</td>
+        <td>Create/delete templates</td>
+      </tr>
+      <tr>
+        <td><strong>Contracts</strong></td>
+        <td>PDF agreement generator</td>
+        <td>Fill form, scan with OCR, download PDF</td>
+        <td>Upload/delete templates</td>
+      </tr>
+      <tr>
+        <td><strong>Price Quote</strong></td>
+        <td>Proposal builder</td>
+        <td>Fill cards, download PDF</td>
+        <td>Add/remove presentations</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <br/>
+  <table>
+    <thead>
+      <tr>
+        <th colspan="2">Access URLs</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>At the office (office Wi-Fi)</strong></td>
+        <td><code>http://192.168.1.135</code></td>
+      </tr>
+      <tr>
+        <td><strong>From anywhere (internet)</strong></td>
+        <td><code>https://erp.sunandsun.com.tr</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <br/>
+  <table>
+    <thead>
+      <tr>
+        <th colspan="2">Lead Status Flow</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td colspan="2" style="text-align:center; font-size: 14pt; font-weight: 800; padding: 16px; letter-spacing: 2px;">
+          New → Contacted → Qualified → Proposal Sent → Negotiation → <span style="color:#27ae60">Won</span> / <span style="color:#c0392b">Lost</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top: 30px; text-align: center; color: #888; font-size: 10pt; border-top: 1px solid #eee; padding-top: 16px;">
+    Sun &amp; Sun Consulting — Internal Use Only — erp.sunandsun.com.tr — 2026
+  </div>
+</div>
+
+</body>
+</html>

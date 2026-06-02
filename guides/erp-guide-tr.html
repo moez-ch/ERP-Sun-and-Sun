@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sun & Sun ERP — Kullanıcı Rehberi</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Nunito', Arial, sans-serif;
+    background: #fff;
+    color: #1a1a1a;
+    font-size: 13pt;
+    line-height: 1.7;
+  }
+
+  .cover {
+    page-break-after: always;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFD700;
+  }
+  .cover-top {
+    background: #1a1a1a;
+    color: #FFD700;
+    padding: 20px 40px;
+    font-size: 14pt;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .cover-body {
+    flex: 1;
+    padding: 50px 60px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .cover-tag {
+    display: inline-block;
+    background: #1a1a1a;
+    color: #FFD700;
+    font-size: 11pt;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border-radius: 4px;
+    margin-bottom: 30px;
+    width: fit-content;
+  }
+  .cover-title {
+    font-size: 48pt;
+    font-weight: 900;
+    line-height: 1.05;
+    color: #1a1a1a;
+    margin-bottom: 16px;
+  }
+  .cover-title span { color: #c0392b; }
+  .cover-subtitle {
+    font-size: 16pt;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 40px;
+  }
+  .cover-desc {
+    font-size: 12pt;
+    color: #444;
+    max-width: 480px;
+    line-height: 1.6;
+    border-left: 5px solid #1a1a1a;
+    padding-left: 18px;
+  }
+  .cover-bottom {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 18px 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11pt;
+    font-weight: 700;
+  }
+  .cover-chapters {
+    margin-top: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    max-width: 500px;
+  }
+  .cover-ch {
+    background: rgba(0,0,0,0.08);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 10pt;
+    font-weight: 700;
+    color: #1a1a1a;
+  }
+  .cover-ch span { opacity: 0.6; margin-right: 6px; }
+
+  .toc-page {
+    page-break-after: always;
+    padding: 60px 70px;
+    min-height: 100vh;
+  }
+  .toc-header {
+    font-size: 26pt;
+    font-weight: 900;
+    color: #1a1a1a;
+    border-bottom: 4px solid #FFD700;
+    padding-bottom: 12px;
+    margin-bottom: 36px;
+  }
+  .toc-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px dotted #ccc;
+    font-size: 12pt;
+  }
+  .toc-num {
+    font-weight: 900;
+    color: #c0392b;
+    font-size: 11pt;
+    width: 100px;
+    flex-shrink: 0;
+  }
+  .toc-title { font-weight: 700; flex: 1; }
+  .toc-sub {
+    font-size: 10pt;
+    color: #666;
+    margin-top: 3px;
+    padding-left: 110px;
+  }
+
+  .chapter {
+    page-break-before: always;
+    min-height: 100vh;
+    padding: 0;
+  }
+  .chapter-header {
+    background: #1a1a1a;
+    color: #FFD700;
+    padding: 36px 60px 28px;
+  }
+  .chapter-num {
+    font-size: 10pt;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-bottom: 6px;
+  }
+  .chapter-title {
+    font-size: 28pt;
+    font-weight: 900;
+    line-height: 1.1;
+  }
+  .chapter-tagline {
+    margin-top: 10px;
+    font-size: 11pt;
+    font-style: italic;
+    opacity: 0.8;
+  }
+  .chapter-body {
+    padding: 40px 60px 50px;
+  }
+
+  .in-this-chapter {
+    background: #fffbea;
+    border: 2px solid #FFD700;
+    border-radius: 10px;
+    padding: 18px 24px;
+    margin-bottom: 30px;
+    font-size: 11pt;
+  }
+  .in-this-chapter strong {
+    display: block;
+    font-size: 10pt;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #c0392b;
+    margin-bottom: 8px;
+  }
+  .in-this-chapter ul { padding-left: 18px; }
+  .in-this-chapter li { margin-bottom: 4px; }
+
+  h2 {
+    font-size: 16pt;
+    font-weight: 900;
+    color: #1a1a1a;
+    margin: 28px 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #FFD700;
+  }
+  h3 {
+    font-size: 13pt;
+    font-weight: 800;
+    color: #333;
+    margin: 20px 0 8px;
+  }
+  p { margin-bottom: 12px; }
+  ol, ul { padding-left: 22px; margin-bottom: 14px; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 800; }
+
+  .tip, .remember, .warning {
+    border-radius: 10px;
+    padding: 14px 18px 14px 52px;
+    margin: 18px 0;
+    font-size: 11.5pt;
+    position: relative;
+  }
+  .tip { background: #e8f4fd; border-left: 5px solid #2980b9; }
+  .remember { background: #fef9e7; border-left: 5px solid #f39c12; }
+  .warning { background: #fdf0f0; border-left: 5px solid #c0392b; }
+  .tip::before { content: "💡"; position: absolute; left: 14px; top: 13px; font-size: 18pt; }
+  .remember::before { content: "☝️"; position: absolute; left: 14px; top: 13px; font-size: 18pt; }
+  .warning::before { content: "🚫"; position: absolute; left: 14px; top: 13px; font-size: 18pt; }
+  .tip strong, .remember strong, .warning strong {
+    display: block;
+    font-size: 9pt;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    color: #555;
+  }
+
+  .steps {
+    background: #f8f8f8;
+    border-radius: 10px;
+    padding: 18px 24px;
+    margin: 16px 0;
+    counter-reset: step;
+    list-style: none;
+    padding-left: 24px;
+  }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 36px;
+    margin-bottom: 12px;
+    font-size: 12pt;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 2px;
+    background: #1a1a1a;
+    color: #FFD700;
+    font-weight: 900;
+    font-size: 9pt;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .ref-page {
+    page-break-before: always;
+    padding: 50px 60px;
+  }
+  .ref-header {
+    background: #1a1a1a;
+    color: #FFD700;
+    font-size: 20pt;
+    font-weight: 900;
+    padding: 20px 30px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11pt;
+  }
+  th {
+    background: #1a1a1a;
+    color: #FFD700;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 900;
+    font-size: 10pt;
+    letter-spacing: 0.5px;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #fafafa; }
+  .badge {
+    display: inline-block;
+    background: #FFD700;
+    color: #1a1a1a;
+    font-size: 9pt;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 20px;
+    vertical-align: middle;
+  }
+
+  @media print {
+    body { font-size: 11pt; }
+    .cover { min-height: 100vh; page-break-after: always; }
+    .chapter { page-break-before: always; }
+    @page { margin: 0; size: A4; }
+  }
+</style>
+</head>
+<body>
+
+<!-- KAPAK -->
+<div class="cover">
+  <div class="cover-top">☆ Sun &amp; Sun Danışmanlık — Sadece İç Kullanım İçin ☆</div>
+  <div class="cover-body">
+    <div>
+      <div class="cover-tag">Satış Temsilcisi Sürümü</div>
+      <div class="cover-title">Sun &amp; Sun<br/><span>ERP</span><br/>Yeni Başlayanlar İçin</div>
+      <div class="cover-subtitle">Satış Platformunu Kullanmanın Tam ve Anlaşılır Rehberi</div>
+      <div class="cover-desc">
+        Sisteme girişten sözleşme ve fiyat teklifi oluşturmaya kadar her şey — teknik terimler olmadan, sade ve anlaşılır bir dille yazılmıştır.
+      </div>
+      <div class="cover-chapters">
+        <div class="cover-ch"><span>01</span>Giriş Yapma</div>
+        <div class="cover-ch"><span>02</span>Panel</div>
+        <div class="cover-ch"><span>03</span>Adaylar</div>
+        <div class="cover-ch"><span>04</span>İş Hattı</div>
+        <div class="cover-ch"><span>05</span>Soğuk Aramalar</div>
+        <div class="cover-ch"><span>06</span>E-posta</div>
+        <div class="cover-ch"><span>07</span>Monday.com CRM</div>
+        <div class="cover-ch"><span>08</span>Sözleşmeler</div>
+        <div class="cover-ch"><span>09</span>Fiyat Teklifi</div>
+      </div>
+    </div>
+  </div>
+  <div class="cover-bottom">
+    <span>Sun &amp; Sun Danışmanlık</span>
+    <span>erp.sunandsun.com.tr</span>
+    <span>Kullanıcı Rehberi — 2026</span>
+  </div>
+</div>
+
+<!-- İÇİNDEKİLER -->
+<div class="toc-page">
+  <div class="toc-header">İçindekiler</div>
+
+  <div class="toc-item">
+    <div class="toc-num">Bölüm 1</div>
+    <div>
+      <div class="toc-title">Giriş Yapma &amp; Sisteme Alışma</div>
+      <div class="toc-sub">Sisteme nasıl erişilir · Ekran düzeni · Dil değiştirme</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Bölüm 2</div>
+    <div>
+      <div class="toc-title">Panel — Sabah Brifingini</div>
+      <div class="toc-sub">Sayıları anlamak · Sıcak adaylar · Dönüşüm hunisi</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Bölüm 3</div>
+    <div>
+      <div class="toc-title">Adaylar — Kişi Listeniz</div>
+      <div class="toc-sub">Arama ve filtreleme · Aday profili · Durum güncelleme · Not ekleme</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Bölüm 4</div>
+    <div>
+      <div class="toc-title">İş Hattı — Anlaşmayı Takip Etmek</div>
+      <div class="toc-sub">Kanban panosu nedir · Her sütun ne anlama gelir · Panoyu okuma</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Bölüm 5</div>
+    <div>
+      <div class="toc-title">Soğuk Aramalar — Otomatik Arama Sistemi</div>
+      <div class="toc-sub">Arama başlatma · Transkript okuma · Durum rozetleri</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Bölüm 6</div>
+    <div>
+      <div class="toc-title">E-posta — Kampanyalar &amp; Şablonlar</div>
+      <div class="toc-sub">Şablon seçimi · Alıcı filtreleme · Gönderme · Geçmiş kampanyalar</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Bölüm 7</div>
+    <div>
+      <div class="toc-title">Monday.com CRM — Büyük Kişi Veritabanı</div>
+      <div class="toc-sub">Kişiler / Şirketler görünümü · Filtreleme · Toplu e-posta · Geri dönen e-postalar</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Bölüm 8</div>
+    <div>
+      <div class="toc-title">Sözleşmeler — Müşteri Sözleşmesi Oluşturma</div>
+      <div class="toc-sub">Şablon seçimi · Formu doldurma · OCR ile tarama · Ödeme planı · PDF indirme</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Bölüm 9</div>
+    <div>
+      <div class="toc-title">Fiyat Teklifi — Teklif Hazırlama</div>
+      <div class="toc-sub">Sunum seçimi · Standart / İndirimli mod · Kart doldurma · PDF indirme</div>
+    </div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Hızlı Ref</div>
+    <div>
+      <div class="toc-title">Hızlı Başvuru Kartı — Her Şey Bir Bakışta</div>
+      <div class="toc-sub">Sekme özeti · Temel işlemler · Erişim adresi</div>
+    </div>
+  </div>
+</div>
+
+<!-- BÖLÜM 1 — GİRİŞ YAPMA -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 1</div>
+    <div class="chapter-title">Giriş Yapma &amp;<br/>Sisteme Alışma</div>
+    <div class="chapter-tagline">"Her yolculuk tek bir girişle başlar."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>Bu bölümde</strong>
+      <ul>
+        <li>ERP'yi tarayıcıda nasıl açarsınız</li>
+        <li>Kimlik bilgilerinizle giriş yapma</li>
+        <li>Ekranın iki bölümü</li>
+        <li>Türkçe ve İngilizce arasında geçiş yapma</li>
+      </ul>
+    </div>
+
+    <h2>ERP'yi Açmak</h2>
+    <p>ERP, tarayıcınızda çalışır — kurulum gerekmez. Herhangi bir tarayıcı (Chrome önerilir) açın ve adres çubuğuna şunu yazın:</p>
+    <ul>
+      <li><strong>Ofiste (ofis Wi-Fi'sinde):</strong> <code>http://192.168.1.135</code></li>
+      <li><strong>Her yerden (internet):</strong> <code>https://erp.sunandsun.com.tr</code></li>
+    </ul>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      Adresi yer işaretlerine ekleyin; her seferinde yazmak zorunda kalmazsınız. Chrome'da: adres çubuğundaki ★ simgesine tıklayın.
+    </div>
+
+    <h2>Giriş Yapma</h2>
+    <p>Bir giriş ekranı göreceksiniz. <strong>E-posta adresinizi</strong> ve <strong>şifrenizi</strong> girin, ardından <strong>Giriş Yap</strong>'a tıklayın.</p>
+    <p>Kimlik bilgileriniz yöneticiniz tarafından sağlanır. Şifrenizi unuttuysanız yöneticinizden sıfırlamasını isteyin — kendi kendinize sıfırlama seçeneği yoktur.</p>
+
+    <div class="remember">
+      <strong>Unutmayın</strong>
+      Hesabınız kişiseldir. Şifrenizi meslektaşlarınızla paylaşmayın — her kişinin kendi girişi vardır.
+    </div>
+
+    <h2>Ekran Düzeni — İki Alan</h2>
+    <p>Giriş yaptıktan sonra ekran iki bölüme ayrılır:</p>
+    <ul>
+      <li><strong>Sol kenar çubuğu:</strong> gezinme menüsü. Sekmeler arasında geçiş yapmak için simgelere tıklayın.</li>
+      <li><strong>Ana alan (sağ):</strong> her şeyin gerçekleştiği yer — hangi sekmede olduğunuza göre değişir.</li>
+    </ul>
+
+    <h2>9 Sekme</h2>
+    <p>Kenar çubuğunda (yukarıdan aşağıya) şu sekmeler bulunur:</p>
+    <ol>
+      <li><strong>Panel</strong> — günlük genel bakış ve istatistikler</li>
+      <li><strong>Adaylar</strong> — kişi listeniz</li>
+      <li><strong>İş Hattı</strong> — görsel anlaşma takipçisi</li>
+      <li><strong>Soğuk Aramalar</strong> — otomatik telefon aramaları</li>
+      <li><strong>E-posta</strong> — toplu e-posta kampanyaları</li>
+      <li><strong>Monday.com</strong> — tam CRM kişi veritabanı</li>
+      <li><strong>Sözleşmeler</strong> — PDF sözleşme oluşturucu</li>
+      <li><strong>Fiyat Teklifi</strong> — teklif oluşturucu</li>
+      <li><strong>Ayarlar</strong> — (yalnızca yönetici)</li>
+    </ol>
+
+    <h2>Dil Değiştirme</h2>
+    <p>Sistem hem Türkçe hem de İngilizce destekler. Kenar çubuğunun üstündeki dil geçiş düğmesini arayın ("TR" veya "EN" yazıyor). İstediğiniz zaman tıklayarak değiştirebilirsiniz — tercihiniz kaydedilir.</p>
+
+  </div>
+</div>
+
+<!-- BÖLÜM 2 — PANEL -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 2</div>
+    <div class="chapter-title">Panel —<br/>Sabah Brifingini</div>
+    <div class="chapter-tagline">"Telefonu almadan önce sayıları bilin."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>Bu bölümde</strong>
+      <ul>
+        <li>İstatistik kartlarının gösterdikleri</li>
+        <li>Dönüşüm hunisini okumak</li>
+        <li>En sıcak adayları hızlıca bulmak</li>
+      </ul>
+    </div>
+
+    <h2>Buraya Geldiğinizde Ne Görürsünüz</h2>
+    <p>Panel, giriş yaptıktan sonra gördüğünüz ilk sayfadır. Bunu günlük gazeteniz gibi düşünün — ayrıntılara dalmadan önce tüm önemli başlıklar tek bir yerde.</p>
+
+    <h2>İstatistik Kartları (Üst Sıra)</h2>
+    <p>Üstte dört büyük sayı sizi karşılar:</p>
+    <ul>
+      <li><strong>Toplam Aday</strong> — sistemdeki toplam kişi sayısı</li>
+      <li><strong>Nitelikli Aday</strong> — potansiyel müşteri olarak onaylanan kişiler</li>
+      <li><strong>Kazanılan Anlaşma</strong> — kapatılan satışlar</li>
+      <li><strong>Ortalama Puan</strong> — ortalama aday kalite puanı (0–100)</li>
+    </ul>
+    <p>Bunların altında <strong>Kazanma Oranı</strong> (dönüştürülen aday yüzdesi), <strong>Puan Dağılımı</strong> (kaç adayın sıcak/ılık/soğuk olduğu) ve <strong>Arama Aktivitesi</strong> de yer alır.</p>
+
+    <h2>Dönüşüm Hunisi</h2>
+    <p>Huni grafiği, adayların satış aşamalarında nasıl ilerlediğini gösterir. Üstü geniş (çok yeni aday), aşağı doğru "Kazanıldı"ya geldikçe daralır. Çok dar bir huni, adayların erken aşamalarda elendiğini gösterir — araştırmaya değer.</p>
+
+    <h2>Sıcak Adaylar</h2>
+    <p>Panelin alt kısmına kaydırarak <strong>Sıcak Adaylar</strong> bölümünü bulun — bunlar en yüksek puana sahip kişilerdir. Günün öncelikli aramaları bunlar olmalıdır. Herhangi bir karta tıklayarak tam profilini açabilirsiniz.</p>
+
+    <div class="remember">
+      <strong>Unutmayın</strong>
+      Panel yalnızca görüntülemek içindir. Her şeyi görebilirsiniz ama burada hiçbir şeyi değiştiremezsiniz. Bir adayı güncellemek için Adaylar sekmesine gidin.
+    </div>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      Her sabah başka bir şey yapmadan önce Paneli kontrol etmeyi alışkanlık haline getirin. 30 saniye sürer ve sizi doğru adaylara odaklar.
+    </div>
+
+  </div>
+</div>
+
+<!-- BÖLÜM 3 — ADAYLAR -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 3</div>
+    <div class="chapter-title">Adaylar —<br/>Kişi Listeniz</div>
+    <div class="chapter-tagline">"Adaylarınız geçim kaynağınızdır."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>Bu bölümde</strong>
+      <ul>
+        <li>Aday arama</li>
+        <li>Aday profili içinde neler var</li>
+        <li>Aday durumunu güncelleme</li>
+        <li>Görüşme sonrası not ekleme</li>
+        <li>Aday puanlarını anlamak</li>
+      </ul>
+    </div>
+
+    <h2>Aday Bulma</h2>
+    <p>Adaylar sekmesi sistemdeki tüm kişileri gösterir. Liste uzun olabilir — aradığınızı hızlıca bulmak için şunu yapın:</p>
+    <ol class="steps">
+      <li>Kenar çubuğunda <strong>Adaylar</strong>'a tıklayın.</li>
+      <li>Üstteki <strong>arama çubuğuna</strong> isim veya şirket yazın.</li>
+      <li>Daha da daraltmak için filtre açılır menülerini (Sektör, Durum, Şehir) kullanın.</li>
+      <li>Tam profilini açmak için herhangi bir satıra tıklayın.</li>
+    </ol>
+
+    <h2>Aday Profili İçeriği</h2>
+    <p>Bir adayı açtığınızda tam kartını görürsünüz:</p>
+    <ul>
+      <li><strong>İletişim bilgileri:</strong> e-posta, telefon, LinkedIn URL</li>
+      <li><strong>Şirket bilgileri:</strong> sektör, şehir, şirket büyüklüğü, kaynak</li>
+      <li><strong>Aday Puanı:</strong> 0–100 arası bir sayı. Yüksek = daha sıcak. 70'in üzeri önceliklidir.</li>
+      <li><strong>Durum:</strong> bu adayın satış sürecinde nerede olduğu</li>
+      <li><strong>Müşteri İhtiyaçları:</strong> neye ihtiyaç duyduklarının kontrol listesi</li>
+      <li><strong>Notlar:</strong> bildiğiniz her şeyi kaydetmek için serbest metin alanı</li>
+      <li><strong>Arama Geçmişi:</strong> geçmişte yapılan otomatik aramaların kaydı</li>
+    </ul>
+
+    <h2>Aday Durumunu Güncelleme</h2>
+    <p>Bu, Adaylar sekmesinde yapacağınız en önemli şeydir. Her etkileşimden sonra mutlaka güncelleyin:</p>
+    <ol class="steps">
+      <li>Aday profilini açın.</li>
+      <li>Profil içindeki <strong>Durum</strong> açılır menüsünü bulun.</li>
+      <li>Listeden yeni aşamayı seçin.</li>
+      <li>İş Hattı panosu otomatik olarak güncellenir.</li>
+    </ol>
+
+    <p>Durum aşamaları sırasıyla:</p>
+    <ul>
+      <li><strong>Yeni</strong> → <strong>İletişime Geçildi</strong> → <strong>Nitelendi</strong> → <strong>Teklif Gönderildi</strong> → <strong>Müzakere</strong> → <strong>Kazanıldı</strong> ya da <strong>Kaybedildi</strong></li>
+    </ul>
+
+    <h2>Not Ekleme</h2>
+    <p>Notlar alanı hafızanızdır. Her arama, e-posta veya toplantının ardından buraya kısa bir özet yazın. Gelecekteki siz — ve meslektaşlarınız — buna minnettarlık duyacak.</p>
+    <ol class="steps">
+      <li>Aday profilini açın.</li>
+      <li><strong>Notlar</strong> metin alanının içine tıklayın.</li>
+      <li>Notunuzu yazın. Spesifik olun: tarih, ne konuşuldu, sonraki adım.</li>
+      <li><strong>Kaydet</strong>'e tıklayın (veya otomatik kaydedebilir — onayı arayın).</li>
+    </ol>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      İyi bir not şöyle görünür: <em>"02/06/2026 — Aradım, Mehmet ile görüştüm. KOSGEB desteğiyle ilgileniyor. Cuma'ya kadar teklif göndereceğim. Pazartesi takip et."</em>
+    </div>
+
+    <div class="warning">
+      <strong>Bunu Yapmayın</strong>
+      Adayları silemezsiniz — bu bir yönetici işlemidir. Bir adayın kaldırılması gerekiyorsa yöneticinize başvurun.
+    </div>
+
+  </div>
+</div>
+
+<!-- BÖLÜM 4 — İŞ HATTI -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 4</div>
+    <div class="chapter-title">İş Hattı —<br/>Anlaşmayı Takip Etmek</div>
+    <div class="chapter-tagline">"Hareket olmayan bir boru hattı sadece borudur."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>Bu bölümde</strong>
+      <ul>
+        <li>Kanban panosu nedir</li>
+        <li>Her sütun ne anlama gelir</li>
+        <li>Panoyu takım toplantılarında kullanmak</li>
+      </ul>
+    </div>
+
+    <h2>Kanban Panosu Nedir?</h2>
+    <p>İş Hattı, her sütunun satış sürecindeki bir aşamayı temsil ettiği görsel bir panodur. Her aday, mevcut durumuna karşılık gelen sütunda bir kart olarak görünür. Her anlaşmanın tam olarak nerede durduğunu tek bakışta görebilirsiniz.</p>
+
+    <h2>7 Sütun (Soldan Sağa)</h2>
+    <ul>
+      <li><strong>Yeni</strong> — sisteme yeni eklendi, henüz iletişim kurulmadı</li>
+      <li><strong>İletişime Geçildi</strong> — en az bir kez ulaşıldı</li>
+      <li><strong>Nitelendi</strong> — gerçek bir ihtiyaç ve bütçesi olduğu onaylandı</li>
+      <li><strong>Teklif Gönderildi</strong> — teklif veya sözleşme gönderildi</li>
+      <li><strong>Müzakere</strong> — şartlar aktif olarak tartışılıyor</li>
+      <li><strong>Kazanıldı</strong> — anlaşma kapandı, sözleşme imzalandı 🎉</li>
+      <li><strong>Kaybedildi</strong> — bu sefer olmadı</li>
+    </ul>
+
+    <h2>Kartları Okumak</h2>
+    <p>Her kart adayın <strong>adını</strong>, <strong>şirketini</strong> ve en önemli <strong>ihtiyaçlarını</strong> küçük rozetler olarak gösterir. Herhangi bir karta tıklayarak doğrudan tam profiline gidebilirsiniz.</p>
+    <p>Her sütun ayrıca o aşamadaki aday <strong>sayısını</strong> da gösterir. "Teklif Gönderildi"de 8 aday varken "Kazanıldı"da 1 aday varsa, bu konuşmaya değer bir durumdur.</p>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      Haftalık takım toplantılarında İş Hattı görünümünü kullanın. Kimin takılıp kaldığını, kimin ilerlediğini tek bakışta görmek yeterlidir.
+    </div>
+
+    <div class="remember">
+      <strong>Unutmayın</strong>
+      Kartlar ancak aday profilinde Durumu güncellediğinizde hareket eder. Pano durumu yansıtır — kendiliğinden güncellemez.
+    </div>
+
+  </div>
+</div>
+
+<!-- BÖLÜM 5 — SOĞUK ARAMALAR -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 5</div>
+    <div class="chapter-title">Soğuk Aramalar —<br/>Otomatik Arama Sistemi</div>
+    <div class="chapter-tagline">"Sistem arasın, siz sunuma odaklanın."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>Bu bölümde</strong>
+      <ul>
+        <li>Soğuk Aramalar sekmesi ne işe yarar</li>
+        <li>Arama başlatmak</li>
+        <li>Arama penceresini ve transkripti okumak</li>
+        <li>Arama durum rozetlerini anlamak</li>
+      </ul>
+    </div>
+
+    <h2>Otomatik Soğuk Aramalar Nedir?</h2>
+    <p>Soğuk Aramalar sekmesi otomatik bir arama sistemine bağlanır. Bir adayın yanındaki Ara düğmesine tıkladığınızda sistem aramayı sizin adınıza gerçekleştirir. Aramayı gerçek zamanlı olarak izleyebilir ve transkript yakalandıysa sonrasında okuyabilirsiniz.</p>
+
+    <h2>Üstteki İstatistikler</h2>
+    <p>Sayfanın üstündeki dört sayaç şunları gösterir:</p>
+    <ul>
+      <li><strong>Toplam Arama</strong> — şimdiye kadar yapılan tüm aramalar</li>
+      <li><strong>Tamamlanan</strong> — bağlantı kurulup tamamlanan aramalar</li>
+      <li><strong>Cevapsız</strong> — açılmayan aramalar</li>
+      <li><strong>Sesli Mesaj</strong> — sesli mesaja düşen aramalar</li>
+    </ul>
+
+    <h2>Arama Yapma</h2>
+    <ol class="steps">
+      <li>Kenar çubuğunda <strong>Soğuk Aramalar</strong>'a tıklayın.</li>
+      <li>Listede adayı bulun (yalnızca telefon numarası olanlar görünür).</li>
+      <li>İsimlerinin yanındaki <strong>Arama</strong> sayısını kontrol edin — kaç kez arandığını ve son arama sonucunu gösterir.</li>
+      <li><strong>Ara</strong> düğmesine tıklayın.</li>
+      <li>Adayın adını, telefon numarasını ve canlı durumunu gösteren bir arama penceresi açılır.</li>
+      <li>Arama bittiğinde yakalanan transkript (varsa) pencerede görünür.</li>
+      <li>İşiniz bittiğinde pencereyi kapatın.</li>
+    </ol>
+
+    <h2>Arama Durum Rozetleri</h2>
+    <p>Listedeki her adayın son arama sonucu için renkli bir rozet gösterilir:</p>
+    <ul>
+      <li><span class="badge">Tamamlandı</span> — başarılı arama</li>
+      <li><span class="badge" style="background:#e74c3c;color:white">Cevapsız</span> — açılmadı</li>
+      <li><span class="badge" style="background:#95a5a6;color:white">Sesli Mesaj</span> — sesli mesaj bırakıldı</li>
+      <li><em>Rozet yok</em> — henüz aranmadı</li>
+    </ul>
+
+    <div class="warning">
+      <strong>Bunu Yapmayın</strong>
+      Arama sisteminin yapılandırılmadığını belirten bir uyarı başlığı görürseniz arama yapmaya çalışmayın — yöneticinizden önce kurmasını isteyin.
+    </div>
+
+  </div>
+</div>
+
+<!-- BÖLÜM 6 — E-POSTA -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 6</div>
+    <div class="chapter-title">E-posta —<br/>Kampanyalar &amp; Şablonlar</div>
+    <div class="chapter-tagline">"Bir kez yaz, yüzlere gönder."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>Bu bölümde</strong>
+      <ul>
+        <li>E-posta yazma veya şablon kullanma</li>
+        <li>İmzanızı seçmek</li>
+        <li>Alıcıları filtreleme ve seçme</li>
+        <li>Göndermeden önce önizleme</li>
+        <li>Geçmiş kampanya sonuçlarını kontrol etme</li>
+      </ul>
+    </div>
+
+    <h2>E-posta Sekmesine Genel Bakış</h2>
+    <p>E-posta sekmesi, aynı anda birçok kişiye tek bir mesaj göndermenizi sağlar. Özel bir e-posta yazabilir veya önceden hazırlanmış bir şablon kullanabilirsiniz. Sistem kimin aldığını ve başarı oranını takip eder.</p>
+
+    <h2>Kampanya Gönderme — Adım Adım</h2>
+    <ol class="steps">
+      <li>Kenar çubuğunda <strong>E-posta</strong>'ya tıklayın.</li>
+      <li>Önceden yazılmış bir mesajı otomatik doldurmak için <strong>Hızlı Yanıt Şablonu</strong> düğmelerinden birine tıklayın; ya da kendi <strong>Konu</strong> ve <strong>İçerik</strong> alanlarınızı yazın.</li>
+      <li>Açılır menüden <strong>İmzanızı</strong> seçin (Merve, Şura, Ahmet veya Esra). İmza otomatik olarak eklenir.</li>
+      <li><strong>Alıcıları</strong> filtreleyin: Durum, Sektör ve geçerli e-posta adresine göre seçin.</li>
+      <li>E-postanın nasıl görüneceğini gitmeden önce görmek için <strong>Önizleme</strong>'ye tıklayın.</li>
+      <li><strong>Gönder</strong>'e tıklayın.</li>
+    </ol>
+
+    <h2>Alıcıları Filtreleme</h2>
+    <p>Neredeyse hiçbir zaman her adaya e-posta göndermek istemezsiniz. Doğru grubu hedeflemek için filtreleri kullanın:</p>
+    <ul>
+      <li><strong>Durum filtresi:</strong> örneğin yalnızca "Nitelikli" adaylara e-posta gönderin</li>
+      <li><strong>Sektör filtresi:</strong> belirli bir sektörü hedefleyin</li>
+      <li><strong>Yalnızca geçerli e-posta:</strong> e-posta adresi olmayan kişileri atlamak için işaretleyin</li>
+    </ul>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      Göndermeden önce "Kaybedildi" adaylarını her zaman filtreleyin. Zaten hayır diyen kişilere e-posta göndermek gönderici itibarınıza zarar verir ve onları rahatsız eder.
+    </div>
+
+    <h2>Kampanya Geçmişini Kontrol Etme</h2>
+    <p>E-posta sayfasında aşağı kaydırarak <strong>Kampanya Geçmişi</strong>'ni görün. Her geçmiş kampanya şunları gösterir:</p>
+    <ul>
+      <li>Gönderim tarihi</li>
+      <li>Alıcı sayısı</li>
+      <li>Başarı oranı (teslim edilen / geri dönen)</li>
+    </ul>
+
+    <div class="warning">
+      <strong>Bunu Yapmayın</strong>
+      Gönderilen e-postayı geri alamazsınız. Göndermeden önce her zaman Önizleme'ye tıklayın. Özellikle konu satırını iki kez kontrol edin — bir yazım hatası herkese gider.
+    </div>
+
+  </div>
+</div>
+
+<!-- BÖLÜM 7 — MONDAY.COM -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 7</div>
+    <div class="chapter-title">Monday.com CRM —<br/>Büyük Kişi Veritabanı</div>
+    <div class="chapter-tagline">"Tüm müşterileriniz tek bir yerde."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>Bu bölümde</strong>
+      <ul>
+        <li>Kişiler görünümü ile Şirketler görünümü</li>
+        <li>Arama ve filtreleme</li>
+        <li>CRM'den doğrudan toplu e-posta gönderme</li>
+        <li>Geri dönen e-postaları senkronize etme</li>
+      </ul>
+    </div>
+
+    <h2>Monday.com Sekmesi Nedir?</h2>
+    <p>Bu sekme şirketin Monday.com hesabına doğrudan bağlanır. Tam müşteri ve aday veritabanınızı — kişileri (bireysel kişiler) ve şirketleri (kuruluşlar) — gösterir. Adaylar sekmesinden daha büyük ve zengin bir veritabanıdır.</p>
+
+    <h2>Kişiler ile Şirketler</h2>
+    <p>Sekmenin üstündeki iki düğme geçiş yapmanızı sağlar:</p>
+    <ul>
+      <li><strong>Kişiler</strong> — bireysel kişiler (ad, e-posta, telefon, iş unvanı)</li>
+      <li><strong>Şirketler</strong> — kuruluşlar (şirket adı, e-posta, çalışan sayısı)</li>
+    </ul>
+
+    <h2>Arama &amp; Filtreleme</h2>
+    <p>Tam olarak kimi aradığınızı bulmak için filtre panelini kullanın:</p>
+    <ul>
+      <li>Arama yapmak için <strong>Ad</strong>, <strong>E-posta</strong> veya <strong>Telefon</strong> alanına yazın</li>
+      <li>Şirketleri büyüklüğe göre filtrelemek için <strong>Çalışan Sayısı</strong> aralığı belirleyin</li>
+      <li>E-posta adresi olmayan kişileri gizlemek için <strong>Yalnızca Geçerli E-posta Göster</strong>'i işaretleyin</li>
+    </ul>
+
+    <h2>CRM'den Toplu E-posta Gönderme</h2>
+    <p>Bu sekmeden doğrudan seçili bir gruba e-posta gönderebilirsiniz:</p>
+    <ol class="steps">
+      <li>E-posta göndermek istediğiniz her kişinin (veya şirketin) yanındaki kutuyu işaretleyin. Birden fazla seçebilirsiniz.</li>
+      <li>Görünen <strong>Toplu Gönder</strong> düğmesine tıklayın.</li>
+      <li>Konu, İçerik gireceğiniz (veya şablon seçeceğiniz) ve İmza seçeceğiniz bir yazma penceresi açılır.</li>
+      <li><strong>Gönder</strong>'e tıklayın.</li>
+    </ol>
+
+    <h2>Geri Dönen E-postaları Senkronize Etme</h2>
+    <p>Bazen e-postalar geri döner (geçersiz adresler). En güncel geri dönme verilerini çekmek için <strong>Zıplamaları Senkronize Et</strong>'e tıklayın. Geri dönen adresler işaretlenerek gelecekteki kampanyalara dahil edilmez.</p>
+
+    <div class="remember">
+      <strong>Unutmayın</strong>
+      Bu sekmedeki kişiler Monday.com'dan gelir. Görmeyi beklediğiniz biri eksikse önce Monday.com'a eklenmesi gerekir — ERP oradan senkronize eder.
+    </div>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      Veritabanını temizlemek için ara sıra <strong>Tekrar Edenleri Bul</strong> düğmesine tıklayın. Birden fazla kez görünen kişileri vurgular.
+    </div>
+
+  </div>
+</div>
+
+<!-- BÖLÜM 8 — SÖZLEŞMELER -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 8</div>
+    <div class="chapter-title">Sözleşmeler —<br/>Müşteri Sözleşmesi Oluşturma</div>
+    <div class="chapter-tagline">"El sıkışmadan imzaya dakikalar içinde."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>Bu bölümde</strong>
+      <ul>
+        <li>Şirket ve şablon seçimi</li>
+        <li>Sözleşme formunu doldurmak</li>
+        <li>OCR ile belge tarama</li>
+        <li>Ödeme planı ekleme</li>
+        <li>Tamamlanan PDF'i indirme</li>
+      </ul>
+    </div>
+
+    <h2>Sözleşmeler Sekmesi Ne Yapar?</h2>
+    <p>Sözleşmeler sekmesi, önceden hazırlanmış bir sözleşme şablonunu doldurmanızı ve dakikalar içinde imzalanmaya hazır bir PDF indirmenizi sağlar. Tüm hukuki metin zaten yazılıdır — siz sadece boşlukları doldurursunuz.</p>
+
+    <h2>Sözleşme Oluşturma — Adım Adım</h2>
+    <ol class="steps">
+      <li>Kenar çubuğunda <strong>Sözleşmeler</strong>'e tıklayın.</li>
+      <li>Açılır menüden <strong>Şirket</strong>'i seçin. Liste uzunsa arama yapın.</li>
+      <li><strong>Şablon</strong>'u seçin — örneğin "KOSGEB Dijital Dönüşüm" veya "Tekil Danışmanlık".</li>
+      <li>Form, o şablonun alanlarını gösterecek şekilde güncellenir. Hepsini doldurun (aşağıya bakın).</li>
+      <li><strong>PDF Oluştur</strong>'a tıklayın (düzenlenebilir bir dosyaya ihtiyacınız varsa <strong>Word Oluştur</strong>'a tıklayın).</li>
+      <li>Dosya otomatik olarak İndirilenler klasörünüze iner.</li>
+    </ol>
+
+    <h2>Form Alanları — Neyi Dolduracaksınız</h2>
+    <p>Şablona bağlı olarak şu alanları göreceksiniz:</p>
+    <ul>
+      <li><strong>Taraf 1 / Taraf 2 / Taraf 3:</strong> ad, vergi numarası, vergi dairesi, adres — imzalayan taraflar</li>
+      <li><strong>Program Adı:</strong> sözleşmenin kapsadığı hizmet/program</li>
+      <li><strong>Finansör:</strong> fon kuruluşu (örn. KOSGEB)</li>
+      <li><strong>Hizmet Bedeli:</strong> Türk Lirası cinsinden tutar</li>
+      <li><strong>Son Tarih:</strong> gün sayısı (sadece sayıyı yazın, örn. <em>60</em>)</li>
+      <li><strong>Başarı Primi:</strong> proje onayı üzerine yüzde ücret</li>
+      <li><strong>Başarı Primi Türü:</strong> priminin "onaylanan destek", "onaylanan kredi" veya "sağlanan fayda" olup olmadığı</li>
+      <li><strong>Sözleşme Tarihi:</strong> takvimden seçin</li>
+    </ul>
+
+    <h2>OCR ile Belge Tarama</h2>
+    <p>Taraf 2 ve Taraf 3 için, manuel olarak yazmak yerine bir vergi levhası veya kimlik belgesi fotoğrafı/taraması yükleyebilirsiniz:</p>
+    <ol class="steps">
+      <li>Taraf 2'nin (veya Taraf 3'ün) yanındaki <strong>Görsel Yükle</strong>'ye tıklayın.</li>
+      <li>Belgenin fotoğrafı veya taranmış görüntüsünü seçin (JPG, PNG).</li>
+      <li>Birkaç saniye bekleyin — sistem belgeyi okur ve alanları otomatik doldurur.</li>
+      <li>Devam etmeden önce her alanı dikkatlice inceleyin ve hataları düzeltin.</li>
+    </ol>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      OCR çok doğrudur ama kusursuz değildir. Sözleşmeyi oluşturmadan önce otomatik doldurulan alanları, özellikle vergi numaralarını ve adresleri, her zaman okuyun.
+    </div>
+
+    <h2>Ödeme Planı Ekleme (Ek-1)</h2>
+    <p>Çoğu sözleşme bir ödeme planı tablosu içerir. Şu şekilde ekleyin:</p>
+    <ol class="steps">
+      <li>Formun sağ tarafındaki <strong>Ek-1 / Ödeme Planı</strong> bölümüne kaydırın.</li>
+      <li>Bir ödeme taksiti eklemek için <strong>+ Satır Ekle</strong>'ye tıklayın.</li>
+      <li>Her satır için: açılır menüden <strong>Konu</strong>'yu (ödeme türü) seçin, <strong>Tarihi</strong> belirleyin ve <strong>Tutarı</strong> yazın.</li>
+      <li>Gerektiği kadar satır ekleyin.</li>
+      <li>Tablo oluşturulan PDF'e otomatik olarak dahil edilir.</li>
+    </ol>
+
+    <div class="remember">
+      <strong>Unutmayın</strong>
+      Tarihleri <strong>gg/aa/yyyy</strong> formatında girin. Tutarları yalnızca sayı olarak girin — "TL" veya nokta/virgül gerekmez, sistem otomatik olarak biçimlendirir.
+    </div>
+
+    <div class="warning">
+      <strong>Bunu Yapmayın</strong>
+      Yeni şablon yükleyemez veya mevcut olanları silemezsiniz — bu bir yönetici işlemidir. Yeni bir sözleşme şablonuna ihtiyacınız varsa yöneticinizden isteyin.
+    </div>
+
+  </div>
+</div>
+
+<!-- BÖLÜM 9 — FİYAT TEKLİFİ -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Bölüm 9</div>
+    <div class="chapter-title">Fiyat Teklifi —<br/>Teklif Hazırlama</div>
+    <div class="chapter-tagline">"Harika bir sunum harika görünen bir teklifle başlar."</div>
+  </div>
+  <div class="chapter-body">
+
+    <div class="in-this-chapter">
+      <strong>Bu bölümde</strong>
+      <ul>
+        <li>Sunum seçmek</li>
+        <li>Standart mod ile İndirimli mod</li>
+        <li>Teklif kartlarını doldurmak</li>
+        <li>PDF'i indirmek</li>
+      </ul>
+    </div>
+
+    <h2>Fiyat Teklifi Sekmesi Ne Yapar?</h2>
+    <p>Fiyat Teklifi sekmesi, Canva destekli profesyonel bir teklif PDF'i oluşturur. Bir sunum tasarımı seçer, fiyatlandırmanızı doldurur ve 5 dakikadan kısa sürede müşteriyle paylaşabileceğiniz şık bir PDF indirirsiniz.</p>
+
+    <h2>Teklif Oluşturma — Adım Adım</h2>
+    <ol class="steps">
+      <li>Kenar çubuğunda <strong>Fiyat Teklifi</strong>'ne tıklayın.</li>
+      <li>Kategori düğmelerinden bir <strong>Sunum</strong> seçin. Her biri farklı bir Canva tasarımıdır.</li>
+      <li><strong>Müşteri Adı</strong>'nı yazın — bu, indirilen PDF'nin dosya adı olur (örn. "Acme_Corp" → <em>Acme_Corp.pdf</em>).</li>
+      <li>Bir <strong>Tema</strong> seçin: Mavi veya Yeşil.</li>
+      <li>Bir <strong>Mod</strong> seçin: Standart veya İndirimli (aşağıya bakın).</li>
+      <li><strong>Teklif kartlarını</strong> doldurun (en fazla 3 seçenek).</li>
+      <li><strong>PDF Oluştur</strong>'a tıklayın.</li>
+    </ol>
+
+    <h2>Standart Mod ile İndirimli Mod</h2>
+    <ul>
+      <li><strong>Standart:</strong> normal fiyatlarınızı doğrudan gösterir.</li>
+      <li><strong>İndirimli:</strong> üzeri çizili orijinal fiyat ve indirimli fiyatı yan yana gösterir. Müşteriye bir fırsat yakaladığını göstermek için idealdir.</li>
+    </ul>
+
+    <h2>Teklif Kartları</h2>
+    <p>Tek bir teklife en fazla 3 hizmet seçeneği ekleyebilirsiniz. Her kart şunları içerir:</p>
+    <ul>
+      <li><strong>Başlık</strong> — hizmetin/programın adı</li>
+      <li><strong>Peşinat</strong> — peşin ücret (İndirimli modda indirimli fiyat)</li>
+      <li><strong>Orijinal Fiyat</strong> — (yalnızca İndirimli mod) indirim öncesi fiyat</li>
+      <li><strong>Başarı Primi 1 &amp; 2</strong> — proje başarısı üzerine yüzde ücret</li>
+      <li><strong>Not</strong> — bu seçenek için ek bilgi</li>
+    </ul>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      İki seçenek sunmak (örn. temel ve premium paket) müşterilere seçim hissi verir ve genellikle tek bir al-ya-da-bırak fiyatından daha iyi sonuç verir.
+    </div>
+
+    <div class="tip">
+      <strong>İpucu</strong>
+      Müşteri Adı alanını dikkatli kullanın — özel karakter kullanmaktan kaçının. Şirket adını dosya adında görünmesini istediğiniz şekilde yazın.
+    </div>
+
+    <div class="warning">
+      <strong>Bunu Yapmayın</strong>
+      Listeden sunum ekleyemez veya kaldıramazsınız — bu bir yönetici işlemidir. Yeni bir sunum türüne ihtiyacınız varsa yöneticinizden isteyin.
+    </div>
+
+  </div>
+</div>
+
+<!-- HIZLI BAŞVURU KARTI -->
+<div class="ref-page">
+  <div class="ref-header">⚡ Hızlı Başvuru Kartı — Sun &amp; Sun ERP</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Sekme</th>
+        <th>Ne işe yarar</th>
+        <th>Temel işlemleriniz</th>
+        <th>Yapılamaz (yalnızca yönetici)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Panel</strong></td>
+        <td>Günlük genel bakış &amp; istatistikler</td>
+        <td>Sıcak adayları incele, sayıları oku</td>
+        <td>Aday ekle, AI ajanı çalıştır</td>
+      </tr>
+      <tr>
+        <td><strong>Adaylar</strong></td>
+        <td>Kişi profilleri</td>
+        <td>Ara, durum güncelle, not ekle</td>
+        <td>Aday sil, XLS içe aktar</td>
+      </tr>
+      <tr>
+        <td><strong>İş Hattı</strong></td>
+        <td>Görsel anlaşma takipçisi</td>
+        <td>Aşama dağılımını izle</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><strong>Soğuk Aramalar</strong></td>
+        <td>Otomatik telefon aramaları</td>
+        <td>Arama başlat, transkriptleri oku</td>
+        <td>Arama sistemini yapılandır</td>
+      </tr>
+      <tr>
+        <td><strong>E-posta</strong></td>
+        <td>Toplu kampanyalar</td>
+        <td>Şablon seç, filtrele, gönder</td>
+        <td>Şablon oluştur/sil</td>
+      </tr>
+      <tr>
+        <td><strong>Monday.com</strong></td>
+        <td>Tam CRM veritabanı</td>
+        <td>Ara, filtrele, toplu e-posta gönder</td>
+        <td>Şablon oluştur/sil</td>
+      </tr>
+      <tr>
+        <td><strong>Sözleşmeler</strong></td>
+        <td>PDF sözleşme oluşturucu</td>
+        <td>Form doldur, OCR ile tara, PDF indir</td>
+        <td>Şablon yükle/sil</td>
+      </tr>
+      <tr>
+        <td><strong>Fiyat Teklifi</strong></td>
+        <td>Teklif oluşturucu</td>
+        <td>Kartları doldur, PDF indir</td>
+        <td>Sunum ekle/kaldır</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <br/>
+  <table>
+    <thead>
+      <tr>
+        <th colspan="2">Erişim Adresleri</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Ofiste (ofis Wi-Fi'sinde)</strong></td>
+        <td><code>http://192.168.1.135</code></td>
+      </tr>
+      <tr>
+        <td><strong>Her yerden (internet)</strong></td>
+        <td><code>https://erp.sunandsun.com.tr</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <br/>
+  <table>
+    <thead>
+      <tr>
+        <th colspan="2">Aday Durum Akışı</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td colspan="2" style="text-align:center; font-size: 14pt; font-weight: 800; padding: 16px; letter-spacing: 1px;">
+          Yeni → İletişime Geçildi → Nitelendi → Teklif Gönderildi → Müzakere → <span style="color:#27ae60">Kazanıldı</span> / <span style="color:#c0392b">Kaybedildi</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top: 30px; text-align: center; color: #888; font-size: 10pt; border-top: 1px solid #eee; padding-top: 16px;">
+    Sun &amp; Sun Danışmanlık — Sadece İç Kullanım İçin — erp.sunandsun.com.tr — 2026
+  </div>
+</div>
+
+</body>
+</html>

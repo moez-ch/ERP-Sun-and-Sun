@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sun &amp; Sun ERP — Admin Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Nunito', Arial, sans-serif; background: #fff; color: #1a1a1a; font-size: 13pt; line-height: 1.7; }
+
+  .cover { page-break-after: always; min-height: 100vh; display: flex; flex-direction: column; background: #1a1a1a; }
+  .cover-top { background: #c0392b; color: #fff; padding: 20px 40px; font-size: 14pt; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; }
+  .cover-body { flex: 1; padding: 50px 60px 40px; display: flex; flex-direction: column; justify-content: space-between; }
+  .cover-tag { display: inline-block; background: #c0392b; color: #fff; font-size: 11pt; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; padding: 6px 16px; border-radius: 4px; margin-bottom: 30px; width: fit-content; }
+  .cover-title { font-size: 48pt; font-weight: 900; line-height: 1.05; color: #FFD700; margin-bottom: 16px; }
+  .cover-title span { color: #c0392b; }
+  .cover-subtitle { font-size: 16pt; font-weight: 700; color: #aaa; margin-bottom: 40px; }
+  .cover-desc { font-size: 12pt; color: #ccc; max-width: 520px; line-height: 1.6; border-left: 5px solid #c0392b; padding-left: 18px; }
+  .cover-chapters { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 560px; }
+  .cover-ch { background: rgba(255,255,255,0.07); border-radius: 8px; padding: 7px 13px; font-size: 9.5pt; font-weight: 700; color: #ccc; }
+  .cover-ch span { opacity: 0.5; margin-right: 6px; }
+  .cover-bottom { background: #c0392b; color: #fff; padding: 18px 60px; display: flex; justify-content: space-between; align-items: center; font-size: 11pt; font-weight: 700; }
+
+  .toc-page { page-break-after: always; padding: 60px 70px; min-height: 100vh; }
+  .toc-header { font-size: 26pt; font-weight: 900; color: #1a1a1a; border-bottom: 4px solid #c0392b; padding-bottom: 12px; margin-bottom: 36px; }
+  .toc-item { display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-bottom: 1px dotted #ccc; font-size: 11.5pt; }
+  .toc-num { font-weight: 900; color: #c0392b; font-size: 10.5pt; width: 90px; flex-shrink: 0; }
+  .toc-title { font-weight: 700; flex: 1; }
+  .toc-sub { font-size: 9.5pt; color: #666; margin-top: 2px; padding-left: 100px; }
+
+  .chapter { page-break-before: always; min-height: 100vh; padding: 0; }
+  .chapter-header { background: #1a1a1a; color: #FFD700; padding: 36px 60px 28px; }
+  .chapter-header.red { background: #c0392b; color: #fff; }
+  .chapter-num { font-size: 10pt; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; opacity: 0.7; margin-bottom: 6px; }
+  .chapter-title { font-size: 26pt; font-weight: 900; line-height: 1.1; }
+  .chapter-tagline { margin-top: 10px; font-size: 11pt; font-style: italic; opacity: 0.8; }
+  .chapter-body { padding: 36px 60px 50px; }
+
+  .in-this-chapter { background: #fff5f5; border: 2px solid #c0392b; border-radius: 10px; padding: 16px 22px; margin-bottom: 28px; font-size: 11pt; }
+  .in-this-chapter strong { display: block; font-size: 9.5pt; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; color: #c0392b; margin-bottom: 8px; }
+  .in-this-chapter ul { padding-left: 18px; }
+  .in-this-chapter li { margin-bottom: 3px; }
+
+  h2 { font-size: 15pt; font-weight: 900; color: #1a1a1a; margin: 26px 0 9px; padding-bottom: 5px; border-bottom: 2px solid #c0392b; }
+  h3 { font-size: 12.5pt; font-weight: 800; color: #333; margin: 18px 0 7px; }
+  p { margin-bottom: 11px; }
+  ol, ul { padding-left: 22px; margin-bottom: 13px; }
+  li { margin-bottom: 5px; }
+  strong { font-weight: 800; }
+
+  .tip { background: #e8f4fd; border-left: 5px solid #2980b9; border-radius: 10px; padding: 13px 18px 13px 50px; margin: 16px 0; font-size: 11pt; position: relative; }
+  .remember { background: #fef9e7; border-left: 5px solid #f39c12; border-radius: 10px; padding: 13px 18px 13px 50px; margin: 16px 0; font-size: 11pt; position: relative; }
+  .warning { background: #fdf0f0; border-left: 5px solid #c0392b; border-radius: 10px; padding: 13px 18px 13px 50px; margin: 16px 0; font-size: 11pt; position: relative; }
+  .admin-only { background: #1a1a1a; color: #FFD700; border-radius: 10px; padding: 13px 18px 13px 50px; margin: 16px 0; font-size: 11pt; position: relative; }
+  .tip::before { content: "💡"; position: absolute; left: 13px; top: 12px; font-size: 17pt; }
+  .remember::before { content: "☝️"; position: absolute; left: 13px; top: 12px; font-size: 17pt; }
+  .warning::before { content: "🚫"; position: absolute; left: 13px; top: 12px; font-size: 17pt; }
+  .admin-only::before { content: "🔐"; position: absolute; left: 13px; top: 12px; font-size: 17pt; }
+  .tip strong, .remember strong, .warning strong, .admin-only strong { display: block; font-size: 9pt; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; opacity: 0.7; }
+
+  .steps { background: #f8f8f8; border-radius: 10px; padding: 16px 22px 16px 24px; margin: 14px 0; counter-reset: step; list-style: none; }
+  .steps li { counter-increment: step; position: relative; padding-left: 34px; margin-bottom: 10px; font-size: 11.5pt; }
+  .steps li::before { content: counter(step); position: absolute; left: 0; top: 2px; background: #c0392b; color: #fff; font-weight: 900; font-size: 8.5pt; width: 21px; height: 21px; border-radius: 50%; display: flex; align-items: center; justify-content: center; line-height: 1; }
+
+  .settings-block { background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 16px 20px; margin: 14px 0; }
+  .settings-block h3 { margin-top: 0; color: #c0392b; }
+
+  .ref-page { page-break-before: always; padding: 50px 60px; }
+  .ref-header { background: #1a1a1a; color: #FFD700; font-size: 20pt; font-weight: 900; padding: 20px 30px; border-radius: 10px; margin-bottom: 30px; text-align: center; letter-spacing: 1px; }
+  .ref-section { font-size: 12pt; font-weight: 900; color: #c0392b; text-transform: uppercase; letter-spacing: 1px; margin: 24px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #c0392b; }
+  table { width: 100%; border-collapse: collapse; font-size: 10.5pt; margin-bottom: 18px; }
+  th { background: #1a1a1a; color: #FFD700; padding: 9px 13px; text-align: left; font-weight: 900; font-size: 9.5pt; }
+  td { padding: 9px 13px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  code { background: #f0f0f0; padding: 1px 6px; border-radius: 3px; font-size: 9.5pt; font-family: monospace; color: #c0392b; }
+
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+  .field-item { background: #f8f8f8; border-radius: 8px; padding: 10px 14px; font-size: 10.5pt; }
+  .field-item .fname { font-weight: 800; color: #1a1a1a; }
+  .field-item .fdesc { color: #555; font-size: 10pt; margin-top: 2px; }
+
+  @media print {
+    body { font-size: 11pt; }
+    .cover, .chapter, .ref-page { page-break-before: always; }
+    @page { margin: 0; size: A4; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-top">🔐 Admin Edition — Restricted</div>
+  <div class="cover-body">
+    <div>
+      <div class="cover-tag">Administrator Edition</div>
+      <div class="cover-title">Sun &amp; Sun<br/><span>ERP</span><br/>Admin Guide</div>
+      <div class="cover-subtitle">Complete Reference for Running, Configuring &amp; Managing the Platform</div>
+      <div class="cover-desc">
+        This guide covers every feature of the system — from daily lead management and calling campaigns to contract templates, price quotes, email campaigns, AI prospecting, and full system configuration. Written for admins with zero prior knowledge required.
+      </div>
+      <div class="cover-chapters">
+        <div class="cover-ch"><span>01</span> Admin Basics &amp; Access</div>
+        <div class="cover-ch"><span>02</span> Dashboard</div>
+        <div class="cover-ch"><span>03</span> Leads &amp; Pipeline</div>
+        <div class="cover-ch"><span>04</span> Cold Calls (Vapi &amp; Twilio)</div>
+        <div class="cover-ch"><span>05</span> Email Campaigns</div>
+        <div class="cover-ch"><span>06</span> Monday.com Integration</div>
+        <div class="cover-ch"><span>07</span> Contracts — Full Admin</div>
+        <div class="cover-ch"><span>08</span> Price Quote &amp; Canva</div>
+        <div class="cover-ch"><span>09</span> Inbox &amp; ML Classifier</div>
+        <div class="cover-ch"><span>10</span> AI Agent (Lusha + Snov.io)</div>
+        <div class="cover-ch"><span>11</span> Settings — All Options</div>
+        <div class="cover-ch"><span>REF</span> Placeholder Reference</div>
+      </div>
+    </div>
+  </div>
+  <div class="cover-bottom">
+    <span>Sun &amp; Sun Consulting</span>
+    <span>erp.sunandsun.com.tr</span>
+    <span>Admin Guide — 2026</span>
+  </div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc-page">
+  <div class="toc-header">Table of Contents</div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 1</div>
+    <div><div class="toc-title">Admin Basics — What Makes You Different</div>
+    <div class="toc-sub">Admin vs. user · Where admin features appear · First login checklist</div></div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 2</div>
+    <div><div class="toc-title">Dashboard — Your Command Center</div>
+    <div class="toc-sub">Reading the KPI cards · Charts · Pipeline funnel · Source breakdown</div></div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 3</div>
+    <div><div class="toc-title">Leads &amp; Pipeline — Managing Contacts</div>
+    <div class="toc-sub">Adding leads · Bulk import · Lead profile · Pipeline stages · Deleting leads</div></div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 4</div>
+    <div><div class="toc-title">Cold Calls — Vapi AI Calling &amp; Twilio</div>
+    <div class="toc-sub">Vapi AI calling · Twilio traditional calls · Call logs · Switching modes</div></div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 5</div>
+    <div><div class="toc-title">Email Campaigns — SendGrid Integration</div>
+    <div class="toc-sub">Creating templates · Sending campaigns · Variables · Tracking opens &amp; replies</div></div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 6</div>
+    <div><div class="toc-title">Monday.com Integration</div>
+    <div class="toc-sub">Connecting boards · Importing contacts · Bulk email with salutations · Bounce sync · Tag updates</div></div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 7</div>
+    <div><div class="toc-title">Contracts — Full Admin Reference</div>
+    <div class="toc-sub">Uploading templates · Party 1 companies · Visible fields · Dropdown options · Generating contracts · All form fields explained</div></div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 8</div>
+    <div><div class="toc-title">Price Quote — Presentations &amp; Canva</div>
+    <div class="toc-sub">Adding presentations · Slide theme editor · Canva OAuth · Exporting PDFs</div></div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 9</div>
+    <div><div class="toc-title">Inbox — Email Monitoring &amp; ML Classifier</div>
+    <div class="toc-sub">Reading replies · Sentiment analysis · Positive / negative flags · Admin-only access</div></div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 10</div>
+    <div><div class="toc-title">AI Agent — Automated Prospecting</div>
+    <div class="toc-sub">How it works · Lusha prospecting · Snov.io domain enrichment · Reading results · Pushing to leads</div></div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Chapter 11</div>
+    <div><div class="toc-title">Settings — Full Configuration</div>
+    <div class="toc-sub">API keys · Sun Group companies &amp; IBANs · User management · Lead scoring · Notifications</div></div>
+  </div>
+
+  <div class="toc-item">
+    <div class="toc-num">Reference</div>
+    <div><div class="toc-title">Contract Template Placeholder Reference</div>
+    <div class="toc-sub">All @@variable@@ and [[variable]] tags — what they are, where they appear, what they output</div></div>
+  </div>
+</div>
+
+<!-- CHAPTER 1 — ADMIN BASICS -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Chapter 1</div>
+    <div class="chapter-title">Admin Basics —<br/>What Makes You Different</div>
+    <div class="chapter-tagline">"With great access comes great responsibility."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>In this chapter</strong><ul>
+      <li>What admin access unlocks compared to a regular user</li>
+      <li>Where admin-only features appear in the interface</li>
+      <li>Your first-login checklist before going live</li>
+    </ul></div>
+
+    <h2>Admin vs. Regular User</h2>
+    <p>The ERP has two roles: <strong>admin</strong> and <strong>user</strong>. Every account is one or the other. The system detects your role automatically after login — there is no separate admin portal. You simply log in at the normal URL and see more features than a regular user does.</p>
+    <p>Regular users can: view leads, work the pipeline, make calls, send emails, generate contracts (read-only templates), send price quotes, and view their own activity. They cannot change any settings, add or delete data in bulk, or access the AI agent or the Inbox ML classifier.</p>
+    <p>As an admin you can do everything a regular user can, plus all the management and configuration features described in this guide.</p>
+
+    <h2>Where Admin Features Appear</h2>
+    <ul>
+      <li><strong>Dashboard:</strong> Extra KPI cards, the full source/status chart, and access to the Add Lead + Import XLS buttons</li>
+      <li><strong>Leads tab:</strong> Delete Lead button (trash icon) on each row; Import XLS button at the top</li>
+      <li><strong>Cold Calls tab:</strong> Ability to switch between Vapi AI calling and Twilio traditional calling modes</li>
+      <li><strong>Email tab:</strong> Create Template and Delete Template buttons</li>
+      <li><strong>Monday.com tab:</strong> Board selector, bulk email controls, bounce sync, tag column updates</li>
+      <li><strong>Contracts tab:</strong> Upload Template button, Party 1 company management, Visible Fields editor, Dropdown Option editor</li>
+      <li><strong>Price Quote tab:</strong> Add Presentation button, Delete button on each card, slide theme editor, Canva Connect button</li>
+      <li><strong>Inbox tab:</strong> The entire tab — regular users cannot see it</li>
+      <li><strong>Agent tab:</strong> The entire tab — regular users cannot see it</li>
+      <li><strong>Settings tab:</strong> The entire tab — regular users cannot see it</li>
+    </ul>
+
+    <div class="admin-only">
+      <strong>Admin Only</strong>
+      Throughout this guide, boxes like this highlight features that are completely invisible to regular users. You will never accidentally share an admin feature — the UI hides them based on your role.
+    </div>
+
+    <h2>First-Login Checklist</h2>
+    <p>Before the system is ready for your team, confirm these items in <strong>Settings</strong>:</p>
+    <ol class="steps">
+      <li>Add your <strong>Sun Group companies</strong> (Party 1 entities) with their tax office, tax number, address, and bank IBAN.</li>
+      <li>Add at least one <strong>contract template</strong> (.docx file) in the Contracts tab.</li>
+      <li>Enter your <strong>SendGrid API key</strong> so email campaigns work.</li>
+      <li>Add <strong>team user accounts</strong> with the correct roles (admin or user).</li>
+      <li>If using AI calling, enter your <strong>Vapi API key and assistant ID</strong>. If using traditional calling, enter your <strong>Twilio credentials</strong>.</li>
+      <li>If using the AI Agent, enter your <strong>Lusha API key</strong> (and optionally Snov.io key).</li>
+      <li>If using Monday.com, enter your <strong>Monday.com API key</strong> in Settings.</li>
+    </ol>
+
+    <div class="warning">
+      <strong>Security Warning</strong>
+      Do not share your admin credentials with sales team members. Give each person their own account with the appropriate role. Admin access allows deleting leads, changing API keys, managing all users, and accessing confidential prospect data.
+    </div>
+  </div>
+</div>
+
+<!-- CHAPTER 2 — DASHBOARD -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 2</div>
+    <div class="chapter-title">Dashboard —<br/>Your Command Center</div>
+    <div class="chapter-tagline">"Everything important, at a glance."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>In this chapter</strong><ul>
+      <li>What the KPI cards mean</li>
+      <li>Reading the pipeline funnel chart</li>
+      <li>Understanding the source breakdown</li>
+      <li>Using the activity feed</li>
+    </ul></div>
+
+    <h2>Overview</h2>
+    <p>The Dashboard is the first screen you see after logging in. It gives you a real-time summary of your entire CRM: how many leads you have, where they are in the pipeline, how recent activity is trending, and where your prospects are coming from.</p>
+    <p>All numbers on the Dashboard update live — if you add a lead or move someone to a new pipeline stage, the Dashboard reflects it immediately without needing to refresh.</p>
+
+    <h2>KPI Cards (Top Row)</h2>
+    <p>The cards across the top of the Dashboard each show one key metric:</p>
+    <ul>
+      <li><strong>Total Leads:</strong> The total number of contacts in the system across all statuses.</li>
+      <li><strong>Active Pipeline:</strong> Leads currently in a working pipeline stage (not Won/Lost/Unqualified).</li>
+      <li><strong>Contracts Sent:</strong> Leads who have reached the "Contract Sent" stage in the pipeline.</li>
+      <li><strong>Won / Closed:</strong> Leads marked as "Won" — successfully converted clients.</li>
+      <li><strong>New This Week:</strong> Leads added or updated in the last 7 days.</li>
+    </ul>
+
+    <h2>Pipeline Funnel Chart</h2>
+    <p>The funnel shows how many leads are at each pipeline stage. Stages typically flow from left to right: New → Contacted → Interested → Meeting Scheduled → Proposal Sent → Contract Sent → Won (or Lost / Unqualified).</p>
+    <p>The width of each funnel section is proportional to the number of leads at that stage. A very narrow section means very few leads made it that far — useful for spotting where your team is losing prospects.</p>
+
+    <h2>Lead Source Breakdown</h2>
+    <p>The source chart shows which channels are generating the most leads: referral, website, Monday.com, cold outreach, etc. The source is set when a lead is created (in the <strong>Source</strong> field of the Add Lead form). Consistent use of this field gives you accurate data here.</p>
+
+    <h2>Recent Activity Feed</h2>
+    <p>The activity feed on the right side of the Dashboard shows the latest actions taken in the system: new leads added, pipeline stage changes, contracts generated, emails sent. This helps you keep track of what your team has been doing without needing to check individual lead profiles.</p>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      If the Dashboard shows zero data after your first setup, it's because there are no leads yet. Add your first lead (or import a batch) and all the charts will populate immediately.
+    </div>
+  </div>
+</div>
+
+<!-- CHAPTER 3 — LEADS & PIPELINE -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Chapter 3</div>
+    <div class="chapter-title">Leads &amp; Pipeline —<br/>Managing Contacts</div>
+    <div class="chapter-tagline">"The core of your CRM."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>In this chapter</strong><ul>
+      <li>Adding a lead manually</li>
+      <li>Importing many leads from Excel</li>
+      <li>Viewing and editing a lead profile</li>
+      <li>Moving leads through pipeline stages</li>
+      <li>Deleting leads (admin only)</li>
+      <li>Searching and filtering leads</li>
+    </ul></div>
+
+    <h2>Adding a Lead Manually</h2>
+    <p>Use this when you want to add a single contact you already know about:</p>
+    <ol class="steps">
+      <li>Go to the <strong>Leads</strong> tab from the left sidebar.</li>
+      <li>Click the <strong>+ Add Lead</strong> button in the top-right corner. (This button is admin-only and is invisible to regular users.)</li>
+      <li>Fill in the form fields. At minimum, enter a name. All other fields are optional but help with reporting and personalized outreach.</li>
+      <li>Click <strong>Save</strong>. The lead appears at the top of your leads list immediately.</li>
+    </ol>
+
+    <h3>Lead Form Fields</h3>
+    <div class="field-grid">
+      <div class="field-item"><div class="fname">Name</div><div class="fdesc">Full name of the contact person</div></div>
+      <div class="field-item"><div class="fname">Email</div><div class="fdesc">Used for email campaigns and contract delivery</div></div>
+      <div class="field-item"><div class="fname">Phone</div><div class="fdesc">Used for cold call campaigns</div></div>
+      <div class="field-item"><div class="fname">Company</div><div class="fdesc">Company or organization name</div></div>
+      <div class="field-item"><div class="fname">LinkedIn URL</div><div class="fdesc">Profile link — used by the AI Agent</div></div>
+      <div class="field-item"><div class="fname">Job Title</div><div class="fdesc">Role/position at the company</div></div>
+      <div class="field-item"><div class="fname">Industry</div><div class="fdesc">Sector (manufacturing, tech, etc.)</div></div>
+      <div class="field-item"><div class="fname">City</div><div class="fdesc">Location — used for filtering</div></div>
+      <div class="field-item"><div class="fname">Company Size</div><div class="fdesc">Employee headcount</div></div>
+      <div class="field-item"><div class="fname">Source</div><div class="fdesc">Where the lead came from — feeds Dashboard chart</div></div>
+      <div class="field-item"><div class="fname">Status</div><div class="fdesc">Pipeline stage (set via pipeline board or here)</div></div>
+      <div class="field-item"><div class="fname">Notes</div><div class="fdesc">Free text — call notes, context, etc.</div></div>
+    </div>
+
+    <h2>Importing Leads from Excel (Bulk Import)</h2>
+    <p>When you have a spreadsheet of contacts to add in bulk:</p>
+    <ol class="steps">
+      <li>Go to the <strong>Leads</strong> tab.</li>
+      <li>Click the <strong>Import XLS</strong> button (top right — admin only).</li>
+      <li>Select your Excel file (.xls or .xlsx).</li>
+      <li>The system reads the file and shows a preview. Column headers should match the field names (name, email, phone, company, etc.). Case-insensitive matching is applied.</li>
+      <li>Confirm the import. Duplicate detection runs on email address — contacts that already exist are skipped.</li>
+      <li>A summary shows how many leads were added and how many were skipped as duplicates.</li>
+    </ol>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Prepare your Excel file with a header row containing: name, email, phone, company, job_title, industry, city. The system maps these automatically. Extra columns are ignored.
+    </div>
+
+    <h2>Viewing and Editing a Lead</h2>
+    <p>Click on any row in the Leads list to open the full lead profile panel on the right side of the screen. From here you can:</p>
+    <ul>
+      <li>Edit any field inline by clicking on it</li>
+      <li>Add call notes in the Notes section</li>
+      <li>See the full activity history for this lead</li>
+      <li>Change the pipeline stage</li>
+      <li>Initiate a call directly from the profile</li>
+      <li>Send an email directly from the profile</li>
+    </ul>
+
+    <h2>The Pipeline Board</h2>
+    <p>Click the <strong>Pipeline</strong> tab in the sidebar to see the Kanban-style pipeline board. Each column is a pipeline stage. Each card represents one lead.</p>
+    <p>To move a lead to a different stage, drag the card to a new column. The change is saved automatically and reflected on the Dashboard immediately.</p>
+    <p>Pipeline stages (in order):</p>
+    <ul>
+      <li><strong>New</strong> — Just added, not yet contacted</li>
+      <li><strong>Contacted</strong> — Initial outreach made</li>
+      <li><strong>Interested</strong> — Showed interest, conversation started</li>
+      <li><strong>Meeting Scheduled</strong> — Appointment booked</li>
+      <li><strong>Proposal Sent</strong> — Price quote or proposal delivered</li>
+      <li><strong>Contract Sent</strong> — Contract generated and sent</li>
+      <li><strong>Won</strong> — Deal closed successfully</li>
+      <li><strong>Lost</strong> — Decided not to proceed</li>
+      <li><strong>Unqualified</strong> — Not a viable prospect</li>
+    </ul>
+
+    <h2>Searching and Filtering Leads</h2>
+    <p>At the top of the Leads tab, use the search bar to find leads by name, email, or company. Use the filter dropdowns to narrow by status, industry, city, or source. Filters combine — for example, "Industry: Manufacturing" + "Status: Interested" shows only interested manufacturing leads.</p>
+
+    <h2>Deleting a Lead</h2>
+    <div class="admin-only">
+      <strong>Admin Only</strong>
+      The delete button is only visible to admins. Regular users cannot delete leads.
+    </div>
+    <p>To delete a lead, click the trash icon on the lead's row in the list (or inside the lead profile panel). A confirmation dialog appears. Confirm to permanently delete the lead and all associated data (call logs, email history, contract drafts).</p>
+
+    <div class="warning">
+      <strong>Warning — Permanent Action</strong>
+      Deleting a lead cannot be undone. All associated data (notes, call logs, email records) is also deleted. Only delete leads you are certain should be removed.
+    </div>
+  </div>
+</div>
+
+<!-- CHAPTER 4 — COLD CALLS -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 4</div>
+    <div class="chapter-title">Cold Calls —<br/>Vapi AI &amp; Twilio</div>
+    <div class="chapter-tagline">"Two ways to call. One place to manage them."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>In this chapter</strong><ul>
+      <li>What the Cold Calls tab does</li>
+      <li>Vapi AI calling — automated outbound calls</li>
+      <li>Twilio traditional calling</li>
+      <li>Switching between modes</li>
+      <li>Reading call logs</li>
+    </ul></div>
+
+    <h2>Overview</h2>
+    <p>The Cold Calls tab lets you run outbound calling campaigns directly from the ERP. You choose a lead (or batch of leads) and initiate calls. Two calling systems are supported: <strong>Vapi</strong> (AI-powered automated calling) and <strong>Twilio</strong> (traditional programmatic calling). You set which one to use in the Settings tab.</p>
+
+    <h2>Vapi AI Calling</h2>
+    <p>Vapi uses a pre-configured AI voice assistant to call leads and conduct a scripted conversation. The assistant speaks naturally, handles basic questions, and records the outcome. This allows you to call large numbers of leads without a sales rep making each call manually.</p>
+    <h3>How to Use Vapi</h3>
+    <ol class="steps">
+      <li>Make sure your <strong>Vapi API key</strong> and <strong>Vapi Assistant ID</strong> are saved in Settings → API Integrations.</li>
+      <li>Go to the <strong>Cold Calls</strong> tab.</li>
+      <li>Select the leads you want to call from the list (checkboxes).</li>
+      <li>Click <strong>Start AI Call Campaign</strong>. Vapi dials each selected lead in sequence.</li>
+      <li>Call status updates appear in real time — Calling, Completed, No Answer, etc.</li>
+      <li>After calls complete, call transcripts and outcomes are saved to each lead's profile.</li>
+    </ol>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      The Vapi assistant's script and voice are configured in your Vapi dashboard (vapi.ai), not inside the ERP. The ERP only passes the phone number and triggers the call. Set up and test your assistant in Vapi before running campaigns here.
+    </div>
+
+    <h2>Twilio Traditional Calling</h2>
+    <p>Twilio connects real phone calls through your registered Twilio number. Unlike Vapi, Twilio calls require a human to actually speak on the call — the system dials the lead, your representative picks up, and the conversation happens live. Twilio also supports automated SMS follow-ups.</p>
+    <h3>How to Use Twilio</h3>
+    <ol class="steps">
+      <li>Make sure your <strong>Twilio Account SID</strong>, <strong>Auth Token</strong>, and <strong>Twilio Phone Number</strong> are saved in Settings → API Integrations.</li>
+      <li>Go to the <strong>Cold Calls</strong> tab.</li>
+      <li>Select the lead to call.</li>
+      <li>Click <strong>Call</strong>. Twilio dials the lead's phone number.</li>
+      <li>When the lead answers, your browser connects you for the live conversation.</li>
+      <li>After the call ends, add a note about the outcome in the lead's profile.</li>
+    </ol>
+
+    <h2>Switching Between Vapi and Twilio</h2>
+    <p>You can only use one calling system at a time. To switch:</p>
+    <ol class="steps">
+      <li>Go to <strong>Settings → API Integrations</strong>.</li>
+      <li>Enter or verify credentials for the system you want to use.</li>
+      <li>Select the active calling mode (Vapi or Twilio). The Cold Calls tab UI updates to match the selected mode.</li>
+    </ol>
+
+    <h2>Reading Call Logs</h2>
+    <p>Each completed call (Vapi or Twilio) is logged automatically. To see call history:</p>
+    <ul>
+      <li>Open a lead's profile — the right panel shows a timeline of all calls with date, duration, and outcome.</li>
+      <li>In the Cold Calls tab, the main list shows aggregate call stats: total calls attempted, answer rate, outcomes.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- CHAPTER 5 — EMAIL CAMPAIGNS -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Chapter 5</div>
+    <div class="chapter-title">Email Campaigns —<br/>SendGrid Integration</div>
+    <div class="chapter-tagline">"Personalized outreach at scale."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>In this chapter</strong><ul>
+      <li>How email sending works (SendGrid)</li>
+      <li>Creating and managing email templates</li>
+      <li>Using variables in templates</li>
+      <li>Sending a campaign to selected leads</li>
+      <li>Tracking opens and replies</li>
+    </ul></div>
+
+    <h2>How It Works</h2>
+    <p>All outbound emails from the ERP are sent via <strong>SendGrid</strong>. You need a valid SendGrid API key in Settings for any email to go out. Emails are sent from the sender address configured in your SendGrid account.</p>
+    <p>The Email tab has two parts: the <strong>template library</strong> (where you manage email templates) and the <strong>campaign sender</strong> (where you choose who to send to and which template to use).</p>
+
+    <h2>Creating an Email Template</h2>
+    <div class="admin-only">
+      <strong>Admin Only</strong>
+      Creating and deleting templates is admin-only. Regular users can view and use templates, but cannot add or remove them.
+    </div>
+    <ol class="steps">
+      <li>Go to the <strong>Email</strong> tab.</li>
+      <li>Click <strong>+ New Template</strong> (top right — admin only).</li>
+      <li>Enter a <strong>Template Name</strong> (for internal reference only — not shown to the recipient).</li>
+      <li>Enter the <strong>Subject Line</strong>. You can use variables like <code>{{first_name}}</code> or <code>{{company}}</code> in the subject.</li>
+      <li>Write the email body in the editor. Use variables wherever you want personalized content (see below).</li>
+      <li>Click <strong>Save Template</strong>.</li>
+    </ol>
+
+    <h3>Template Variables</h3>
+    <p>Variables are replaced with each lead's actual data when the email is sent. Available variables:</p>
+    <table>
+      <tr><th>Variable</th><th>Replaced With</th></tr>
+      <tr><td><code>{{first_name}}</code></td><td>Lead's first name</td></tr>
+      <tr><td><code>{{last_name}}</code></td><td>Lead's last name</td></tr>
+      <tr><td><code>{{full_name}}</code></td><td>Lead's full name</td></tr>
+      <tr><td><code>{{company}}</code></td><td>Lead's company name</td></tr>
+      <tr><td><code>{{job_title}}</code></td><td>Lead's job title</td></tr>
+      <tr><td><code>{{city}}</code></td><td>Lead's city</td></tr>
+    </table>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Always preview the email with real data before sending to a large list. The preview button in the template editor shows you how the email will look for a specific lead.
+    </div>
+
+    <h2>Editing and Deleting Templates</h2>
+    <p>Click the pencil icon next to any template to edit it. Click the trash icon to delete it. Deleting a template does not affect any emails that were already sent using it.</p>
+
+    <h2>Sending a Campaign</h2>
+    <ol class="steps">
+      <li>Go to the <strong>Email</strong> tab.</li>
+      <li>Select the leads you want to email (checkboxes in the leads list, or use filters to select a segment).</li>
+      <li>Click <strong>Send Campaign</strong>.</li>
+      <li>Select the template to use from the dropdown.</li>
+      <li>Review the recipient count and preview a sample email.</li>
+      <li>Click <strong>Send</strong>. The campaign is dispatched via SendGrid immediately.</li>
+    </ol>
+
+    <div class="remember">
+      <strong>Remember</strong>
+      Emails go out immediately — there is no scheduling or delay option. Make sure your template is ready and your recipient list is correct before clicking Send.
+    </div>
+
+    <h2>Tracking Opens and Replies</h2>
+    <p>SendGrid tracks email opens automatically (via a 1x1 tracking pixel). Reply tracking depends on your SendGrid plan. The Email tab shows per-campaign stats: sent count, open rate, and bounce count. Bounced email addresses are flagged in the lead profile so you don't contact them again.</p>
+  </div>
+</div>
+
+<!-- CHAPTER 6 — MONDAY.COM -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 6</div>
+    <div class="chapter-title">Monday.com Integration</div>
+    <div class="chapter-tagline">"Pull your Monday board into the ERP in one click."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>In this chapter</strong><ul>
+      <li>Connecting Monday.com to the ERP</li>
+      <li>Selecting and importing boards</li>
+      <li>Deduplication — how the system handles existing contacts</li>
+      <li>Bulk email with gender-based salutations</li>
+      <li>Bounce sync back to Monday.com</li>
+      <li>Updating tag columns</li>
+    </ul></div>
+
+    <h2>Connecting Monday.com</h2>
+    <ol class="steps">
+      <li>Go to <strong>Settings → API Integrations</strong>.</li>
+      <li>Enter your <strong>Monday.com API key</strong> (found in your Monday.com profile under Developers → API).</li>
+      <li>Click <strong>Save</strong>. The Monday.com tab in the ERP is now active.</li>
+    </ol>
+
+    <h2>Selecting and Importing a Board</h2>
+    <ol class="steps">
+      <li>Go to the <strong>Monday.com</strong> tab in the sidebar.</li>
+      <li>Click <strong>Load Boards</strong>. The system fetches all boards accessible by your API key.</li>
+      <li>Select the board you want to work with from the dropdown.</li>
+      <li>Click <strong>Import Contacts</strong>. The system pulls all contacts from that board.</li>
+      <li>Deduplication runs automatically — contacts whose email already exists in the ERP leads table are skipped. New contacts are added as leads.</li>
+      <li>A summary shows how many were imported and how many were skipped as duplicates.</li>
+    </ol>
+
+    <h2>Bulk Email with Gender-Based Salutations</h2>
+    <p>When sending emails to Monday.com contacts, the ERP can automatically apply gender-appropriate Turkish salutations (Sayın Bey / Sayın Hanım) based on the contact's gender field in Monday.com. This makes bulk outreach feel personal in Turkish business communications.</p>
+    <ol class="steps">
+      <li>After loading a board, select the contacts to email using the checkboxes.</li>
+      <li>Click <strong>Send Email</strong>.</li>
+      <li>Choose your template. If the template includes <code>{{salutation}}</code>, it is automatically replaced with the correct gender salutation for each recipient.</li>
+      <li>Review and send.</li>
+    </ol>
+
+    <h2>Bounce Sync</h2>
+    <p>If an email bounces (SendGrid reports a hard bounce), the ERP can push the bounce status back to Monday.com so your board stays updated. To sync bounces:</p>
+    <ol class="steps">
+      <li>After a campaign, go to the <strong>Monday.com</strong> tab.</li>
+      <li>Click <strong>Sync Bounces</strong>. The system finds all bounced emails from the latest campaign and updates the corresponding Monday.com records.</li>
+    </ol>
+
+    <h2>Updating Tag Columns</h2>
+    <p>The ERP can write back to a designated "tag" column on your Monday.com board. For example, after a campaign you can mark rows with "Email Sent — [date]" so your Monday board reflects activity from the ERP.</p>
+    <p>Configure which column to write to in Settings → Monday.com Configuration. The column must be a text or label column in Monday.com.</p>
+  </div>
+</div>
+
+<!-- CHAPTER 7 — CONTRACTS -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Chapter 7</div>
+    <div class="chapter-title">Contracts —<br/>Full Admin Reference</div>
+    <div class="chapter-tagline">"Generate professional contracts in seconds."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>In this chapter</strong><ul>
+      <li>How the contract system works</li>
+      <li>Uploading and managing contract templates</li>
+      <li>Managing Party 1 (Sun Group) companies</li>
+      <li>Controlling which fields are visible per template</li>
+      <li>Editing dropdown options</li>
+      <li>Filling out the contract form — every field explained</li>
+      <li>Generating and downloading the contract</li>
+      <li>The payment schedule (Annex-1)</li>
+    </ul></div>
+
+    <h2>How the Contract System Works</h2>
+    <p>The ERP generates Word (.docx) contracts by merging your template file with data entered in the contract form. You upload a template once; from then on, anyone can use it to generate a filled contract in seconds.</p>
+    <p>Templates contain <strong>placeholders</strong> — special tags that get replaced with real data when the contract is generated. The Reference section at the end of this guide lists every placeholder. Two formats are supported:</p>
+    <ul>
+      <li><strong><code>@@placeholder_name@@</code></strong> — Legacy format (older templates)</li>
+      <li><strong><code>[[placeholder_name]]</code></strong> — Current docxtemplater format (recommended for new templates)</li>
+    </ul>
+
+    <h2>Uploading a Contract Template</h2>
+    <div class="admin-only">
+      <strong>Admin Only</strong>
+      Only admins can upload, rename, or delete contract templates.
+    </div>
+    <ol class="steps">
+      <li>Go to the <strong>Contracts</strong> tab.</li>
+      <li>Click <strong>Upload Template</strong> (top right).</li>
+      <li>Select your .docx file. The file must be a valid Word document containing placeholders in either <code>@@...@@</code> or <code>[[...]]</code> format.</li>
+      <li>Give the template a <strong>display name</strong> (shown in the template selector dropdown).</li>
+      <li>Click <strong>Save</strong>. The template is stored on the server and immediately available for use.</li>
+    </ol>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Name your templates clearly — for example "KOSGEB Danışmanlık 2026" or "TÜBİTAK 3 Taraflı". Users will see exactly this name when selecting a template to generate a contract.
+    </div>
+
+    <h2>Managing Party 1 Companies</h2>
+    <p>Party 1 is your Sun Group company — the service provider on the contract. You may have multiple legal entities (Sun &amp; Sun Danışmanlık, Sun &amp; Sun Teknoloji, etc.). Each has its own tax data and IBAN.</p>
+    <div class="admin-only">
+      <strong>Admin Only</strong>
+      Adding, editing, and deleting Party 1 companies is admin-only. This data auto-fills the contract header when a company is selected.
+    </div>
+    <ol class="steps">
+      <li>Go to <strong>Settings → Sun Group Companies</strong>.</li>
+      <li>Click <strong>+ Add Company</strong>.</li>
+      <li>Fill in: Company Name, Tax Office (Vergi Dairesi), Tax Number (Vergi No), Registered Address, and IBAN.</li>
+      <li>Click <strong>Save</strong>. The company appears in the Party 1 selector in the contract form.</li>
+    </ol>
+    <p>When a user selects a Party 1 company in the contract form, the following placeholders are auto-filled from this record: <code>@@party1_name@@</code>, <code>@@party1_tax_office@@</code>, <code>@@party1_tax_no@@</code>, <code>@@party1_address@@</code>, <code>@@iban@@</code>.</p>
+
+    <h2>Controlling Visible Fields (Per Template)</h2>
+    <p>Different contract templates need different fields. For example, a KOSGEB single-program contract doesn't need Program 2 or Program 3 fields. Visible Fields lets you hide irrelevant fields for each template so the form stays clean.</p>
+    <div class="admin-only">
+      <strong>Admin Only</strong>
+      The Visible Fields editor is admin-only. Regular users always see the field set you configure here.
+    </div>
+    <ol class="steps">
+      <li>Go to the <strong>Contracts</strong> tab.</li>
+      <li>Select the template you want to configure from the template dropdown.</li>
+      <li>Click <strong>Manage Fields</strong> (or the gear/fields icon — admin only).</li>
+      <li>A checklist of all contract fields appears. Check the fields you want to show for this template; uncheck fields you want to hide.</li>
+      <li>Click <strong>Save Field Settings</strong>. The form for this template immediately reflects your choices.</li>
+    </ol>
+
+    <h2>Editing Dropdown Options</h2>
+    <p>Several contract form fields use dropdowns whose options you can customize. The following dropdowns are editable by admins:</p>
+    <ul>
+      <li><strong>Success Bonus Type</strong> — e.g., "onaylanan destek", "onaylanan kredi", "sağlanan fayda"</li>
+      <li><strong>Deadline Type</strong> — e.g., "Projenin onaylanmasını takip eden", "İmza tarihinden itibaren"</li>
+      <li><strong>Payment Subject</strong> — Labels for payment schedule rows</li>
+    </ul>
+    <p>To add or remove options:</p>
+    <ol class="steps">
+      <li>Go to the <strong>Contracts</strong> tab.</li>
+      <li>Locate the dropdown field (e.g., Success Bonus Type) and click the pencil/edit icon that appears next to it (admin only — not visible to regular users).</li>
+      <li>The dropdown option editor opens. Add a new option by typing in the input and clicking +, or delete an existing option by clicking the × next to it.</li>
+      <li>Changes take effect immediately — no save button needed.</li>
+    </ol>
+
+    <div class="remember">
+      <strong>Remember</strong>
+      The option "sağlanan fayda" in the Success Bonus Type dropdown has a special effect: when selected, the <code>@@vakifbank_clause@@</code> placeholder in the contract template is automatically replaced with the Vakıfbank clause sentence. This is built in — you don't need to do anything extra.
+    </div>
+
+    <h2>Filling Out the Contract Form</h2>
+    <p>When a user (or admin) wants to generate a contract:</p>
+    <ol class="steps">
+      <li>Go to the <strong>Contracts</strong> tab.</li>
+      <li>Select the <strong>template</strong> from the dropdown at the top.</li>
+      <li>Select the <strong>Party 1 company</strong> from the dropdown. This auto-fills all Party 1 fields.</li>
+      <li>Fill in all <strong>Party 2</strong> (client) fields manually.</li>
+      <li>If the contract involves a third party, fill in <strong>Party 3</strong> fields as well.</li>
+      <li>Fill in the <strong>Program Details</strong> section (program name, fees, bonuses, dates).</li>
+      <li>If the contract includes a payment schedule, fill in the <strong>Annex-1 (Payment Schedule)</strong> section.</li>
+      <li>Click <strong>Generate Contract</strong>. A .docx file is created and downloaded automatically.</li>
+    </ol>
+
+    <h3>Party 2 (Client) Fields</h3>
+    <table>
+      <tr><th>Field</th><th>Description</th><th>Placeholder</th></tr>
+      <tr><td>Client Company Name</td><td>Legal name of the client</td><td><code>@@party2_name@@</code></td></tr>
+      <tr><td>Tax Office</td><td>Client's tax office name (Vergi Dairesi)</td><td><code>@@party2_tax_office@@</code></td></tr>
+      <tr><td>Tax Number</td><td>Client's VKN/TC number</td><td><code>@@party2_tax_no@@</code></td></tr>
+      <tr><td>Address</td><td>Client's registered address</td><td><code>@@party2_address@@</code></td></tr>
+    </table>
+
+    <h3>Program 1 Fields</h3>
+    <table>
+      <tr><th>Field</th><th>Description</th><th>Placeholder</th></tr>
+      <tr><td>Financier</td><td>Funding body (KOSGEB, TÜBİTAK, TKDK…)</td><td><code>@@financier@@</code></td></tr>
+      <tr><td>Program Name</td><td>Name of the specific program/grant</td><td><code>@@program_name@@</code></td></tr>
+      <tr><td>Service Fee 1</td><td>Fixed service fee — auto-formatted with Turkish thousand separators</td><td><code>@@down_payment@@</code></td></tr>
+      <tr><td>Service Fee 2</td><td>Second service fee (if applicable)</td><td><code>@@down_payment_2@@</code></td></tr>
+      <tr><td>Fee Deadline</td><td>Date by which the service fee is due</td><td><code>@@down_payment_deadline@@</code></td></tr>
+      <tr><td>Success Bonus 1 (%)</td><td>Performance bonus percentage</td><td><code>@@success_bonus@@</code></td></tr>
+      <tr><td>Bonus Type 1</td><td>Dropdown: what the bonus is based on</td><td><code>@@success_bonus_type@@</code></td></tr>
+      <tr><td>Bonus 1 Deadline (days)</td><td>Number of days — automatically spaced (e.g. "60 gün")</td><td><code>@@sb1ddl@@</code></td></tr>
+      <tr><td>Bonus 1 Deadline Type</td><td>Dropdown: counting from which event</td><td><code>@@sb1ddl_type@@</code></td></tr>
+      <tr><td>Success Bonus 2 (%)</td><td>Second performance bonus (if applicable)</td><td><code>@@success_bonus_2@@</code></td></tr>
+      <tr><td>Bonus Type 2</td><td>Second bonus type dropdown</td><td><code>@@success_bonus_type_2@@</code></td></tr>
+      <tr><td>Bonus 2 Deadline</td><td>Days for second bonus payment</td><td><code>@@sb1ddl_2@@</code></td></tr>
+      <tr><td>Bonus 2 Deadline Type</td><td>Counting from which event</td><td><code>@@sb1ddl_2_type@@</code></td></tr>
+      <tr><td>Contract Date</td><td>Signing date — formatted DD/MM/YYYY in the output</td><td><code>@@contract_date@@</code></td></tr>
+      <tr><td>Notes</td><td>Additional contractual notes</td><td><code>@@notes@@</code></td></tr>
+    </table>
+
+    <h2>The Payment Schedule (Annex-1)</h2>
+    <p>The payment schedule is an auto-generated table embedded in the contract (or as a separate annex). You fill in rows with subject, date, and amount. The system builds a formatted Word table and injects it into the contract at the <code>@@payment_schedule@@</code> placeholder location.</p>
+    <p>Each row in the payment schedule has three parts:</p>
+    <ul>
+      <li><strong>Subject</strong> — What the payment is for (e.g., "Danışmanlık Hizmeti 1. Taksit"). Fills <code>@@payment_subject1@@</code> … <code>@@payment_subject20@@</code></li>
+      <li><strong>Date</strong> — When the payment is due. Fills <code>@@payment_date1@@</code> … <code>@@payment_date20@@</code></li>
+      <li><strong>Amount</strong> — Payment amount in TL. Fills <code>@@down_payment1@@</code> … <code>@@down_payment20@@</code></li>
+    </ul>
+    <p>You can have up to 20 payment rows per schedule. Unused rows are ignored.</p>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Use the custom date picker (calendar icon) to select payment dates — this ensures the date is formatted correctly in the output. Don't type dates manually.
+    </div>
+  </div>
+</div>
+
+<!-- CHAPTER 8 — PRICE QUOTE -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 8</div>
+    <div class="chapter-title">Price Quote —<br/>Presentations &amp; Canva</div>
+    <div class="chapter-tagline">"Send a beautiful pricing PDF in two clicks."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>In this chapter</strong><ul>
+      <li>What the Price Quote tab does</li>
+      <li>Adding and managing presentations</li>
+      <li>Presentation categories and themes</li>
+      <li>Connecting Canva (OAuth2)</li>
+      <li>Exporting and sending pricing PDFs</li>
+    </ul></div>
+
+    <h2>Overview</h2>
+    <p>The Price Quote tab is where you manage the presentation library — a curated set of Canva-linked pricing and service presentations. When a sales rep wants to send a price quote, they pick a presentation from the library, export it as a PDF via Canva, and send it to the lead.</p>
+
+    <h2>Adding a Presentation</h2>
+    <div class="admin-only">
+      <strong>Admin Only</strong>
+      Adding and deleting presentations is admin-only. Regular users can only view and export presentations.
+    </div>
+    <ol class="steps">
+      <li>Go to the <strong>Price Quote</strong> tab.</li>
+      <li>Click <strong>+ Add Presentation</strong> (top right — admin only).</li>
+      <li>Enter the <strong>Presentation Name</strong> (shown on the card in the library).</li>
+      <li>Select a <strong>Category</strong> from the dropdown (e.g., KOSGEB, TÜBİTAK, Genel). Categories group cards in the library.</li>
+      <li>Enter the <strong>Canva Link</strong> — the direct URL to the Canva design for this presentation.</li>
+      <li>Select a <strong>Theme</strong> (visual color scheme for the card in the library — does not change the Canva design itself).</li>
+      <li>Click <strong>Save</strong>. The presentation card appears in the library immediately.</li>
+    </ol>
+
+    <h2>Categories</h2>
+    <p>Presentations are organized into categories. When a user opens the Price Quote tab, they see tabs or sections for each category. This makes it easy to find the right presentation quickly when there are many options in the library.</p>
+    <p>Categories are set when adding a presentation. To add a new category, simply type its name in the Category field when adding a new presentation — the system creates it automatically.</p>
+
+    <h2>Slide Theme Editor</h2>
+    <p>Each presentation card in the library has a visual theme (color palette for the card UI — not the actual Canva slide). Themes are managed in the slide theme editor:</p>
+    <div class="admin-only">
+      <strong>Admin Only</strong>
+      The slide theme editor is admin-only.
+    </div>
+    <ol class="steps">
+      <li>In the Price Quote tab, click the <strong>Themes</strong> or <strong>Edit Themes</strong> button.</li>
+      <li>A color editor opens. Create or edit themes with a name and color combination.</li>
+      <li>Saved themes become available in the Theme selector when adding or editing a presentation.</li>
+    </ol>
+
+    <h2>Connecting Canva (OAuth2)</h2>
+    <p>To export presentations as PDFs directly from within the ERP, you must connect a Canva account via OAuth2:</p>
+    <ol class="steps">
+      <li>In the Price Quote tab, click <strong>Connect Canva</strong>.</li>
+      <li>A Canva login window opens. Sign in with the Canva account that owns the presentations.</li>
+      <li>Authorize the ERP app to access your Canva designs.</li>
+      <li>Once connected, the Connect button changes to show your connected account name.</li>
+    </ol>
+    <p>The Canva connection is saved per user — each team member needs to connect their own Canva account if they want to export PDFs.</p>
+
+    <h2>Exporting and Sending a Price Quote</h2>
+    <ol class="steps">
+      <li>In the Price Quote tab, find the presentation you want to send.</li>
+      <li>Click the <strong>Export PDF</strong> button on the presentation card.</li>
+      <li>The system calls Canva's API to export the design as a PDF file.</li>
+      <li>Once the PDF is ready, you can download it or send it directly to a lead via email (the email compose window opens with the PDF attached).</li>
+    </ol>
+
+    <h2>Deleting a Presentation</h2>
+    <div class="admin-only">
+      <strong>Admin Only</strong>
+    </div>
+    <p>Click the trash icon on any presentation card. Confirm the deletion. The card is removed from the library. This does not affect any emails already sent using that presentation.</p>
+  </div>
+</div>
+
+<!-- CHAPTER 9 — INBOX -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Chapter 9</div>
+    <div class="chapter-title">Inbox —<br/>Email Monitoring &amp; ML Classifier</div>
+    <div class="chapter-tagline">"Know instantly whether a reply is good news or bad news."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>In this chapter</strong><ul>
+      <li>What the Inbox tab is and who can see it</li>
+      <li>How the ML sentiment classifier works</li>
+      <li>Reading the positive / negative labels</li>
+      <li>Acting on replies from the Inbox</li>
+    </ul></div>
+
+    <div class="admin-only">
+      <strong>Admin Only — Entire Tab</strong>
+      The Inbox tab is completely invisible to regular users. Only admin accounts see it in the sidebar.
+    </div>
+
+    <h2>What the Inbox Does</h2>
+    <p>The Inbox tab aggregates email replies received from your outbound campaigns. Instead of going to Gmail or Outlook to read replies, you see them here, inside the ERP, alongside the lead's full profile.</p>
+    <p>The key feature is the <strong>ML sentiment classifier</strong>: every incoming reply is automatically analyzed by a machine learning model (BERTurk / XLM-RoBERTa) that classifies it as <strong>Positive</strong> or <strong>Negative</strong>. A positive reply generally indicates interest; a negative reply indicates a rejection, unsubscribe request, or complaint.</p>
+
+    <h2>How the Classifier Works</h2>
+    <p>When a reply arrives in the connected inbox:</p>
+    <ol class="steps">
+      <li>The reply text is extracted.</li>
+      <li>The text is sent to the ML classifier (running on the server).</li>
+      <li>The classifier returns a label: <strong>Positive</strong> (green) or <strong>Negative</strong> (red) and a confidence score (0–100%).</li>
+      <li>The reply appears in the Inbox list with the label and confidence score displayed next to the sender's name.</li>
+    </ol>
+    <p>The model is trained on Turkish business email language and handles both formal and informal register. It is designed specifically for outbound sales reply patterns (interest, rejection, out-of-office, complaints).</p>
+
+    <h2>Reading the Inbox</h2>
+    <p>The Inbox tab shows a list of replies sorted by date (newest first). Each row shows:</p>
+    <ul>
+      <li>The sender's name and email</li>
+      <li>The subject line</li>
+      <li>A preview of the first line of the reply</li>
+      <li>The sentiment label (Positive / Negative) with color coding</li>
+      <li>The confidence percentage</li>
+      <li>The date and time received</li>
+    </ul>
+    <p>Click on any reply to open the full message. The lead's profile is shown in a side panel so you have full context immediately.</p>
+
+    <h2>Acting on Replies</h2>
+    <p>From the open reply view, you can:</p>
+    <ul>
+      <li><strong>Move the lead to a new pipeline stage</strong> — e.g., move a "Positive" reply lead to "Interested" or "Meeting Scheduled"</li>
+      <li><strong>Reply directly</strong> — compose a response that goes out via your connected email</li>
+      <li><strong>Add a note</strong> to the lead's profile</li>
+      <li><strong>Mark as handled</strong> to remove it from the active inbox view</li>
+    </ul>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Use the Inbox as your morning routine — review all overnight replies, act on the positive ones first, and mark negatives as handled so they don't clutter your view. This takes about 5 minutes and ensures no warm lead slips through.
+    </div>
+  </div>
+</div>
+
+<!-- CHAPTER 10 — AI AGENT -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-num">Chapter 10</div>
+    <div class="chapter-title">AI Agent —<br/>Automated Prospecting</div>
+    <div class="chapter-tagline">"Let the system find new leads for you."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>In this chapter</strong><ul>
+      <li>What the Agent does</li>
+      <li>How Lusha prospecting works</li>
+      <li>How Snov.io domain enrichment works</li>
+      <li>Running an agent session</li>
+      <li>Reading results and pushing leads</li>
+    </ul></div>
+
+    <div class="admin-only">
+      <strong>Admin Only — Entire Tab</strong>
+      The Agent tab is completely invisible to regular users. Only admin accounts see it in the sidebar.
+    </div>
+
+    <h2>What the Agent Does</h2>
+    <p>The AI Agent is an automated prospecting tool. You give it search criteria (industry, location, job title, company size) and it uses external APIs to find matching contacts, enrich them with email addresses and phone numbers, and present the results for you to review. You then decide which ones to import as leads.</p>
+    <p>Two data sources are integrated:</p>
+    <ul>
+      <li><strong>Lusha</strong> — B2B contact database. Finds people matching your criteria with professional emails and direct phone numbers.</li>
+      <li><strong>Snov.io</strong> — Domain-based email enrichment. Given a company domain, finds all emails associated with that domain.</li>
+    </ul>
+
+    <h2>Setting Up the Agent</h2>
+    <ol class="steps">
+      <li>Go to <strong>Settings → API Integrations</strong>.</li>
+      <li>Enter your <strong>Lusha API key</strong> (from your Lusha account dashboard).</li>
+      <li>Optionally enter your <strong>Snov.io API key and Secret</strong> for domain enrichment.</li>
+      <li>Click <strong>Save</strong>. The Agent tab becomes active.</li>
+    </ol>
+
+    <h2>Running a Lusha Prospecting Search</h2>
+    <ol class="steps">
+      <li>Go to the <strong>Agent</strong> tab.</li>
+      <li>Fill in the search filters:
+        <ul>
+          <li><strong>Job Title</strong> — e.g., "CEO", "Genel Müdür", "R&amp;D Manager"</li>
+          <li><strong>Industry</strong> — e.g., "Manufacturing", "Technology"</li>
+          <li><strong>Country / City</strong> — Geographic filter</li>
+          <li><strong>Company Size</strong> — Employee headcount range</li>
+        </ul>
+      </li>
+      <li>Click <strong>Search</strong>. The agent calls Lusha's API with your filters.</li>
+      <li>Results appear as a list of contacts: name, title, company, email, phone.</li>
+      <li>Review the results. Check the contacts you want to add as leads.</li>
+      <li>Click <strong>Import Selected</strong>. The selected contacts are added to your Leads table (duplicates skipped automatically).</li>
+    </ol>
+
+    <div class="remember">
+      <strong>Remember</strong>
+      Lusha charges credits per contact revealed. The agent only "reveals" a contact (consuming a credit) when you import them, not just when they appear in search results. Check your Lusha credit balance before running large searches.
+    </div>
+
+    <h2>Running a Snov.io Domain Enrichment</h2>
+    <ol class="steps">
+      <li>In the <strong>Agent</strong> tab, switch to the <strong>Domain Enrichment</strong> mode.</li>
+      <li>Enter one or more company domain names (e.g., <code>example.com.tr</code>).</li>
+      <li>Click <strong>Find Emails</strong>. Snov.io searches for all email addresses associated with those domains.</li>
+      <li>Results show email addresses and (where available) associated names and roles.</li>
+      <li>Select and import as with Lusha results.</li>
+    </ol>
+
+    <div class="tip">
+      <strong>Tip</strong>
+      Use Snov.io when you already know which companies to target but don't have contact email addresses. Use Lusha when you want to discover new contacts based on role and industry filters.
+    </div>
+  </div>
+</div>
+
+<!-- CHAPTER 11 — SETTINGS -->
+<div class="chapter">
+  <div class="chapter-header red">
+    <div class="chapter-num">Chapter 11</div>
+    <div class="chapter-title">Settings —<br/>Full Configuration</div>
+    <div class="chapter-tagline">"One place to control everything."</div>
+  </div>
+  <div class="chapter-body">
+    <div class="in-this-chapter"><strong>In this chapter</strong><ul>
+      <li>API Integrations — all keys explained</li>
+      <li>Sun Group Companies and IBANs</li>
+      <li>User management — adding, editing, removing users</li>
+      <li>Lead scoring configuration</li>
+      <li>Notifications</li>
+    </ul></div>
+
+    <div class="admin-only">
+      <strong>Admin Only — Entire Settings Tab</strong>
+      The Settings tab is completely invisible to regular users. Only admins can access system configuration.
+    </div>
+
+    <h2>API Integrations</h2>
+    <p>All third-party service credentials are stored here. None of these values are shown to regular users.</p>
+
+    <div class="settings-block">
+      <h3>SendGrid</h3>
+      <ul>
+        <li><strong>API Key</strong> — Your SendGrid API key (starts with SG.). Required for all email sending.</li>
+        <li><strong>From Email</strong> — The sender address that appears in recipients' inboxes (must be verified in SendGrid).</li>
+        <li><strong>From Name</strong> — The sender display name (e.g., "Sun &amp; Sun Danışmanlık").</li>
+      </ul>
+    </div>
+
+    <div class="settings-block">
+      <h3>Monday.com</h3>
+      <ul>
+        <li><strong>API Key</strong> — Your Monday.com API v2 token. Found in Monday.com under your avatar → Developers → My Access Tokens.</li>
+      </ul>
+    </div>
+
+    <div class="settings-block">
+      <h3>Twilio (Traditional Calling)</h3>
+      <ul>
+        <li><strong>Account SID</strong> — Your Twilio account identifier.</li>
+        <li><strong>Auth Token</strong> — Your Twilio secret token.</li>
+        <li><strong>Phone Number</strong> — Your Twilio outbound number in E.164 format (e.g., +905XXXXXXXXX).</li>
+      </ul>
+    </div>
+
+    <div class="settings-block">
+      <h3>Vapi (AI Calling)</h3>
+      <ul>
+        <li><strong>API Key</strong> — Your Vapi API key from vapi.ai.</li>
+        <li><strong>Assistant ID</strong> — The ID of the Vapi assistant to use for calls. Set up and test the assistant in vapi.ai first, then paste its ID here.</li>
+        <li><strong>Phone Number ID</strong> — The ID of the Vapi phone number resource to call from.</li>
+      </ul>
+    </div>
+
+    <div class="settings-block">
+      <h3>Lusha (AI Agent prospecting)</h3>
+      <ul>
+        <li><strong>API Key</strong> — Your Lusha API key from lusha.com dashboard.</li>
+      </ul>
+    </div>
+
+    <div class="settings-block">
+      <h3>Snov.io (Domain enrichment)</h3>
+      <ul>
+        <li><strong>Client ID</strong> — Your Snov.io app client ID.</li>
+        <li><strong>Client Secret</strong> — Your Snov.io app secret. Both are found in your Snov.io account under API settings.</li>
+      </ul>
+    </div>
+
+    <h2>Sun Group Companies &amp; IBANs</h2>
+    <p>This section stores your legal entities — the Party 1 companies that appear on contracts. Each company record holds:</p>
+    <ul>
+      <li><strong>Company Name</strong> — Full legal name</li>
+      <li><strong>Tax Office (Vergi Dairesi)</strong></li>
+      <li><strong>Tax Number (Vergi No)</strong></li>
+      <li><strong>Registered Address</strong></li>
+      <li><strong>IBAN</strong> — Bank account for payment instructions in the contract</li>
+    </ul>
+    <p>To add: click <strong>+ Add Company</strong>, fill the form, Save. To edit: click the pencil icon on the company row. To delete: click the trash icon (confirmation required).</p>
+
+    <div class="warning">
+      <strong>Warning</strong>
+      Changing a company's IBAN or tax number does not retroactively update contracts already generated. It only affects new contracts generated after the change. Keep past contracts archived separately.
+    </div>
+
+    <h2>User Management</h2>
+    <p>This section lists all user accounts and lets you create, edit, and deactivate them.</p>
+    <h3>Adding a New User</h3>
+    <ol class="steps">
+      <li>Go to <strong>Settings → Users</strong>.</li>
+      <li>Click <strong>+ Add User</strong>.</li>
+      <li>Enter the new user's <strong>name</strong>, <strong>email address</strong>, and a temporary <strong>password</strong>.</li>
+      <li>Select the <strong>role</strong>: <strong>admin</strong> (full access) or <strong>user</strong> (standard access, no settings).</li>
+      <li>Click <strong>Save</strong>. The user can now log in immediately with the credentials you set.</li>
+    </ol>
+    <div class="tip">
+      <strong>Tip</strong>
+      Give each sales representative a "user" role account, not admin. Only give admin access to people who need to configure the system, manage templates, or access the Inbox and Agent tabs.
+    </div>
+    <h3>Changing a User's Password</h3>
+    <ol class="steps">
+      <li>In the Users list, click the pencil icon next to the user.</li>
+      <li>Enter the new password in the Password field.</li>
+      <li>Click <strong>Save</strong>. The user's password is updated immediately.</li>
+    </ol>
+    <h3>Changing a User's Role</h3>
+    <ol class="steps">
+      <li>Click the pencil icon next to the user.</li>
+      <li>Change the Role dropdown from "user" to "admin" or vice versa.</li>
+      <li>Click <strong>Save</strong>. The change takes effect on their next login (or immediately if they refresh).</li>
+    </ol>
+    <h3>Removing a User</h3>
+    <p>Click the trash icon next to the user and confirm. The user's account is deactivated and they cannot log in. Their historical data (leads they added, calls they made) remains in the system.</p>
+
+    <h2>Lead Scoring Configuration</h2>
+    <p>The ERP assigns a score to each lead based on how complete their profile is and how much activity has been logged for them. Lead scoring helps your team prioritize which leads to focus on.</p>
+    <p>In Settings → Lead Scoring, you can adjust the weight assigned to each scoring factor:</p>
+    <ul>
+      <li>Email address present</li>
+      <li>Phone number present</li>
+      <li>Company filled in</li>
+      <li>LinkedIn URL added</li>
+      <li>Notes added</li>
+      <li>Calls made</li>
+      <li>Emails sent</li>
+      <li>Pipeline stage reached</li>
+    </ul>
+    <p>Increase the weight for factors most important to your sales process. Scores appear on lead cards in the Pipeline board.</p>
+
+    <h2>Notifications</h2>
+    <p>The Notifications section lets you configure system-level alerts:</p>
+    <ul>
+      <li><strong>New Lead Alert</strong> — Notify when a new lead is added (via the AI Agent or bulk import)</li>
+      <li><strong>Positive Reply Alert</strong> — Notify when the Inbox ML classifier detects a positive reply</li>
+      <li><strong>Pipeline Change Alert</strong> — Notify when a lead moves to a specified pipeline stage</li>
+    </ul>
+    <p>Notifications are delivered in-app (the bell icon in the header) and optionally via email if configured.</p>
+  </div>
+</div>
+
+<!-- PLACEHOLDER REFERENCE -->
+<div class="ref-page">
+  <div class="ref-header">Contract Template Placeholder Reference</div>
+  <p style="margin-bottom:20px; font-size:11.5pt;">Every placeholder that can appear in a contract template (.docx file) is listed here. Use <code>@@name@@</code> for legacy templates or <code>[[name]]</code> for current docxtemplater templates. Both formats use the same names — only the delimiters differ.</p>
+
+  <div class="ref-section">Party 1 — Sun Group Company (auto-filled from Settings)</div>
+  <table>
+    <tr><th>Placeholder</th><th>What It Outputs</th><th>Source</th></tr>
+    <tr><td><code>@@party1_name@@</code></td><td>Full legal name of the Sun Group company</td><td>Selected from Settings → Companies</td></tr>
+    <tr><td><code>@@party1_tax_office@@</code></td><td>Party 1's tax office (Vergi Dairesi)</td><td>Settings → Companies</td></tr>
+    <tr><td><code>@@party1_tax_no@@</code></td><td>Party 1's tax number (VKN)</td><td>Settings → Companies</td></tr>
+    <tr><td><code>@@party1_address@@</code></td><td>Party 1's registered address</td><td>Settings → Companies</td></tr>
+    <tr><td><code>@@iban@@</code></td><td>Party 1's bank IBAN</td><td>Settings → Companies</td></tr>
+  </table>
+
+  <div class="ref-section">Party 2 — Client (entered in contract form)</div>
+  <table>
+    <tr><th>Placeholder</th><th>What It Outputs</th><th>Source</th></tr>
+    <tr><td><code>@@party2_name@@</code></td><td>Client company legal name</td><td>Contract form → Party 2 fields</td></tr>
+    <tr><td><code>@@party2_tax_office@@</code></td><td>Client's tax office</td><td>Contract form</td></tr>
+    <tr><td><code>@@party2_tax_no@@</code></td><td>Client's tax number (VKN or TC)</td><td>Contract form</td></tr>
+    <tr><td><code>@@party2_address@@</code></td><td>Client's registered address</td><td>Contract form</td></tr>
+  </table>
+
+  <div class="ref-section">Party 3 — Optional Third Party</div>
+  <table>
+    <tr><th>Placeholder</th><th>What It Outputs</th></tr>
+    <tr><td><code>@@party3_name@@</code></td><td>Third party company name (if applicable)</td></tr>
+    <tr><td><code>@@party3_tax_office@@</code></td><td>Third party tax office</td></tr>
+    <tr><td><code>@@party3_tax_no@@</code></td><td>Third party tax number</td></tr>
+    <tr><td><code>@@party3_address@@</code></td><td>Third party registered address</td></tr>
+  </table>
+
+  <div class="ref-section">Program 1 — Main Program Details</div>
+  <table>
+    <tr><th>Placeholder</th><th>What It Outputs</th><th>Notes</th></tr>
+    <tr><td><code>@@financier@@</code></td><td>Funding body name (KOSGEB, TÜBİTAK, TKDK…)</td><td>Free text</td></tr>
+    <tr><td><code>@@program_name@@</code></td><td>Name of the specific grant/program</td><td>Free text</td></tr>
+    <tr><td><code>@@down_payment@@</code></td><td>Service fee 1 — formatted with Turkish number style (1.000,00 TL)</td><td>Auto-formatted</td></tr>
+    <tr><td><code>@@down_payment_2@@</code></td><td>Service fee 2</td><td>Auto-formatted</td></tr>
+    <tr><td><code>@@down_payment_deadline@@</code></td><td>Service fee payment deadline date</td><td>DD/MM/YYYY format</td></tr>
+    <tr><td><code>@@success_bonus@@</code></td><td>Success bonus 1 percentage</td><td>Numeric, e.g. "8"</td></tr>
+    <tr><td><code>@@success_bonus_type@@</code></td><td>Bonus type 1 label (dropdown option)</td><td>"onaylanan destek" / "onaylanan kredi" / "sağlanan fayda"</td></tr>
+    <tr><td><code>@@sb1ddl@@</code></td><td>Bonus 1 deadline — number of days, auto-spaced before "gün"</td><td>e.g. input "60" → output "60 gün"</td></tr>
+    <tr><td><code>@@sb1ddl_type@@</code></td><td>Bonus 1 deadline type (dropdown)</td><td>e.g. "Projenin onaylanmasını takip eden"</td></tr>
+    <tr><td><code>@@success_bonus_2@@</code></td><td>Success bonus 2 percentage</td><td></td></tr>
+    <tr><td><code>@@success_bonus_type_2@@</code></td><td>Bonus type 2 label</td><td></td></tr>
+    <tr><td><code>@@sb1ddl_2@@</code></td><td>Bonus 2 deadline days</td><td></td></tr>
+    <tr><td><code>@@sb1ddl_2_type@@</code></td><td>Bonus 2 deadline type (dropdown)</td><td></td></tr>
+    <tr><td><code>@@contract_date@@</code></td><td>Contract signing date</td><td>Auto-formatted DD/MM/YYYY</td></tr>
+    <tr><td><code>@@notes@@</code></td><td>Additional contractual notes / special clauses</td><td>Free text</td></tr>
+  </table>
+
+  <div class="ref-section">Program 2 — Second Program (if applicable)</div>
+  <table>
+    <tr><th>Placeholder</th><th>What It Outputs</th></tr>
+    <tr><td><code>@@program2_name@@</code></td><td>Program 2 name</td></tr>
+    <tr><td><code>@@program2_fee@@</code></td><td>Program 2 service fee 1</td></tr>
+    <tr><td><code>@@program2_fee_2@@</code></td><td>Program 2 service fee 2</td></tr>
+    <tr><td><code>@@program2_fee_deadline@@</code></td><td>Program 2 fee deadline</td></tr>
+    <tr><td><code>@@program2_bonus@@</code></td><td>Program 2 success bonus 1 (%)</td></tr>
+    <tr><td><code>@@program2_bonus_2@@</code></td><td>Program 2 success bonus 2 (%)</td></tr>
+    <tr><td><code>@@program2_bonus_deadline@@</code></td><td>Program 2 bonus 1 deadline</td></tr>
+    <tr><td><code>@@program2_bonus_2_deadline@@</code></td><td>Program 2 bonus 2 deadline</td></tr>
+  </table>
+
+  <div class="ref-section">Program 3 — Third Program (if applicable)</div>
+  <table>
+    <tr><th>Placeholder</th><th>What It Outputs</th></tr>
+    <tr><td><code>@@program3_name@@</code></td><td>Program 3 name</td></tr>
+    <tr><td><code>@@program3_fee@@</code></td><td>Program 3 service fee 1</td></tr>
+    <tr><td><code>@@program3_fee_2@@</code></td><td>Program 3 service fee 2</td></tr>
+    <tr><td><code>@@program3_fee_deadline@@</code></td><td>Program 3 fee deadline</td></tr>
+    <tr><td><code>@@program3_bonus@@</code></td><td>Program 3 success bonus 1 (%)</td></tr>
+    <tr><td><code>@@program3_bonus_2@@</code></td><td>Program 3 success bonus 2 (%)</td></tr>
+    <tr><td><code>@@program3_bonus_deadline@@</code></td><td>Program 3 bonus 1 deadline</td></tr>
+    <tr><td><code>@@program3_bonus_2_deadline@@</code></td><td>Program 3 bonus 2 deadline</td></tr>
+  </table>
+
+  <div class="ref-section">Payment Schedule (Annex-1) — Auto-generated Table</div>
+  <table>
+    <tr><th>Placeholder</th><th>What It Outputs</th><th>Notes</th></tr>
+    <tr><td><code>@@payment_schedule@@</code></td><td>Full Word table (all payment rows) injected as XML</td><td>The entire Annex-1 table. Must appear alone on its paragraph in the template.</td></tr>
+    <tr><td><code>@@payment_subject1@@</code> … <code>@@payment_subject20@@</code></td><td>Row label/description for each payment row</td><td>Up to 20 rows supported</td></tr>
+    <tr><td><code>@@payment_date1@@</code> … <code>@@payment_date20@@</code></td><td>Due date for each payment row</td><td>DD/MM/YYYY format</td></tr>
+    <tr><td><code>@@down_payment1@@</code> … <code>@@down_payment20@@</code></td><td>Amount for each payment row (TL, formatted)</td><td>Auto-formatted with Turkish number style</td></tr>
+  </table>
+
+  <div class="ref-section">Auto-Inserted Clauses</div>
+  <table>
+    <tr><th>Placeholder</th><th>What It Outputs</th><th>When Inserted</th></tr>
+    <tr><td><code>@@vakifbank_clause@@</code></td><td>The Vakıfbank-specific payment sentence required by the program rules</td><td>Automatically inserted when the selected Success Bonus Type is "sağlanan fayda". If a different bonus type is selected, this placeholder is removed (replaced with empty string).</td></tr>
+  </table>
+
+  <div style="background:#fff5f5; border:2px solid #c0392b; border-radius:10px; padding:18px 22px; margin-top:28px;">
+    <strong style="display:block; font-size:10pt; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:#c0392b; margin-bottom:10px;">How to Use Placeholders in Your Word Template</strong>
+    <p style="font-size:11pt; margin-bottom:8px;">In your .docx file, write placeholders exactly as shown — including the double <code>@@</code> delimiters or double square brackets <code>[[</code> and <code>]]</code>. Make sure the placeholder is typed as a single continuous run of text in Word (do not split it across formatting runs — avoid formatting part of a placeholder differently). If Word's autocorrect capitalizes or changes characters inside a placeholder, turn off autocorrect for that section.</p>
+    <p style="font-size:11pt; margin-bottom:0;">For the <code>@@payment_schedule@@</code> placeholder specifically: it must be the only content on its paragraph (line) in the Word document. Do not put other text before or after it on the same line — the server replaces the entire paragraph with the generated table.</p>
+  </div>
+</div>
+
+</body>
+</html>
