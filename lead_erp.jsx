@@ -701,9 +701,11 @@ Kurallar:
     { key: "success_bonus_type",       label: "Success Bonus Type",          group: "Contract Details" },
     { key: "success_bonus_type_2",     label: "Success Bonus Type 2",        group: "Contract Details" },
     { key: "success_bonus",            label: "Success Bonus 1 (%)",         group: "Contract Details" },
-    { key: "sb1ddl",                   label: "Success Bonus 1 Deadline",    group: "Contract Details" },
-    { key: "success_bonus_2",          label: "Success Bonus 2 (%)",         group: "Contract Details" },
-    { key: "success_bonus_2_deadline", label: "Success Bonus 2 Deadline",    group: "Contract Details" },
+    { key: "sb1ddl",                   label: "Success Bonus 1 Deadline",      group: "Contract Details" },
+    { key: "sb1ddl_type",              label: "Success Bonus 1 Deadline Type", group: "Contract Details" },
+    { key: "success_bonus_2",          label: "Success Bonus 2 (%)",           group: "Contract Details" },
+    { key: "success_bonus_2_deadline", label: "Success Bonus 2 Deadline",      group: "Contract Details" },
+    { key: "sb1ddl_2_type",            label: "Success Bonus 2 Deadline Type", group: "Contract Details" },
     { key: "multi_program",            label: "Add Program (2nd / 3rd)",     group: "Contract Details" },
     { key: "contract_date",            label: "Contract Date",               group: "Other" },
     { key: "notes",                    label: "Notes",                       group: "Other" },
@@ -714,7 +716,7 @@ Kurallar:
     party2_address: "", party3_name: "", party3_tax_office: "", party3_tax_no: "", party3_address: "",
     financier: "", program_name: "", down_payment: "", down_payment_2: "", success_bonus: "", success_bonus_2: "",
     success_bonus_type: "onaylanan destek", success_bonus_type_2: "onaylanan destek",
-    down_payment_deadline: "", sb1ddl: "", success_bonus_2_deadline: "",
+    down_payment_deadline: "", sb1ddl: "", sb1ddl_type: "Projenin onaylanmasını takip eden", success_bonus_2_deadline: "", sb1ddl_2_type: "Projenin onaylanmasını takip eden",
     program2_name: "", program2_fee: "", program2_fee_2: "", program2_bonus: "", program2_bonus_2: "",
     program2_fee_deadline: "", program2_bonus_deadline: "", program2_bonus_2_deadline: "",
     program3_name: "", program3_fee: "", program3_fee_2: "", program3_bonus: "", program3_bonus_2: "",
@@ -5042,9 +5044,9 @@ Kurallar:
                       {(() => {
                         const dlStyle = { marginTop: 5, width: "100%", padding: "6px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, color: colors.text, fontSize: 11, outline: "none", boxSizing: "border-box" };
                         return [
-                        { label: "Program 1", nameKey: "program_name", feeKey: "down_payment", fee2Key: "down_payment_2", bonusKey: "success_bonus", bonus2Key: "success_bonus_2", feeDeadlineKey: "down_payment_deadline", bonusDeadlineKey: "sb1ddl", bonus2DeadlineKey: "success_bonus_2_deadline" },
-                        { label: "Program 2", nameKey: "program2_name", feeKey: "program2_fee", fee2Key: "program2_fee_2", bonusKey: "program2_bonus", bonus2Key: "program2_bonus_2", feeDeadlineKey: "program2_fee_deadline", bonusDeadlineKey: "program2_bonus_deadline", bonus2DeadlineKey: "program2_bonus_2_deadline" },
-                        { label: "Program 3", nameKey: "program3_name", feeKey: "program3_fee", fee2Key: "program3_fee_2", bonusKey: "program3_bonus", bonus2Key: "program3_bonus_2", feeDeadlineKey: "program3_fee_deadline", bonusDeadlineKey: "program3_bonus_deadline", bonus2DeadlineKey: "program3_bonus_2_deadline" },
+                        { label: "Program 1", nameKey: "program_name", feeKey: "down_payment", fee2Key: "down_payment_2", bonusKey: "success_bonus", bonus2Key: "success_bonus_2", feeDeadlineKey: "down_payment_deadline", bonusDeadlineKey: "sb1ddl", bonusDdlTypeKey: "sb1ddl_type", bonus2DeadlineKey: "success_bonus_2_deadline", bonus2DdlTypeKey: "sb1ddl_2_type" },
+                        { label: "Program 2", nameKey: "program2_name", feeKey: "program2_fee", fee2Key: "program2_fee_2", bonusKey: "program2_bonus", bonus2Key: "program2_bonus_2", feeDeadlineKey: "program2_fee_deadline", bonusDeadlineKey: "program2_bonus_deadline", bonusDdlTypeKey: null, bonus2DeadlineKey: "program2_bonus_2_deadline", bonus2DdlTypeKey: null },
+                        { label: "Program 3", nameKey: "program3_name", feeKey: "program3_fee", fee2Key: "program3_fee_2", bonusKey: "program3_bonus", bonus2Key: "program3_bonus_2", feeDeadlineKey: "program3_fee_deadline", bonusDeadlineKey: "program3_bonus_deadline", bonusDdlTypeKey: null, bonus2DeadlineKey: "program3_bonus_2_deadline", bonus2DdlTypeKey: null },
                       ].slice(0, contractProgramCount).map((prog, idx) => (
                         <div key={prog.label} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: idx < contractProgramCount - 1 ? `1px dashed ${colors.border}` : "none" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
@@ -5075,7 +5077,7 @@ Kurallar:
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('sb1ddl') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonusDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
+                              {fieldVisible('sb1ddl') && <>{prog.bonusDdlTypeKey && fieldVisible('sb1ddl_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline Type <span style={{ fontWeight: 400, opacity: 0.6 }}>(@@sb1ddl_type@@)</span></div><select value={contractData[prog.bonusDdlTypeKey] || "Projenin onaylanmasını takip eden"} onChange={e => setContractData(p => ({ ...p, [prog.bonusDdlTypeKey]: e.target.value }))} style={dlStyle}><option value="Projenin onaylanmasını takip eden">Projenin onaylanmasını takip eden</option><option value="Hakedişin tamamının müşteri hesabına yatmasını takip eden">Hakedişin tamamının müşteri hesabına yatmasını takip eden</option><option value="Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden">Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden</option></select></>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonusDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
                             </div>}
                             {fieldVisible('success_bonus_2') && <div>
                               <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus2")}</div>
@@ -5084,7 +5086,7 @@ Kurallar:
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('success_bonus_2_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonus2DeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
+                              {fieldVisible('success_bonus_2_deadline') && <>{prog.bonus2DdlTypeKey && fieldVisible('sb1ddl_2_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline Type <span style={{ fontWeight: 400, opacity: 0.6 }}>(@@sb1ddl_2_type@@)</span></div><select value={contractData[prog.bonus2DdlTypeKey] || "Projenin onaylanmasını takip eden"} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DdlTypeKey]: e.target.value }))} style={dlStyle}><option value="Projenin onaylanmasını takip eden">Projenin onaylanmasını takip eden</option><option value="Hakedişin tamamının müşteri hesabına yatmasını takip eden">Hakedişin tamamının müşteri hesabına yatmasını takip eden</option><option value="Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden">Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden</option></select></>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonus2DeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
                             </div>}
                           </div>
                           )}
