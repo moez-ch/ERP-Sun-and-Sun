@@ -427,6 +427,10 @@ db.exec(`
 try { db.exec(`ALTER TABLE contract_companies ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`); } catch {}
 db.exec(`CREATE TABLE IF NOT EXISTS dropdown_options (id INTEGER PRIMARY KEY AUTOINCREMENT, dropdown_key TEXT NOT NULL, value TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
 try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_dropdown_options ON dropdown_options (dropdown_key, value)`); } catch {}
+{ const ins = db.prepare("INSERT OR IGNORE INTO dropdown_options (dropdown_key, value) VALUES (?,?)");
+  for (const v of ["Projenin onaylanmasını takip eden","Hakedişin tamamının müşteri hesabına yatmasını takip eden","Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden"]) { ins.run("deadline_type", v); }
+  for (const v of ["onaylanan destek","onaylanan kredi","sağlanan fayda"]) { ins.run("success_bonus_type", v); }
+}
 
 // ── COMPANY IBANs (multiple IBANs per company) ────────────────────
 db.exec(`
