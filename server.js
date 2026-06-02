@@ -425,6 +425,8 @@ db.exec(`
   )
 `);
 try { db.exec(`ALTER TABLE contract_companies ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`); } catch {}
+db.exec(`CREATE TABLE IF NOT EXISTS dropdown_options (id INTEGER PRIMARY KEY AUTOINCREMENT, dropdown_key TEXT NOT NULL, value TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_dropdown_options ON dropdown_options (dropdown_key, value)`); } catch {}
 
 // ── COMPANY IBANs (multiple IBANs per company) ────────────────────
 db.exec(`
@@ -1285,6 +1287,34 @@ app.put("/contracts/companies/ibans/:ibanId/set-default", authenticate, (req, re
   db.prepare("UPDATE company_ibans SET is_default=0 WHERE company_id=?").run(row.company_id);
   db.prepare("UPDATE company_ibans SET is_default=1 WHERE id=?").run(req.params.ibanId);
   db.prepare("UPDATE contract_companies SET iban=? WHERE id=?").run(row.iban, row.company_id);
+  res.json({ ok: true });
+});
+
+// GET /dropdown-options — all custom options grouped by key
+app.get("/dropdown-options", authenticate, (req, res) => {
+  const rows = db.prepare("SELECT id, dropdown_key, value FROM dropdown_options ORDER BY dropdown_key, created_at").all();
+  const grouped = {};
+  rows.forEach(r => { (grouped[r.dropdown_key] = grouped[r.dropdown_key] || []).push({ id: r.id, value: r.value }); });
+  res.json(grouped);
+});
+
+// POST /dropdown-options — admin only
+app.post("/dropdown-options", authenticate, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  const { dropdown_key, value } = req.body || {};
+  if (!dropdown_key?.trim() || !value?.trim()) return res.status(400).json({ error: "dropdown_key and value required" });
+  try {
+    const r = db.prepare("INSERT INTO dropdown_options (dropdown_key, value) VALUES (?,?)").run(dropdown_key.trim(), value.trim());
+    res.json({ ok: true, id: r.lastInsertRowid });
+  } catch (e) {
+    res.status(409).json({ error: "Already exists" });
+  }
+});
+
+// DELETE /dropdown-options/:id — admin only
+app.delete("/dropdown-options/:id", authenticate, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  db.prepare("DELETE FROM dropdown_options WHERE id=?").run(req.params.id);
   res.json({ ok: true });
 });
 
