@@ -691,6 +691,7 @@ Kurallar:
   const [dropdownExtras, setDropdownExtras] = useState({});
   const [addingDropdown, setAddingDropdown] = useState(null);
   const [newDropdownVal, setNewDropdownVal] = useState("");
+  const [editingDropdownOption, setEditingDropdownOption] = useState(null);
   const ALL_CONTRACT_FIELDS = [
     { key: "party2_name",              label: "Client Title",                group: "Party 2" },
     { key: "party2_tax_office",        label: "Tax Office",                  group: "Party 2" },
@@ -4230,19 +4231,65 @@ Kurallar:
             if (d.ok) setDropdownExtras(prev => ({ ...prev, [dropdownKey]: [...(prev[dropdownKey] || []), { id: d.id, value: value.trim() }] }));
             setAddingDropdown(null); setNewDropdownVal("");
           };
+          const deleteDropdownOption = async (id, dropdownKey) => {
+            const token = localStorage.getItem("sns_token");
+            await fetch(`/dropdown-options/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+            setDropdownExtras(prev => ({ ...prev, [dropdownKey]: (prev[dropdownKey] || []).filter(o => o.id !== id) }));
+          };
+          const saveEditOption = async () => {
+            if (!editingDropdownOption || !editingDropdownOption.value.trim()) return;
+            const { id, value, dropdownKey } = editingDropdownOption;
+            const token = localStorage.getItem("sns_token");
+            const r = await fetch(`/dropdown-options/${id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ value: value.trim() }) });
+            if ((await r.json()).ok) setDropdownExtras(prev => ({ ...prev, [dropdownKey]: (prev[dropdownKey] || []).map(o => o.id === id ? { ...o, value: value.trim() } : o) }));
+            setEditingDropdownOption(null);
+          };
           const addBtnSt = { marginTop: 3, padding: "2px 8px", background: "none", border: `1px dashed ${colors.border}`, borderRadius: 4, color: colors.textMuted, fontSize: 10, cursor: "pointer", fontFamily: font };
-          const addConfirmSt = { padding: "2px 8px", background: colors.primary, border: "none", borderRadius: 4, color: "#fff", fontSize: 10, cursor: "pointer" };
-          const addCancelSt = { padding: "2px 8px", background: "none", border: `1px solid ${colors.border}`, borderRadius: 4, color: colors.textMuted, fontSize: 10, cursor: "pointer" };
+          const addConfirmSt = { padding: "2px 6px", background: colors.primary, border: "none", borderRadius: 3, color: "#fff", fontSize: 10, cursor: "pointer" };
+          const addCancelSt = { padding: "2px 6px", background: "none", border: `1px solid ${colors.border}`, borderRadius: 3, color: colors.textMuted, fontSize: 10, cursor: "pointer" };
           const addInputSt = { flex: 1, padding: "3px 6px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 4, color: colors.text, fontSize: 11, outline: "none" };
-          const renderAddBtn = (instanceId, dropdownKey) => isAdmin && (
-            addingDropdown === instanceId
-              ? <div style={{ display: "flex", gap: 4, marginTop: 3 }}>
-                  <input autoFocus value={newDropdownVal} onChange={e => setNewDropdownVal(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addDropdownOption(dropdownKey, newDropdownVal); if (e.key === "Escape") { setAddingDropdown(null); setNewDropdownVal(""); } }} placeholder="Yeni seçenek..." style={addInputSt} />
-                  <button onClick={() => addDropdownOption(dropdownKey, newDropdownVal)} style={addConfirmSt}>✓</button>
-                  <button onClick={() => { setAddingDropdown(null); setNewDropdownVal(""); }} style={addCancelSt}>✕</button>
-                </div>
-              : <button onClick={() => { setAddingDropdown(instanceId); setNewDropdownVal(""); }} style={addBtnSt}>+ add option</button>
-          );
+          const editBtnSt = { padding: "1px 5px", background: "none", border: `1px solid ${colors.border}`, borderRadius: 3, color: colors.textMuted, fontSize: 9, cursor: "pointer" };
+          const delBtnSt = { padding: "1px 5px", background: "none", border: "1px solid rgba(229,115,115,0.35)", borderRadius: 3, color: "#e57373", fontSize: 9, cursor: "pointer" };
+          const renderDropdownAdmin = (instanceId, dropdownKey) => {
+            if (!isAdmin) return null;
+            const extras = dropdownExtras[dropdownKey] || [];
+            return (
+              <div>
+                {extras.length > 0 && (
+                  <div style={{ marginTop: 3, padding: "4px 6px", background: `${colors.primary}08`, border: `1px solid ${colors.border}`, borderRadius: 4 }}>
+                    {extras.map(o => (
+                      <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 3, marginBottom: 2 }}>
+                        {editingDropdownOption?.id === o.id
+                          ? <>
+                              <input autoFocus value={editingDropdownOption.value} onChange={e => setEditingDropdownOption(p => ({ ...p, value: e.target.value }))}
+                                onKeyDown={e => { if (e.key === "Enter") saveEditOption(); if (e.key === "Escape") setEditingDropdownOption(null); }}
+                                style={{ ...addInputSt, flex: 1 }} />
+                              <button onClick={saveEditOption} style={addConfirmSt}>✓</button>
+                              <button onClick={() => setEditingDropdownOption(null)} style={addCancelSt}>✕</button>
+                            </>
+                          : <>
+                              <span style={{ flex: 1, fontSize: 10, color: colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={o.value}>{o.value}</span>
+                              <button onClick={() => setEditingDropdownOption({ id: o.id, value: o.value, dropdownKey })} style={editBtnSt}>✏</button>
+                              <button onClick={() => deleteDropdownOption(o.id, dropdownKey)} style={delBtnSt}>✕</button>
+                            </>
+                        }
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {addingDropdown === instanceId
+                  ? <div style={{ display: "flex", gap: 4, marginTop: 3 }}>
+                      <input autoFocus value={newDropdownVal} onChange={e => setNewDropdownVal(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") addDropdownOption(dropdownKey, newDropdownVal); if (e.key === "Escape") { setAddingDropdown(null); setNewDropdownVal(""); } }}
+                        placeholder="Yeni seçenek..." style={addInputSt} />
+                      <button onClick={() => addDropdownOption(dropdownKey, newDropdownVal)} style={addConfirmSt}>✓</button>
+                      <button onClick={() => { setAddingDropdown(null); setNewDropdownVal(""); }} style={addCancelSt}>✕</button>
+                    </div>
+                  : <button onClick={() => { setAddingDropdown(instanceId); setNewDropdownVal(""); }} style={addBtnSt}>+ add option</button>
+                }
+              </div>
+            );
+          };
 
           const handleGenerate = async (format = "pdf") => {
             if (!contractTemplate) { alert("Lütfen bir sözleşme şablonu seçin."); return; }
@@ -4968,7 +5015,7 @@ Kurallar:
                               <option value="sağlanan fayda">{t("contract_benefitProvided")}</option>
                               {(dropdownExtras["success_bonus_type"] || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                             </select>
-                            {renderAddBtn(`sbt_a_${i}`, "success_bonus_type")}
+                            {renderDropdownAdmin(`sbt_a_${i}`, "success_bonus_type")}
                             {contractData[key] === "sağlanan fayda" && (
                               <div style={{ marginTop: 6, padding: "8px 10px", background: `${colors.primary}12`, border: `1px solid ${colors.primary}33`, borderRadius: 6, fontSize: 11, color: colors.textMuted, fontStyle: "italic", lineHeight: 1.5 }}>
                                 ℹ @@vakifbank_clause@@ will be added
@@ -5106,7 +5153,7 @@ Kurallar:
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('sb1ddl') && <>{prog.bonusDdlTypeKey && fieldVisible('sb1ddl_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline Type <span style={{ fontWeight: 400, opacity: 0.6 }}>(@@sb1ddl_type@@)</span></div><select value={contractData[prog.bonusDdlTypeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDdlTypeKey]: e.target.value }))} style={dlStyle}><option value="">—</option><option value="Projenin onaylanmasını takip eden">Projenin onaylanmasını takip eden</option><option value="Hakedişin tamamının müşteri hesabına yatmasını takip eden">Hakedişin tamamının müşteri hesabına yatmasını takip eden</option><option value="Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden">Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden</option>{(dropdownExtras["deadline_type"] || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}</select>{renderAddBtn(`dlt_1_${prog.label}`, "deadline_type")}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonusDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
+                              {fieldVisible('sb1ddl') && <>{prog.bonusDdlTypeKey && fieldVisible('sb1ddl_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline Type <span style={{ fontWeight: 400, opacity: 0.6 }}>(@@sb1ddl_type@@)</span></div><select value={contractData[prog.bonusDdlTypeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDdlTypeKey]: e.target.value }))} style={dlStyle}><option value="">—</option><option value="Projenin onaylanmasını takip eden">Projenin onaylanmasını takip eden</option><option value="Hakedişin tamamının müşteri hesabına yatmasını takip eden">Hakedişin tamamının müşteri hesabına yatmasını takip eden</option><option value="Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden">Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden</option>{(dropdownExtras["deadline_type"] || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}</select>{renderDropdownAdmin(`dlt_1_${prog.label}`, "deadline_type")}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonusDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
                             </div>}
                             {fieldVisible('success_bonus_2') && <div>
                               <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus2")}</div>
@@ -5115,7 +5162,7 @@ Kurallar:
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('success_bonus_2_deadline') && <>{prog.bonus2DdlTypeKey && fieldVisible('sb1ddl_2_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline Type <span style={{ fontWeight: 400, opacity: 0.6 }}>(@@sb1ddl_2_type@@)</span></div><select value={contractData[prog.bonus2DdlTypeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DdlTypeKey]: e.target.value }))} style={dlStyle}><option value="">—</option><option value="Projenin onaylanmasını takip eden">Projenin onaylanmasını takip eden</option><option value="Hakedişin tamamının müşteri hesabına yatmasını takip eden">Hakedişin tamamının müşteri hesabına yatmasını takip eden</option><option value="Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden">Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden</option>{(dropdownExtras["deadline_type"] || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}</select>{renderAddBtn(`dlt_2_${prog.label}`, "deadline_type")}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonus2DeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
+                              {fieldVisible('success_bonus_2_deadline') && <>{prog.bonus2DdlTypeKey && fieldVisible('sb1ddl_2_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>Deadline Type <span style={{ fontWeight: 400, opacity: 0.6 }}>(@@sb1ddl_2_type@@)</span></div><select value={contractData[prog.bonus2DdlTypeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DdlTypeKey]: e.target.value }))} style={dlStyle}><option value="">—</option><option value="Projenin onaylanmasını takip eden">Projenin onaylanmasını takip eden</option><option value="Hakedişin tamamının müşteri hesabına yatmasını takip eden">Hakedişin tamamının müşteri hesabına yatmasını takip eden</option><option value="Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden">Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden</option>{(dropdownExtras["deadline_type"] || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}</select>{renderDropdownAdmin(`dlt_2_${prog.label}`, "deadline_type")}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonus2DeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DeadlineKey]: e.target.value }))} placeholder="e.g. 60 days" style={dlStyle} /></>}
                             </div>}
                           </div>
                           )}
@@ -5143,7 +5190,7 @@ Kurallar:
                                 <option value="sağlanan fayda">Sağlanan Fayda</option>
                                 {(dropdownExtras["success_bonus_type"] || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                               </select>
-                              {renderAddBtn(`sbt_b_${i}`, "success_bonus_type")}
+                              {renderDropdownAdmin(`sbt_b_${i}`, "success_bonus_type")}
                               {contractData[key] === "sağlanan fayda" && (
                                 <div style={{ marginTop: 6, padding: "8px 10px", background: `${colors.primary}12`, border: `1px solid ${colors.primary}33`, borderRadius: 6, fontSize: 11, color: colors.textMuted, fontStyle: "italic", lineHeight: 1.5 }}>
                                   {t("contract_vakifbankNote")}
@@ -5289,7 +5336,7 @@ Kurallar:
                                 <option value="other">14 — Diğer</option>
                                 {(dropdownExtras["payment_subject"] || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                               </select>
-                              {renderAddBtn(`ps_${i}`, "payment_subject")}
+                              {renderDropdownAdmin(`ps_${i}`, "payment_subject")}
                               {rowSubject === "other" && (
                                 <input value={row.subjectCustom || ""} onChange={e => upd("subjectCustom", e.target.value)}
                                   placeholder={t("contract_paySubjectPh")} style={{ ...inputSt, flex: 1 }} />

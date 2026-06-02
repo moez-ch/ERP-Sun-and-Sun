@@ -1311,6 +1311,19 @@ app.post("/dropdown-options", authenticate, (req, res) => {
   }
 });
 
+// PUT /dropdown-options/:id — admin only
+app.put("/dropdown-options/:id", authenticate, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  const { value } = req.body || {};
+  if (!value?.trim()) return res.status(400).json({ error: "value required" });
+  try {
+    db.prepare("UPDATE dropdown_options SET value=? WHERE id=?").run(value.trim(), req.params.id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(409).json({ error: "Already exists" });
+  }
+});
+
 // DELETE /dropdown-options/:id — admin only
 app.delete("/dropdown-options/:id", authenticate, (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
