@@ -1715,6 +1715,7 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
         if (/\d$/.test(data[key])) data[key] = data[key] + " ";
       }
     }
+    data.sb1ddl_2 = data.success_bonus_2_deadline;
     // Set vakifbank_clause: appended by migration 8 to the sb1ddl paragraph in the template
     const VAKIFBANK_SENTENCE = " Sağlanan fayda; projenin onaylandığı tarihte Vakıfbank’ ın ticari müşterilerine kullandırdığı 1 yıl vadeli ticari kredilerindeki tabela faiz oranı üzerinden, projenin toplam uygulama süresince hesaplanacak faiz miktarınca olacaktır.";
     const isFayda = (v) => (v || "").includes("sağlanan fayda");
