@@ -989,6 +989,328 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// ATTENDANCE TRACKER
+// ═══════════════════════════════════════════════════════════════
+function AttendanceView({ colors, font, lang, onBack }) {
+  const tr = (en, t) => lang === "tr" ? t : en;
+
+  const [headers, setHeaders]   = useState([]);
+  const [allRows, setAllRows]   = useState([]);
+  const [fileName, setFileName] = useState("");
+  const [colName, setColName]   = useState("");
+  const [colDate, setColDate]   = useState("");
+  const [colIn, setColIn]       = useState("");
+  const [colOut, setColOut]     = useState("");
+  const [workStart, setWorkStart] = useState("08:30");
+  const [workEnd,   setWorkEnd]   = useState("18:30");
+  const [results, setResults]   = useState(null);
+  const [resTab, setResTab]     = useState("summary");
+  const [filterEmp, setFilterEmp] = useState("__all__");
+  const fileRef = useRef(null);
+
+  function toMinutes(val) {
+    if (val == null || val === "") return null;
+    if (val instanceof Date && !isNaN(val)) return val.getHours() * 60 + val.getMinutes();
+    if (typeof val === "number") {
+      const frac = val >= 1 ? val - Math.floor(val) : val;
+      if (frac > 0) return Math.round(frac * 24 * 60) % (24 * 60);
+    }
+    if (typeof val === "string") {
+      const m = val.trim().match(/(\d{1,2}):(\d{2})/);
+      if (m) {
+        let h = parseInt(m[1]), min = parseInt(m[2]);
+        if (/pm/i.test(val) && h < 12) h += 12;
+        if (/am/i.test(val) && h === 12) h = 0;
+        return h * 60 + min;
+      }
+    }
+    return null;
+  }
+
+  function toDateStr(val) {
+    if (val == null || val === "") return "";
+    if (val instanceof Date && !isNaN(val)) {
+      if (val.getFullYear() < 1901) return "";
+      return `${val.getFullYear()}-${String(val.getMonth()+1).padStart(2,"0")}-${String(val.getDate()).padStart(2,"0")}`;
+    }
+    if (typeof val === "string") {
+      const s = val.trim();
+      const m1 = s.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})/);
+      if (m1) return `${m1[3]}-${String(m1[2]).padStart(2,"0")}-${String(m1[1]).padStart(2,"0")}`;
+      return s.split(" ")[0];
+    }
+    if (typeof val === "number") {
+      const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+      if (!isNaN(d)) return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+    }
+    return String(val);
+  }
+
+  const fmtTime = m => { if (m == null) return "—"; const h = Math.floor(((m%1440)+1440)%1440/60), min = ((m%1440)+1440)%1440%60; return `${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`; };
+  const fmtDur  = m => { if (m == null) return "—"; const h = Math.floor(Math.abs(m)/60), min = Math.abs(m)%60; return `${h}h ${String(min).padStart(2,"0")}m`; };
+  const fmtDiff = m => { if (m == null) return "—"; const sign = m >= 0 ? "+" : "-", h = Math.floor(Math.abs(m)/60), min = Math.abs(m)%60; return `${sign}${h}h ${String(min).padStart(2,"0")}m`; };
+
+  function loadFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array", cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        if (!raw || raw.length === 0) { alert(tr("File appears empty.", "Dosya boş görünüyor.")); return; }
+        const hdrs = (raw[0] || []).map((h, i) => h ? String(h) : `Col ${i+1}`);
+        setHeaders(hdrs); setAllRows(raw); setFileName(file.name); setResults(null);
+        const lower = hdrs.map(h => h.toLowerCase());
+        const detect = terms => { const i = lower.findIndex(h => terms.some(t => h.includes(t))); return i >= 0 ? hdrs[i] : ""; };
+        setColName(detect(["ad soyad","full name","employee","çalışan","personel","isim","ad","name"]));
+        setColDate(detect(["tarih","date","gün","gun"]));
+        setColIn(detect(["giriş","giris","check-in","checkin","ilk giriş","in time","in"]));
+        setColOut(detect(["çıkış","cikis","check-out","checkout","son çıkış","out time","out"]));
+      } catch (err) { alert(tr("Could not read: ", "Okunamadı: ") + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function calculate() {
+    const [sh, sm] = workStart.split(":").map(Number);
+    const [eh, em] = workEnd.split(":").map(Number);
+    const expectedMins = (eh * 60 + em) - (sh * 60 + sm);
+    const nameIdx = headers.indexOf(colName);
+    const dateIdx = headers.indexOf(colDate);
+    const inIdx   = headers.indexOf(colIn);
+    const outIdx  = headers.indexOf(colOut);
+    if (nameIdx < 0 || inIdx < 0 || outIdx < 0) {
+      alert(tr("Please map Name, Check-in and Check-out columns.", "Lütfen Ad, Giriş ve Çıkış sütunlarını seçin.")); return;
+    }
+    const empMap = {};
+    allRows.slice(1).forEach((row, idx) => {
+      const name = String(row[nameIdx] ?? "").trim();
+      if (!name) return;
+      const dateStr  = dateIdx >= 0 ? (toDateStr(row[dateIdx]) || `Row ${idx+2}`) : `Row ${idx+2}`;
+      const inMins   = toMinutes(row[inIdx]);
+      const outMins  = toMinutes(row[outIdx]);
+      if (inMins == null && outMins == null) return;
+      let workedMins = (inMins != null && outMins != null) ? (outMins - inMins < 0 ? outMins - inMins + 1440 : outMins - inMins) : null;
+      const diff     = workedMins != null ? workedMins - expectedMins : null;
+      if (!empMap[name]) empMap[name] = { name, days: [], totalWorked: 0, totalExpected: 0, missingDays: 0 };
+      empMap[name].days.push({ date: dateStr, inMins, outMins, workedMins, diff });
+      empMap[name].totalExpected += expectedMins;
+      if (workedMins != null) empMap[name].totalWorked += workedMins;
+      else empMap[name].missingDays++;
+    });
+    const summaries = Object.values(empMap).sort((a, b) => a.name.localeCompare(b.name));
+    setResults({ summaries, expectedMins });
+    setResTab("summary");
+    setFilterEmp("__all__");
+  }
+
+  function downloadResults() {
+    if (!results) return;
+    const data = [];
+    results.summaries.forEach(emp => emp.days.forEach(d => data.push({
+      [tr("Employee","Çalışan")]: emp.name,
+      [tr("Date","Tarih")]: d.date,
+      [tr("Check-in","Giriş")]: d.inMins != null ? fmtTime(d.inMins) : "—",
+      [tr("Check-out","Çıkış")]: d.outMins != null ? fmtTime(d.outMins) : "—",
+      [tr("Worked","Çalışılan")]: d.workedMins != null ? fmtDur(d.workedMins) : "—",
+      [tr("Expected","Beklenen")]: fmtDur(results.expectedMins),
+      [tr("Diff","Fark")]: d.diff != null ? fmtDiff(d.diff) : "—",
+    })));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb2 = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2, ws, "Attendance");
+    XLSX.writeFile(wb2, fileName.replace(/\.[^.]+$/, "") + "_attendance.xlsx");
+  }
+
+  const canCalc = allRows.length > 0 && colName && colIn && colOut;
+  const allEmployees = results ? results.summaries.map(s => s.name) : [];
+  const detailRows   = results
+    ? (filterEmp === "__all__"
+        ? results.summaries.flatMap(s => s.days.map(d => ({ ...d, name: s.name })))
+        : (results.summaries.find(s => s.name === filterEmp)?.days || []).map(d => ({ ...d, name: filterEmp })))
+    : [];
+
+  const thStyle = { background: colors.bg, color: colors.accent, padding: "8px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, whiteSpace: "nowrap", fontFamily: font };
+
+  return (
+    <div style={{ animation: "slideIn .3s ease" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+        <button onClick={onBack} style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, padding: "6px 14px", cursor: "pointer", color: colors.textMuted, fontSize: 12, fontFamily: font }}>← {tr("Back","Geri")}</button>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: font, marginBottom: 2 }}>⏱ {tr("Attendance Tracker","Mesai Takibi")}</h1>
+          <p style={{ color: colors.textMuted, fontSize: 12, fontFamily: font }}>{tr("Upload a check-in/out sheet and calculate overtime & undertime per employee.","Giriş/çıkış tablosunu yükle, çalışan başına fazla/eksik mesaiyi hesapla.")}</p>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "290px 1fr", gap: 18, alignItems: "start" }}>
+        {/* Sidebar */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Upload */}
+          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font }}>📂 {tr("1. Load File","1. Dosya Yükle")}</div>
+            <div style={{ padding: 14 }}>
+              <div onClick={() => fileRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); }}
+                style={{ border: `2px dashed ${fileName ? colors.success : colors.borderLight}`, borderRadius: 8, padding: "14px 10px", textAlign: "center", cursor: "pointer", background: fileName ? `${colors.success}10` : "transparent" }}>
+                <div style={{ fontSize: 22, marginBottom: 5 }}>{fileName ? "✅" : "📊"}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: fileName ? colors.success : colors.text, fontFamily: font, wordBreak: "break-all" }}>{fileName || tr("Click or drag & drop","Tıkla veya sürükle & bırak")}</div>
+                {!fileName && <div style={{ fontSize: 11, color: colors.textDim, marginTop: 3, fontFamily: font }}>.xlsx / .xls</div>}
+                {allRows.length > 0 && <div style={{ fontSize: 10, color: colors.textDim, marginTop: 3, fontFamily: font }}>{(allRows.length-1).toLocaleString()} {tr("rows","satır")} · {headers.length} {tr("cols","sütun")}</div>}
+              </div>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) loadFile(e.target.files[0]); }} />
+            </div>
+          </div>
+
+          {/* Column mapping */}
+          {headers.length > 0 && (
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font }}>🗂 {tr("2. Map Columns","2. Sütunları Eşle")}</div>
+              <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 9 }}>
+                {[
+                  { label: tr("Employee Name *","Çalışan Adı *"), val: colName, set: setColName },
+                  { label: tr("Date","Tarih"),                    val: colDate, set: setColDate },
+                  { label: tr("Check-in *","Giriş *"),            val: colIn,   set: setColIn   },
+                  { label: tr("Check-out *","Çıkış *"),           val: colOut,  set: setColOut  },
+                ].map(({ label, val, set }) => (
+                  <div key={label}>
+                    <div style={{ fontSize: 10, color: colors.textMuted, fontFamily: font, marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+                    <select value={val} onChange={e => set(e.target.value)}
+                      style={{ width: "100%", background: colors.bg, border: `1px solid ${val ? colors.primary : colors.border}`, borderRadius: 6, padding: "6px 8px", color: colors.text, fontSize: 12, fontFamily: font, outline: "none" }}>
+                      <option value="">{tr("— not set —","— seçilmedi —")}</option>
+                      {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Work schedule */}
+          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font }}>⏰ {tr("3. Work Hours","3. Mesai Saatleri")}</div>
+            <div style={{ padding: "12px 14px", display: "flex", gap: 10 }}>
+              {[
+                { label: tr("Start","Başlangıç"), val: workStart, set: setWorkStart },
+                { label: tr("End","Bitiş"),       val: workEnd,   set: setWorkEnd   },
+              ].map(({ label, val, set }) => (
+                <div key={label} style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: colors.textMuted, fontFamily: font, marginBottom: 3 }}>{label}</div>
+                  <input type="time" value={val} onChange={e => set(e.target.value)}
+                    style={{ width: "100%", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "6px 8px", color: colors.text, fontSize: 12, fontFamily: font, outline: "none" }} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={calculate} disabled={!canCalc}
+            style={{ width: "100%", padding: 13, background: canCalc ? colors.primary : colors.border, border: "none", borderRadius: 10, color: canCalc ? "#fff" : colors.textDim, fontSize: 13, fontWeight: 700, cursor: canCalc ? "pointer" : "not-allowed", fontFamily: font }}>
+            ⏱ {tr("Calculate","Hesapla")}
+          </button>
+        </div>
+
+        {/* Results panel */}
+        <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 400 }}>
+          {!results ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 60, textAlign: "center", minHeight: 400 }}>
+              <div style={{ fontSize: 48, marginBottom: 14 }}>⏱</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: colors.textMuted, fontFamily: font, marginBottom: 6 }}>{tr("No results yet","Henüz sonuç yok")}</div>
+              <div style={{ fontSize: 12, color: colors.textDim, fontFamily: font, maxWidth: 300 }}>{tr("Load your attendance file, map the columns, then click Calculate.","Mesai dosyasını yükle, sütunları eşle, ardından Hesapla'ya tıkla.")}</div>
+            </div>
+          ) : (
+            <>
+              {/* Tabs + actions */}
+              <div style={{ padding: "10px 16px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ display: "flex" }}>
+                  {[{ id:"summary", label: tr("Summary","Özet") }, { id:"detail", label: tr("Detail","Detay") }].map((tab, ti) => (
+                    <button key={tab.id} onClick={() => setResTab(tab.id)}
+                      style={{ padding: "5px 14px", background: resTab === tab.id ? colors.primary : "transparent", border: `1px solid ${resTab === tab.id ? colors.primary : colors.border}`, borderRadius: ti === 0 ? "6px 0 0 6px" : "0 6px 6px 0", color: resTab === tab.id ? "#fff" : colors.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                {resTab === "detail" && (
+                  <select value={filterEmp} onChange={e => setFilterEmp(e.target.value)}
+                    style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "5px 8px", color: colors.text, fontSize: 12, fontFamily: font, outline: "none" }}>
+                    <option value="__all__">{tr("All employees","Tüm çalışanlar")}</option>
+                    {allEmployees.map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                )}
+                <span style={{ fontSize: 11, color: colors.textDim, fontFamily: font }}>
+                  {results.summaries.length} {tr("employees","çalışan")}
+                  {" · "}
+                  {tr("Expected","Beklenen")}: {workStart}–{workEnd} ({fmtDur(results.expectedMins)})
+                </span>
+                <button onClick={downloadResults} style={{ marginLeft: "auto", background: colors.success, border: "none", borderRadius: 6, padding: "6px 14px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}>
+                  ⬇ {tr("Export","Dışa Aktar")}
+                </button>
+              </div>
+
+              {/* Summary */}
+              {resTab === "summary" && (
+                <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        {[tr("Employee","Çalışan"), tr("Days","Gün"), tr("Total Worked","Toplam Çalışılan"), tr("Expected","Beklenen"), tr("Difference","Fark")].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.summaries.map((emp, i) => {
+                        const diff = emp.totalWorked - emp.totalExpected;
+                        return (
+                          <tr key={i} style={{ borderBottom: `1px solid ${colors.border}`, cursor: "pointer" }}
+                            onMouseEnter={e => e.currentTarget.style.background = colors.surfaceHover}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                            onClick={() => { setResTab("detail"); setFilterEmp(emp.name); }}>
+                            <td style={{ padding: "8px 12px", color: colors.text, fontWeight: 600, fontFamily: font }}>{emp.name}</td>
+                            <td style={{ padding: "8px 12px", color: colors.textMuted, fontFamily: font }}>
+                              {emp.days.length}
+                              {emp.missingDays > 0 && <span style={{ color: colors.warning, fontSize: 10, marginLeft: 5 }}>({emp.missingDays} {tr("missing","eksik")})</span>}
+                            </td>
+                            <td style={{ padding: "8px 12px", color: colors.text, fontFamily: font }}>{fmtDur(emp.totalWorked)}</td>
+                            <td style={{ padding: "8px 12px", color: colors.textMuted, fontFamily: font }}>{fmtDur(emp.totalExpected)}</td>
+                            <td style={{ padding: "8px 12px", fontWeight: 700, color: diff >= 0 ? colors.success : colors.danger, fontFamily: font }}>{fmtDiff(diff)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Detail */}
+              {resTab === "detail" && (
+                <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        {[tr("Employee","Çalışan"), tr("Date","Tarih"), tr("Check-in","Giriş"), tr("Check-out","Çıkış"), tr("Worked","Çalışılan"), tr("Expected","Beklenen"), tr("Diff","Fark")].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detailRows.map((d, i) => (
+                        <tr key={i} style={{ borderBottom: `1px solid ${colors.border}`, background: d.diff != null && d.diff < -30 ? `${colors.danger}08` : "transparent" }}>
+                          <td style={{ padding: "6px 12px", color: colors.text, fontFamily: font, whiteSpace: "nowrap" }}>{d.name}</td>
+                          <td style={{ padding: "6px 12px", color: colors.textMuted, fontFamily: font }}>{d.date}</td>
+                          <td style={{ padding: "6px 12px", color: d.inMins != null ? colors.text : colors.danger, fontFamily: font }}>{fmtTime(d.inMins)}</td>
+                          <td style={{ padding: "6px 12px", color: d.outMins != null ? colors.text : colors.danger, fontFamily: font }}>{fmtTime(d.outMins)}</td>
+                          <td style={{ padding: "6px 12px", color: colors.text, fontFamily: font }}>{fmtDur(d.workedMins)}</td>
+                          <td style={{ padding: "6px 12px", color: colors.textMuted, fontFamily: font }}>{fmtDur(results.expectedMins)}</td>
+                          <td style={{ padding: "6px 12px", fontWeight: 600, fontFamily: font, color: d.diff == null ? colors.textDim : d.diff >= 0 ? colors.success : colors.danger }}>{fmtDiff(d.diff)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ────────────────────────────────────────────────────
 export default function App() {
   const [authUser, setAuthUser] = useState(null);
@@ -6343,10 +6665,11 @@ Kurallar:
                     {lang === "tr" ? "Excel dosyalarınızı işlemek için bir araç seçin." : "Choose a tool to process your Excel files."}
                   </p>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, maxWidth: 680 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, maxWidth: 1020 }}>
                   {[
-                    { id: "keyword_hunter", icon: "🔍", title: lang === "tr" ? "Anahtar Kelime Avcısı" : "Keyword Hunter", desc: lang === "tr" ? "Excel dosyasından anahtar kelimeyle eşleşen satırları çıkar ve indir." : "Extract rows matching your keywords from a large Excel file and download the results.", color: colors.primary },
-                    { id: "excel_cleaner",  icon: "🧹", title: lang === "tr" ? "Excel Temizleyici" : "Excel Cleaner", desc: lang === "tr" ? "Anahtar kelimeyle eşleşen satırları işaretle ve temizlenmiş dosyayı indir." : "Flag rows matching your keywords, review them, and download a cleaned file.", color: colors.success },
+                    { id: "keyword_hunter", icon: "🔍", title: lang === "tr" ? "Anahtar Kelime Avcısı" : "Keyword Hunter",    desc: lang === "tr" ? "Excel dosyasından anahtar kelimeyle eşleşen satırları çıkar ve indir." : "Extract rows matching your keywords from a large Excel file and download the results.", color: colors.primary },
+                    { id: "excel_cleaner",  icon: "🧹", title: lang === "tr" ? "Excel Temizleyici" : "Excel Cleaner",          desc: lang === "tr" ? "Anahtar kelimeyle eşleşen satırları işaretle ve temizlenmiş dosyayı indir." : "Flag rows matching your keywords, review them, and download a cleaned file.", color: colors.success },
+                    { id: "attendance",     icon: "⏱", title: lang === "tr" ? "Mesai Takibi" : "Attendance Tracker",          desc: lang === "tr" ? "Giriş/çıkış tablosunu yükle, çalışan başına fazla/eksik mesaiyi hesapla." : "Upload a check-in/out sheet and calculate overtime & undertime per employee.", color: colors.accent },
                   ].map(tool => (
                     <button key={tool.id} onClick={() => setToolsSubView(tool.id)}
                       style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 28, cursor: "pointer", textAlign: "left", fontFamily: font, transition: "all .2s" }}
@@ -6367,6 +6690,9 @@ Kurallar:
             )}
             {toolsSubView === "excel_cleaner" && (
               <ExcelCleanerView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />
+            )}
+            {toolsSubView === "attendance" && (
+              <AttendanceView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />
             )}
           </div>
         )}
