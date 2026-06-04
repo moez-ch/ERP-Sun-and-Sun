@@ -954,7 +954,7 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
                         style={{ accentColor: colors.danger }} />
                     </th>
                     <th style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, fontFamily: font }}>#</th>
-                    {headers.slice(0, 6).map(h => (
+                    {headers.map(h => (
                       <th key={h} style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, whiteSpace: "nowrap", fontFamily: font }}>{h}</th>
                     ))}
                     <th style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, fontFamily: font }}>{tr("Matched", "Eşleşen")}</th>
@@ -969,7 +969,7 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
                           style={{ accentColor: colors.danger, cursor: "pointer" }} />
                       </td>
                       <td style={{ padding: "5px 10px", color: colors.textDim, fontSize: 10, fontFamily: font }}>R{res.originalIndex + 1}</td>
-                      {headers.slice(0, 6).map((_, ci) => (
+                      {headers.map((_, ci) => (
                         <td key={ci} title={String(res.row[ci] ?? "")} style={{ padding: "5px 10px", color: colors.text, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: font }}>{String(res.row[ci] ?? "")}</td>
                       ))}
                       <td style={{ padding: "5px 10px" }}>
