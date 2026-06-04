@@ -415,9 +415,10 @@ function deduplicateMondayItems(items, columns, signals = { name: true, email: t
 // ═══════════════════════════════════════════════════════════════
 // EXCEL TOOLS — Shared keyword panel
 // ═══════════════════════════════════════════════════════════════
-function KwPanelSection({ kws, kwInput, showImport, importText, onInput, onAdd, onDelete, onToggle, onCheckAll, onUncheckAll, onToggleImport, onImportText, onDoImport, onExport, onClear, colors, font, lang }) {
+function KwPanelSection({ kws, kwInput, showImport, importText, onInput, onAdd, onDelete, onToggle, onCheck, onCheckAll, onUncheckAll, onToggleImport, onImportText, onDoImport, onExport, onClear, colors, font, lang }) {
   const tr = (en, t) => lang === "tr" ? t : en;
   const activeCount = kws.filter(k => k.active).length;
+  const sorted = [...kws].sort((a, b) => a.text.localeCompare(b.text, undefined, { sensitivity: "base" }));
   return (
     <div>
       <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
@@ -427,12 +428,18 @@ function KwPanelSection({ kws, kwInput, showImport, importText, onInput, onAdd, 
         <button onClick={onAdd} style={{ background: colors.primary, border: "none", borderRadius: 6, padding: "5px 10px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+</button>
       </div>
       <div style={{ maxHeight: 200, overflowY: "auto", marginBottom: 8 }}>
-        {kws.length === 0
+        {sorted.length === 0
           ? <div style={{ color: colors.textDim, fontSize: 11, padding: "6px 0", fontFamily: font }}>{tr("No keywords yet.", "Henüz anahtar kelime yok.")}</div>
-          : kws.map(k => (
+          : sorted.map(k => (
             <div key={k.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0", borderBottom: `1px solid ${colors.border}` }}>
               <input type="checkbox" checked={k.active} onChange={e => onToggle(k.id, e.target.checked)} style={{ accentColor: colors.primary }} />
-              <span style={{ flex: 1, fontSize: 12, color: k.active ? colors.text : colors.textDim, fontFamily: font, wordBreak: "break-word" }}>{k.text}</span>
+              <span style={{ flex: 1, fontSize: 12, color: k.active ? (k.checked ? colors.textDim : colors.text) : colors.textDim, fontFamily: font, wordBreak: "break-word", textDecoration: k.checked ? "line-through" : "none" }}>{k.text}</span>
+              {onCheck && (
+                <button onClick={() => onCheck(k.id)} title={tr(k.checked ? "Unmark" : "Mark as checked", k.checked ? "İşareti kaldır" : "Kontrol edildi olarak işaretle")}
+                  style={{ background: k.checked ? colors.success : "none", border: `1px solid ${k.checked ? colors.success : colors.border}`, borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", color: k.checked ? "#fff" : colors.textDim, flexShrink: 0, padding: 0 }}>
+                  ✓
+                </button>
+              )}
               <button onClick={() => onDelete(k.id)} style={{ background: "none", border: "none", color: colors.textDim, cursor: "pointer", fontSize: 14, padding: "0 2px", lineHeight: 1 }}>×</button>
             </div>
           ))
@@ -683,7 +690,7 @@ const DEFAULT_CLEANER_COMPANY_KWS = [
   "Akademi","Belediye","Diş","Güzellik","Topluluk","Lisa","Ecza","Arabulucu","Kiralama","Rent",
   "Lawyer","Freelance","Birlik","Osb","Ekspertiz","Müşavir","Fk","Futbol","Odası","İtfaiye",
   "Teknopark","Teknokent","Otel","Proje","Rehabilitasyon",
-].map((text, i) => ({ id: i + 1, text, active: true }));
+].map((text, i) => ({ id: i + 1, text, active: true, checked: false }));
 
 function ExcelCleanerView({ colors, font, lang, onBack }) {
   const K_COMPANY = "eccleaner_kw_company";
@@ -742,18 +749,22 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
     const cols = scopeMode === "all" ? headers.map((_, i) => i) : scopeMode === "first" ? [0] : [...pickedCols];
     if (!allKws.length) { alert(tr("No active keywords.", "Aktif anahtar kelime yok.")); return; }
     if (!cols.length)   { alert(tr("No columns selected.", "Sütun seçilmedi.")); return; }
-    const existing = scanResults || [];
-    const existingIdx = new Set(existing.map(r => r.originalIndex));
-    const newResults = [];
+    const freshResults = [];
     rows.slice(1).forEach((row, idx) => {
-      if (existingIdx.has(idx + 1)) return;
       const matches = [];
       for (const kw of allKws) for (const ci of cols) {
         if (String(row[ci] ?? "").toLowerCase().includes(kw.text.toLowerCase())) matches.push({ keyword: kw.text, colIndex: ci });
       }
-      if (matches.length) newResults.push({ originalIndex: idx + 1, row, matches, marked: true });
+      if (matches.length) freshResults.push({ originalIndex: idx + 1, row, matches, marked: true });
     });
-    setScanResults([...existing, ...newResults]);
+    setScanResults(freshResults);
+  }
+
+  function deleteMarkedRows() {
+    if (!scanResults || markedCount === 0) return;
+    const toDelete = new Set(scanResults.filter(r => r.marked).map(r => r.originalIndex));
+    setRows(prev => prev.filter((_, i) => i === 0 || !toDelete.has(i)));
+    setScanResults(null);
   }
 
   function downloadCleaned() {
@@ -785,9 +796,10 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
     return {
       kws, kwInput: kwInp, showImport: imp, importText: impTxt,
       onInput: setInp,
-      onAdd: () => { const t = kwInp.trim(); if (!t || kws.some(k => k.text.toLowerCase() === t.toLowerCase())) { setInp(""); return; } save([...kws, { id: Date.now() + Math.random(), text: t, active: true }]); setInp(""); },
+      onAdd: () => { const t = kwInp.trim(); if (!t || kws.some(k => k.text.toLowerCase() === t.toLowerCase())) { setInp(""); return; } save([...kws, { id: Date.now() + Math.random(), text: t, active: true, checked: false }]); setInp(""); },
       onDelete: id => save(kws.filter(k => String(k.id) !== String(id))),
       onToggle: (id, val) => save(kws.map(k => String(k.id) === String(id) ? { ...k, active: val } : k)),
+      onCheck:  id => save(kws.map(k => String(k.id) === String(id) ? { ...k, checked: !(k.checked ?? false) } : k)),
       onCheckAll:   () => save(kws.map(k => ({ ...k, active: true }))),
       onUncheckAll: () => save(kws.map(k => ({ ...k, active: false }))),
       onToggleImport: () => setImp(s => !s),
@@ -795,7 +807,7 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
       onDoImport: () => {
         const lines = impTxt.split("\n").map(l => l.trim()).filter(Boolean);
         const next = [...kws];
-        lines.forEach(line => { if (!next.some(k => k.text.toLowerCase() === line.toLowerCase())) next.push({ id: Date.now() + Math.random(), text: line, active: true }); });
+        lines.forEach(line => { if (!next.some(k => k.text.toLowerCase() === line.toLowerCase())) next.push({ id: Date.now() + Math.random(), text: line, active: true, checked: false }); });
         save(next); setImpTxt(""); setImp(false);
       },
       onExport: () => { const blob = new Blob([kws.map(k => k.text).join("\n")], { type: "text/plain" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `keywords_${cat}.txt`; a.click(); },
@@ -887,12 +899,6 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
             style={{ width: "100%", padding: 13, background: canScan ? "#1a1a1a" : colors.border, border: `1px solid ${canScan ? "#333" : colors.border}`, borderRadius: 10, color: canScan ? colors.accent : colors.textDim, fontSize: 13, fontWeight: 700, cursor: canScan ? "pointer" : "not-allowed", fontFamily: font }}>
             🔍 {tr("Scan for Matches", "Eşleşmeleri Tara")}
           </button>
-          {scanResults !== null && scanResults.length > 0 && (
-            <button onClick={() => setScanResults(null)}
-              style={{ width: "100%", padding: 8, background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, fontSize: 11, cursor: "pointer", fontFamily: font }}>
-              ↺ {tr("Clear results & start fresh", "Sonuçları temizle")}
-            </button>
-          )}
         </div>
         <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
           {scanResults !== null && scanResults.length > 0 && (
@@ -912,6 +918,10 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
                 <button onClick={downloadCleaned} disabled={markedCount === 0}
                   style={{ background: markedCount > 0 ? colors.success : colors.border, border: "none", borderRadius: 5, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: markedCount > 0 ? "pointer" : "not-allowed", color: markedCount > 0 ? "#fff" : colors.textDim, fontFamily: font }}>
                   ⬇ {tr("Download Cleaned", "Temizlenmiş İndir")}
+                </button>
+                <button onClick={deleteMarkedRows} disabled={markedCount === 0}
+                  style={{ background: markedCount > 0 ? colors.danger : colors.border, border: "none", borderRadius: 5, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: markedCount > 0 ? "pointer" : "not-allowed", color: markedCount > 0 ? "#fff" : colors.textDim, fontFamily: font }}>
+                  🗑 {tr("Delete", "Sil")} ({markedCount})
                 </button>
               </div>
             </div>
