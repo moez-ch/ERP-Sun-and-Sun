@@ -947,13 +947,13 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr>
-                    <th style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, width: 36 }}>
+                    <th style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, left: 0, zIndex: 4, width: 36 }}>
                       <input type="checkbox" checked={markedCount === scanResults.length}
                         ref={el => { if (el) el.indeterminate = markedCount > 0 && keptCount > 0; }}
                         onChange={e => setScanResults(prev => prev.map(r => ({ ...r, marked: e.target.checked })))}
                         style={{ accentColor: colors.danger }} />
                     </th>
-                    <th style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, fontFamily: font }}>#</th>
+                    <th style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, left: 36, zIndex: 4, fontFamily: font, borderRight: `1px solid ${colors.border}` }}>#</th>
                     {headers.map(h => (
                       <th key={h} style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, whiteSpace: "nowrap", fontFamily: font }}>{h}</th>
                     ))}
@@ -963,12 +963,12 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
                 <tbody>
                   {scanResults.map((res, ri) => (
                     <tr key={ri} style={{ borderBottom: `1px solid ${colors.border}`, background: res.marked ? `${colors.danger}10` : `${colors.success}08`, borderLeft: `3px solid ${res.marked ? colors.danger : colors.success}` }}>
-                      <td style={{ padding: "5px 10px" }}>
+                      <td style={{ padding: "5px 10px", position: "sticky", left: 0, zIndex: 1, background: res.marked ? `${colors.danger}18` : `${colors.success}10` }}>
                         <input type="checkbox" checked={res.marked}
                           onChange={e => setScanResults(prev => prev.map((r, i) => i === ri ? { ...r, marked: e.target.checked } : r))}
                           style={{ accentColor: colors.danger, cursor: "pointer" }} />
                       </td>
-                      <td style={{ padding: "5px 10px", color: colors.textDim, fontSize: 10, fontFamily: font }}>R{res.originalIndex + 1}</td>
+                      <td style={{ padding: "5px 10px", color: colors.textDim, fontSize: 10, fontFamily: font, position: "sticky", left: 36, zIndex: 1, background: res.marked ? `${colors.danger}18` : `${colors.success}10`, borderRight: `1px solid ${colors.border}` }}>R{res.originalIndex + 1}</td>
                       {headers.map((_, ci) => (
                         <td key={ci} title={String(res.row[ci] ?? "")} style={{ padding: "5px 10px", color: colors.text, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: font }}>{String(res.row[ci] ?? "")}</td>
                       ))}
