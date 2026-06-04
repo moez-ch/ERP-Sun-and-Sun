@@ -674,13 +674,29 @@ function KeywordHunterView({ colors, font, lang, onBack }) {
 // ═══════════════════════════════════════════════════════════════
 // EXCEL CLEANER
 // ═══════════════════════════════════════════════════════════════
+const DEFAULT_CLEANER_COMPANY_KWS = [
+  "Development","Jandarma","Makyaj","Kendi","Kosgeb","Kurucu","Dental","Çiğ Köfte","Sigorta",
+  "Gayrimenkul","Eğitim Kurumu","Parti","Psikoloji","Öğrenci","Mimar","Association","Avm",
+  "Alışveriş Merkezi","Serbest Çalışan","Duty Free","Kızılay","İşkur","Kargo","Bakanlık",
+  "Bakanlığı","Hastane","Hospital","Univercity","Üniversite","Universite","Human","Organization",
+  "Allianz","Atölye","Kulüp","Baro","Kolej","Consulting","Danışma","Coordination","Hukuk",
+  "Akademi","Belediye","Diş","Güzellik","Topluluk","Lisa","Ecza","Arabulucu","Kiralama","Rent",
+  "Lawyer","Freelance","Birlik","Osb","Ekspertiz","Müşavir","Fk","Futbol","Odası","İtfaiye",
+  "Teknopark","Teknokent","Otel","Proje","Rehabilitasyon",
+].map((text, i) => ({ id: i + 1, text, active: true }));
+
 function ExcelCleanerView({ colors, font, lang, onBack }) {
   const K_COMPANY = "eccleaner_kw_company";
   const K_PROF    = "eccleaner_kw_profession";
   const tr = (en, t) => lang === "tr" ? t : en;
   const loadK = key => { try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; } };
 
-  const [kwsC, setKwsC] = useState(() => loadK(K_COMPANY));
+  const [kwsC, setKwsC] = useState(() => {
+    const stored = localStorage.getItem(K_COMPANY);
+    if (stored) { try { return JSON.parse(stored); } catch {} }
+    localStorage.setItem(K_COMPANY, JSON.stringify(DEFAULT_CLEANER_COMPANY_KWS));
+    return DEFAULT_CLEANER_COMPANY_KWS;
+  });
   const [kwsP, setKwsP] = useState(() => loadK(K_PROF));
   const [kwTab, setKwTab]   = useState("company");
   const [kwInpC, setKwInpC] = useState("");
