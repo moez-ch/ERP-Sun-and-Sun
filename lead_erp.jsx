@@ -1059,7 +1059,7 @@ function AttendanceView({ colors, font, lang, onBack }) {
   function setEntry(emp, dk, field, val) {
     const next = { ...data };
     if (!next[emp]) next[emp] = {};
-    if (!next[emp][dk]) next[emp][dk] = { in: "", out: "" };
+    if (!next[emp][dk]) next[emp][dk] = { in: "", out: "", type: "" };
     next[emp][dk] = { ...next[emp][dk], [field]: val };
     saveData(next);
   }
@@ -1074,6 +1074,7 @@ function AttendanceView({ colors, font, lang, onBack }) {
     let total = null;
     wd.forEach(d => {
       const e = data[emp]?.[attDK(d)];
+      if (e?.type) return; // leave or holiday — excluded from diff
       if (!e?.in || !e?.out) return;
       const v = attDiff(e.in, e.out);
       if (v != null) total = (total ?? 0) + v;
@@ -1186,25 +1187,48 @@ function AttendanceView({ colors, font, lang, onBack }) {
                   <tr key={ei} style={{ background: ei%2===0 ? "transparent" : `${colors.bg}99` }}>
                     <td style={{ ...tdSt, fontFamily:font, fontSize:12, fontWeight:600, color:colors.text, padding:"10px 14px", position:"sticky", left:0, background: ei%2===0 ? colors.surface : `${colors.bg}ee`, zIndex:1 }}>{emp}</td>
                     {wDays.map((d,di) => {
-                      const dk  = attDK(d);
-                      const ent = data[emp]?.[dk] || { in:"", out:"" };
-                      const dv  = attDiff(ent.in, ent.out);
+                      const dk   = attDK(d);
+                      const ent  = data[emp]?.[dk] || { in:"", out:"", type:"" };
+                      const type = ent.type || "";
+                      const dv   = type ? null : attDiff(ent.in, ent.out);
+                      const leaveOpts = [
+                        { key:"paid_leave",   label:tr("PL","Üİ"),  title:tr("Paid Leave","Ücretli İzin"),    color:colors.success },
+                        { key:"unpaid_leave", label:tr("UL","ÜSİ"), title:tr("Unpaid Leave","Ücretsiz İzin"), color:colors.warning },
+                        { key:"holiday",      label:tr("PH","RT"),  title:tr("Public Holiday","Resmi Tatil"),  color:colors.primary },
+                      ];
                       return (
-                        <td key={di} style={{ ...tdSt, minWidth:96 }}>
+                        <td key={di} style={{ ...tdSt, minWidth:100, background: type ? (type==="paid_leave"?`${colors.success}08`:type==="unpaid_leave"?`${colors.warning}08`:`${colors.primary}08`) : "transparent" }}>
                           <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
                             <div style={{ display:"flex", alignItems:"center", gap:3 }}>
                               <span style={{ fontSize:9, color:colors.success, width:8, flexShrink:0 }}>↑</span>
-                              <input type="time" value={ent.in||""} onChange={e=>setEntry(emp,dk,"in",e.target.value)} style={inpSt} />
+                              <input type="time" value={ent.in||""} disabled={!!type}
+                                onChange={e=>setEntry(emp,dk,"in",e.target.value)}
+                                style={{ ...inpSt, opacity: type ? 0.3 : 1 }} />
                             </div>
                             <div style={{ display:"flex", alignItems:"center", gap:3 }}>
                               <span style={{ fontSize:9, color:colors.danger, width:8, flexShrink:0 }}>↓</span>
-                              <input type="time" value={ent.out||""} onChange={e=>setEntry(emp,dk,"out",e.target.value)} style={inpSt} />
+                              <input type="time" value={ent.out||""} disabled={!!type}
+                                onChange={e=>setEntry(emp,dk,"out",e.target.value)}
+                                style={{ ...inpSt, opacity: type ? 0.3 : 1 }} />
                             </div>
                             {dv!=null && (
-                              <div style={{ fontSize:9, fontWeight:700, color:dv>=0?colors.success:colors.danger, textAlign:"center", fontFamily:font }}>
-                                {attFmt(dv)}
+                              <div style={{ fontSize:9, fontWeight:700, color:dv>=0?colors.success:colors.danger, textAlign:"center", fontFamily:font }}>{attFmt(dv)}</div>
+                            )}
+                            {type && (
+                              <div style={{ fontSize:9, fontWeight:700, textAlign:"center", fontFamily:font, color: leaveOpts.find(o=>o.key===type)?.color }}>
+                                {leaveOpts.find(o=>o.key===type)?.title}
                               </div>
                             )}
+                            <div style={{ display:"flex", gap:3, marginTop:2, flexWrap:"wrap" }}>
+                              {leaveOpts.map(opt => (
+                                <label key={opt.key} title={opt.title} style={{ display:"flex", alignItems:"center", gap:2, cursor:"pointer" }}>
+                                  <input type="checkbox" checked={type===opt.key}
+                                    onChange={e=>setEntry(emp,dk,"type",e.target.checked?opt.key:"")}
+                                    style={{ accentColor:opt.color, width:10, height:10, cursor:"pointer" }} />
+                                  <span style={{ fontSize:8, color:type===opt.key?opt.color:colors.textDim, fontWeight:700, fontFamily:font }}>{opt.label}</span>
+                                </label>
+                              ))}
+                            </div>
                           </div>
                         </td>
                       );
