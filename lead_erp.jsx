@@ -278,6 +278,7 @@ const SettingsIcon = (p) => <Icon d="M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.6
 const RefreshIcon = (p) => <Icon d="M23 4v6h-6M1 20v-6h6M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" {...p} />;
 const PhoneCallIcon = (p) => <Icon d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" {...p} />;
 const MicIcon = (p) => <Icon d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zM19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" {...p} />;
+const TableIcon = (p) => <Icon d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18" {...p} />;
 const LinkedInIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="#0A66C2">
     <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
@@ -409,6 +410,557 @@ function deduplicateMondayItems(items, columns, signals = { name: true, email: t
   const order = Object.fromEntries(items.map((item, idx) => [item.id, idx]));
   result.sort((a, b) => (order[a.id] ?? 0) - (order[b.id] ?? 0));
   return { deduped: result, mergedCount, mergeLog };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXCEL TOOLS — Shared keyword panel
+// ═══════════════════════════════════════════════════════════════
+function KwPanelSection({ kws, kwInput, showImport, importText, onInput, onAdd, onDelete, onToggle, onCheckAll, onUncheckAll, onToggleImport, onImportText, onDoImport, onExport, onClear, colors, font, lang }) {
+  const tr = (en, t) => lang === "tr" ? t : en;
+  const activeCount = kws.filter(k => k.active).length;
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+        <input value={kwInput} onChange={e => onInput(e.target.value)} onKeyDown={e => e.key === "Enter" && onAdd()}
+          placeholder={tr("Add keyword…", "Anahtar kelime ekle…")}
+          style={{ flex: 1, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "5px 8px", color: colors.text, fontSize: 12, fontFamily: font, outline: "none" }} />
+        <button onClick={onAdd} style={{ background: colors.primary, border: "none", borderRadius: 6, padding: "5px 10px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+</button>
+      </div>
+      <div style={{ maxHeight: 200, overflowY: "auto", marginBottom: 8 }}>
+        {kws.length === 0
+          ? <div style={{ color: colors.textDim, fontSize: 11, padding: "6px 0", fontFamily: font }}>{tr("No keywords yet.", "Henüz anahtar kelime yok.")}</div>
+          : kws.map(k => (
+            <div key={k.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0", borderBottom: `1px solid ${colors.border}` }}>
+              <input type="checkbox" checked={k.active} onChange={e => onToggle(k.id, e.target.checked)} style={{ accentColor: colors.primary }} />
+              <span style={{ flex: 1, fontSize: 12, color: k.active ? colors.text : colors.textDim, fontFamily: font, wordBreak: "break-word" }}>{k.text}</span>
+              <button onClick={() => onDelete(k.id)} style={{ background: "none", border: "none", color: colors.textDim, cursor: "pointer", fontSize: 14, padding: "0 2px", lineHeight: 1 }}>×</button>
+            </div>
+          ))
+        }
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+        {[
+          { label: tr("✓ All", "✓ Tümü"), fn: onCheckAll },
+          { label: tr("○ None", "○ Hiçbiri"), fn: onUncheckAll },
+          { label: tr("⬆ Import", "⬆ İçe Aktar"), fn: onToggleImport },
+          { label: tr("⬇ Export", "⬇ Dışa Aktar"), fn: onExport },
+          { label: tr("🗑 Clear", "🗑 Temizle"), fn: onClear },
+        ].map(({ label, fn }) => (
+          <button key={label} onClick={fn} style={{ background: "none", border: `1px solid ${colors.border}`, borderRadius: 4, padding: "2px 7px", fontSize: 11, cursor: "pointer", color: colors.textMuted, fontFamily: font }}>{label}</button>
+        ))}
+      </div>
+      {showImport && (
+        <div style={{ marginTop: 6 }}>
+          <textarea value={importText} onChange={e => onImportText(e.target.value)}
+            placeholder={tr("One keyword per line…", "Her satıra bir anahtar kelime…")}
+            style={{ width: "100%", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, padding: "6px 8px", fontSize: 11, color: colors.text, fontFamily: font, height: 70, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
+          <div style={{ display: "flex", gap: 5, marginTop: 4 }}>
+            <button onClick={onDoImport} style={{ background: colors.primary, border: "none", borderRadius: 5, padding: "4px 10px", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: font }}>{tr("Import", "İçe Aktar")}</button>
+            <button onClick={onToggleImport} style={{ background: "none", border: `1px solid ${colors.border}`, borderRadius: 5, padding: "4px 10px", color: colors.textMuted, fontSize: 11, cursor: "pointer", fontFamily: font }}>{tr("Cancel", "İptal")}</button>
+          </div>
+        </div>
+      )}
+      <div style={{ fontSize: 10, color: colors.textDim, fontFamily: font, marginTop: 4 }}>{activeCount} {tr("active", "aktif")} · {kws.length} {tr("total", "toplam")}</div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KEYWORD HUNTER
+// ═══════════════════════════════════════════════════════════════
+function KeywordHunterView({ colors, font, lang, onBack }) {
+  const KW_KEY = "snstool_hunter_kws";
+  const tr = (en, t) => lang === "tr" ? t : en;
+
+  const [kws, setKws] = useState(() => {
+    try {
+      const s = localStorage.getItem(KW_KEY);
+      if (s) return JSON.parse(s);
+      const seed = localStorage.getItem("eccleaner_kw_company");
+      if (seed) { const p = JSON.parse(seed); localStorage.setItem(KW_KEY, JSON.stringify(p)); return p; }
+    } catch {}
+    return [];
+  });
+  const [kwInput, setKwInput]   = useState("");
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [headers, setHeaders]   = useState([]);
+  const [allRows, setAllRows]   = useState([]);
+  const [fileName, setFileName] = useState("");
+  const [selCol, setSelCol]     = useState("__all__");
+  const [results, setResults]   = useState(null);
+  const [outName, setOutName]   = useState("extracted_results.xlsx");
+  const fileRef = useRef(null);
+
+  function saveKws(arr) { setKws(arr); localStorage.setItem(KW_KEY, JSON.stringify(arr)); }
+
+  function loadFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        if (!raw || raw.length === 0) { alert(tr("File appears empty.", "Dosya boş görünüyor.")); return; }
+        const hdrs = (raw[0] || []).map((h, i) => h ? String(h) : `Col ${i + 1}`);
+        setHeaders(hdrs); setAllRows(raw); setFileName(file.name); setResults(null);
+      } catch (err) { alert(tr("Could not read file: ", "Dosya okunamadı: ") + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function addKw() {
+    const text = kwInput.trim();
+    if (!text || kws.some(k => k.text.toLowerCase() === text.toLowerCase())) { setKwInput(""); return; }
+    saveKws([...kws, { id: Date.now() + Math.random(), text, active: true }]);
+    setKwInput("");
+  }
+
+  function doImport() {
+    const lines = importText.split("\n").map(l => l.trim()).filter(Boolean);
+    const next = [...kws];
+    lines.forEach(line => { if (!next.some(k => k.text.toLowerCase() === line.toLowerCase())) next.push({ id: Date.now() + Math.random(), text: line, active: true }); });
+    saveKws(next); setImportText(""); setShowImport(false);
+  }
+
+  function runExtract() {
+    const activeKws = kws.filter(k => k.active);
+    if (!activeKws.length) { alert(tr("No active keywords.", "Aktif anahtar kelime yok.")); return; }
+    const colIdx = headers.indexOf(selCol);
+    const matched = allRows.slice(1).filter(row => {
+      const cells = colIdx >= 0 ? [String(row[colIdx] ?? "")] : row.map(c => String(c ?? ""));
+      return cells.some(cell => activeKws.some(kw => cell.toLowerCase().includes(kw.text.toLowerCase())));
+    });
+    setResults(matched);
+    setOutName(fileName.replace(/\.[^.]+$/, "") + "_extracted.xlsx");
+  }
+
+  function downloadResults() {
+    if (!results || !results.length) return;
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...results]);
+    const wb2 = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2, ws, "Extracted");
+    XLSX.writeFile(wb2, outName.endsWith(".xlsx") ? outName : outName + ".xlsx");
+  }
+
+  const canRun = allRows.length > 0 && kws.some(k => k.active);
+
+  return (
+    <div style={{ animation: "slideIn .3s ease" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+        <button onClick={onBack} style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, padding: "6px 14px", cursor: "pointer", color: colors.textMuted, fontSize: 12, fontFamily: font }}>← {tr("Back", "Geri")}</button>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: font, marginBottom: 2 }}>🔍 {tr("Keyword Hunter", "Anahtar Kelime Avcısı")}</h1>
+          <p style={{ color: colors.textMuted, fontSize: 12, fontFamily: font }}>{tr("Upload an Excel file, select keywords, extract and download matching rows.", "Excel dosyası yükle, anahtar kelimeleri seç, eşleşen satırları çıkar.")}</p>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "290px 1fr", gap: 18, alignItems: "start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font }}>📂 {tr("1. Load File", "1. Dosya Yükle")}</div>
+            <div style={{ padding: 14 }}>
+              <div onClick={() => fileRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); }}
+                style={{ border: `2px dashed ${fileName ? colors.success : colors.borderLight}`, borderRadius: 8, padding: "16px 10px", textAlign: "center", cursor: "pointer", background: fileName ? `${colors.success}10` : "transparent" }}>
+                <div style={{ fontSize: 22, marginBottom: 5 }}>{fileName ? "✅" : "📊"}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: fileName ? colors.success : colors.text, fontFamily: font, wordBreak: "break-all" }}>{fileName || tr("Click or drag & drop", "Tıkla veya sürükle & bırak")}</div>
+                {!fileName && <div style={{ fontSize: 11, color: colors.textDim, marginTop: 3, fontFamily: font }}>.xlsx / .xls</div>}
+                {allRows.length > 0 && <div style={{ fontSize: 10, color: colors.textDim, marginTop: 3, fontFamily: font }}>{(allRows.length - 1).toLocaleString()} {tr("rows", "satır")} · {headers.length} {tr("cols", "sütun")}</div>}
+              </div>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) loadFile(e.target.files[0]); }} />
+            </div>
+          </div>
+          {headers.length > 0 && (
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font }}>🔎 {tr("2. Search Column", "2. Arama Sütunu")}</div>
+              <div style={{ padding: 14 }}>
+                <select value={selCol} onChange={e => setSelCol(e.target.value)}
+                  style={{ width: "100%", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "7px 10px", color: colors.text, fontSize: 12, fontFamily: font, outline: "none" }}>
+                  <option value="__all__">{tr("— All columns —", "— Tüm sütunlar —")}</option>
+                  {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font, display: "flex", justifyContent: "space-between" }}>
+              <span>🏷️ {tr("3. Keywords", "3. Anahtar Kelimeler")}</span>
+              <span style={{ color: colors.primary }}>{kws.filter(k => k.active).length}/{kws.length}</span>
+            </div>
+            <div style={{ padding: 14 }}>
+              <KwPanelSection
+                kws={kws} kwInput={kwInput} showImport={showImport} importText={importText}
+                onInput={setKwInput} onAdd={addKw}
+                onDelete={id => saveKws(kws.filter(k => String(k.id) !== String(id)))}
+                onToggle={(id, val) => saveKws(kws.map(k => String(k.id) === String(id) ? { ...k, active: val } : k))}
+                onCheckAll={() => saveKws(kws.map(k => ({ ...k, active: true })))}
+                onUncheckAll={() => saveKws(kws.map(k => ({ ...k, active: false })))}
+                onToggleImport={() => setShowImport(s => !s)}
+                onImportText={setImportText} onDoImport={doImport}
+                onExport={() => { const blob = new Blob([kws.map(k => k.text).join("\n")], { type: "text/plain" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "keywords_hunter.txt"; a.click(); }}
+                onClear={() => { if (confirm(tr("Clear all keywords?", "Tüm anahtar kelimeler silinsin mi?"))) saveKws([]); }}
+                colors={colors} font={font} lang={lang}
+              />
+            </div>
+          </div>
+          <button onClick={runExtract} disabled={!canRun}
+            style={{ width: "100%", padding: 13, background: canRun ? colors.primary : colors.border, border: "none", borderRadius: 10, color: canRun ? "#fff" : colors.textDim, fontSize: 13, fontWeight: 700, cursor: canRun ? "pointer" : "not-allowed", fontFamily: font }}>
+            🔍 {tr("Extract Matches", "Eşleşmeleri Çıkar")}
+          </button>
+        </div>
+        <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden", minHeight: 400 }}>
+          {results === null ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 60, textAlign: "center", minHeight: 400 }}>
+              <div style={{ fontSize: 48, marginBottom: 14 }}>📋</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: colors.textMuted, fontFamily: font, marginBottom: 6 }}>{tr("No results yet", "Henüz sonuç yok")}</div>
+              <div style={{ fontSize: 12, color: colors.textDim, fontFamily: font, maxWidth: 280 }}>{tr("Load a file, set your keywords, then click Extract.", "Dosya yükle, anahtar kelimeleri ayarla, ardından Çıkar'a tıkla.")}</div>
+            </div>
+          ) : results.length === 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 60, textAlign: "center", minHeight: 400 }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>🎉</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: colors.textMuted, fontFamily: font }}>{tr("No matches found", "Eşleşme bulunamadı")}</div>
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: "10px 16px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, fontFamily: font }}>
+                  <strong style={{ color: colors.success }}>{results.length.toLocaleString()}</strong>
+                  <span style={{ color: colors.textMuted }}> {tr("rows matched", "satır eşleşti")}</span>
+                  {allRows.length > 1 && <span style={{ color: colors.textDim }}> / {(allRows.length - 1).toLocaleString()} {tr("total", "toplam")}</span>}
+                </span>
+                <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+                  <input value={outName} onChange={e => setOutName(e.target.value)}
+                    style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "5px 10px", color: colors.text, fontSize: 11, fontFamily: font, width: 200, outline: "none" }} />
+                  <button onClick={downloadResults}
+                    style={{ background: colors.success, border: "none", borderRadius: 6, padding: "7px 16px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font, whiteSpace: "nowrap" }}>
+                    ⬇ {tr("Download", "İndir")}
+                  </button>
+                </div>
+              </div>
+              <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 300px)" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ background: colors.bg, color: colors.accent, padding: "8px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, fontFamily: font }}>#</th>
+                      {headers.map(h => (
+                        <th key={h} style={{ background: colors.bg, color: colors.accent, padding: "8px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, whiteSpace: "nowrap", fontFamily: font }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.slice(0, 100).map((row, ri) => (
+                      <tr key={ri} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                        <td style={{ padding: "5px 10px", color: colors.textDim, fontSize: 10, fontFamily: font }}>{ri + 1}</td>
+                        {headers.map((_, ci) => (
+                          <td key={ci} title={String(row[ci] ?? "")} style={{ padding: "5px 10px", color: colors.text, maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: font }}>{String(row[ci] ?? "")}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {results.length > 100 && (
+                  <div style={{ padding: "10px 16px", fontSize: 11, color: colors.textDim, fontFamily: font }}>
+                    {tr(`Showing first 100 of ${results.length.toLocaleString()} rows. Full data in download.`, `${results.length.toLocaleString()} satırın ilk 100'ü gösteriliyor. Tüm veri indirilen dosyada.`)}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXCEL CLEANER
+// ═══════════════════════════════════════════════════════════════
+function ExcelCleanerView({ colors, font, lang, onBack }) {
+  const K_COMPANY = "eccleaner_kw_company";
+  const K_PROF    = "eccleaner_kw_profession";
+  const tr = (en, t) => lang === "tr" ? t : en;
+  const loadK = key => { try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; } };
+
+  const [kwsC, setKwsC] = useState(() => loadK(K_COMPANY));
+  const [kwsP, setKwsP] = useState(() => loadK(K_PROF));
+  const [kwTab, setKwTab]   = useState("company");
+  const [kwInpC, setKwInpC] = useState("");
+  const [kwInpP, setKwInpP] = useState("");
+  const [impC, setImpC]     = useState(false);
+  const [impP, setImpP]     = useState(false);
+  const [impTxtC, setImpTxtC] = useState("");
+  const [impTxtP, setImpTxtP] = useState("");
+
+  const [workbook, setWorkbook]   = useState(null);
+  const [headers, setHeaders]     = useState([]);
+  const [rows, setRows]           = useState([]);
+  const [fileName, setFileName]   = useState("");
+  const [curFile, setCurFile]     = useState(null);
+  const [scopeMode, setScopeMode] = useState("all");
+  const [pickedCols, setPickedCols] = useState(new Set());
+  const [scanResults, setScanResults] = useState(null);
+  const fileRef = useRef(null);
+
+  const saveC = arr => { setKwsC(arr); localStorage.setItem(K_COMPANY, JSON.stringify(arr)); };
+  const saveP = arr => { setKwsP(arr); localStorage.setItem(K_PROF, JSON.stringify(arr)); };
+
+  function loadFile(file) {
+    setCurFile(file);
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array", cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        if (!raw || raw.length === 0) { alert(tr("File appears empty.", "Dosya boş görünüyor.")); return; }
+        const hdrs = (raw[0] || []).map((h, i) => h ? String(h) : `Col ${i + 1}`);
+        setWorkbook(wb); setHeaders(hdrs); setRows(raw); setFileName(file.name);
+        setPickedCols(new Set());
+        setScanResults(null);
+      } catch (err) { alert(tr("Could not read file: ", "Dosya okunamadı: ") + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function runScan() {
+    const allKws = [...kwsC.filter(k => k.active), ...kwsP.filter(k => k.active)];
+    const cols = scopeMode === "all" ? headers.map((_, i) => i) : scopeMode === "first" ? [0] : [...pickedCols];
+    if (!allKws.length) { alert(tr("No active keywords.", "Aktif anahtar kelime yok.")); return; }
+    if (!cols.length)   { alert(tr("No columns selected.", "Sütun seçilmedi.")); return; }
+    const existing = scanResults || [];
+    const existingIdx = new Set(existing.map(r => r.originalIndex));
+    const newResults = [];
+    rows.slice(1).forEach((row, idx) => {
+      if (existingIdx.has(idx + 1)) return;
+      const matches = [];
+      for (const kw of allKws) for (const ci of cols) {
+        if (String(row[ci] ?? "").toLowerCase().includes(kw.text.toLowerCase())) matches.push({ keyword: kw.text, colIndex: ci });
+      }
+      if (matches.length) newResults.push({ originalIndex: idx + 1, row, matches, marked: true });
+    });
+    setScanResults([...existing, ...newResults]);
+  }
+
+  function downloadCleaned() {
+    if (!workbook || !scanResults) return;
+    const toDelete = new Set(scanResults.filter(r => r.marked).map(r => r.originalIndex));
+    const cleaned  = rows.filter((_, i) => i === 0 || !toDelete.has(i));
+    const ws  = XLSX.utils.aoa_to_sheet(cleaned);
+    const wb2 = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2, ws, workbook.SheetNames[0]);
+    const base = curFile ? curFile.name.replace(/\.[^.]+$/, "") : "data";
+    XLSX.writeFile(wb2, base + (lang === "tr" ? "_temizlendi" : "_cleaned") + ".xlsx");
+  }
+
+  const hasFile = rows.length > 0;
+  const activeKwCount = kwsC.filter(k => k.active).length + kwsP.filter(k => k.active).length;
+  const canScan    = hasFile && activeKwCount > 0;
+  const markedCount = scanResults ? scanResults.filter(r => r.marked).length : 0;
+  const keptCount   = scanResults ? scanResults.length - markedCount : 0;
+
+  function mkKwProps(cat) {
+    const kws = cat === "company" ? kwsC : kwsP;
+    const save = cat === "company" ? saveC : saveP;
+    const kwInp = cat === "company" ? kwInpC : kwInpP;
+    const setInp = cat === "company" ? setKwInpC : setKwInpP;
+    const imp    = cat === "company" ? impC : impP;
+    const setImp = cat === "company" ? setImpC : setImpP;
+    const impTxt    = cat === "company" ? impTxtC : impTxtP;
+    const setImpTxt = cat === "company" ? setImpTxtC : setImpTxtP;
+    return {
+      kws, kwInput: kwInp, showImport: imp, importText: impTxt,
+      onInput: setInp,
+      onAdd: () => { const t = kwInp.trim(); if (!t || kws.some(k => k.text.toLowerCase() === t.toLowerCase())) { setInp(""); return; } save([...kws, { id: Date.now() + Math.random(), text: t, active: true }]); setInp(""); },
+      onDelete: id => save(kws.filter(k => String(k.id) !== String(id))),
+      onToggle: (id, val) => save(kws.map(k => String(k.id) === String(id) ? { ...k, active: val } : k)),
+      onCheckAll:   () => save(kws.map(k => ({ ...k, active: true }))),
+      onUncheckAll: () => save(kws.map(k => ({ ...k, active: false }))),
+      onToggleImport: () => setImp(s => !s),
+      onImportText: setImpTxt,
+      onDoImport: () => {
+        const lines = impTxt.split("\n").map(l => l.trim()).filter(Boolean);
+        const next = [...kws];
+        lines.forEach(line => { if (!next.some(k => k.text.toLowerCase() === line.toLowerCase())) next.push({ id: Date.now() + Math.random(), text: line, active: true }); });
+        save(next); setImpTxt(""); setImp(false);
+      },
+      onExport: () => { const blob = new Blob([kws.map(k => k.text).join("\n")], { type: "text/plain" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `keywords_${cat}.txt`; a.click(); },
+      onClear: () => { if (confirm(tr("Clear all keywords?", "Tüm anahtar kelimeler silinsin mi?"))) save([]); },
+      colors, font, lang,
+    };
+  }
+
+  return (
+    <div style={{ animation: "slideIn .3s ease" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+        <button onClick={onBack} style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, padding: "6px 14px", cursor: "pointer", color: colors.textMuted, fontSize: 12, fontFamily: font }}>← {tr("Back", "Geri")}</button>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: font, marginBottom: 2 }}>🧹 {tr("Excel Cleaner", "Excel Temizleyici")}</h1>
+          <p style={{ color: colors.textMuted, fontSize: 12, fontFamily: font }}>{tr("Find rows matching your keywords, mark for deletion, download a clean file.", "Anahtar kelimeyle eşleşen satırları işaretle ve temizlenmiş dosyayı indir.")}</p>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "290px 1fr", gap: 18, alignItems: "start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font }}>📂 {tr("1. Load Excel File", "1. Excel Dosyası Yükle")}</div>
+            <div style={{ padding: 14 }}>
+              <div onClick={() => fileRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); }}
+                style={{ border: `2px dashed ${fileName ? colors.success : colors.borderLight}`, borderRadius: 8, padding: "14px 10px", textAlign: "center", cursor: "pointer", background: fileName ? `${colors.success}10` : "transparent" }}>
+                <div style={{ fontSize: 22, marginBottom: 5 }}>{fileName ? "✅" : "📊"}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: fileName ? colors.success : colors.text, fontFamily: font, wordBreak: "break-all" }}>{fileName || tr("Click or drag & drop", "Tıkla veya sürükle & bırak")}</div>
+                {!fileName && <div style={{ fontSize: 11, color: colors.textDim, marginTop: 3, fontFamily: font }}>.xlsx / .xls / .csv</div>}
+                {rows.length > 0 && <div style={{ fontSize: 10, color: colors.textDim, marginTop: 3, fontFamily: font }}>{(rows.length - 1).toLocaleString()} {tr("rows", "satır")} · {headers.length} {tr("cols", "sütun")}</div>}
+              </div>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) loadFile(e.target.files[0]); }} />
+            </div>
+          </div>
+          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font }}>🔍 {tr("2. Search Scope", "2. Arama Kapsamı")}</div>
+            <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
+              {[
+                { val: "all",   label: tr("Search all columns", "Tüm sütunlarda ara") },
+                { val: "first", label: tr("Column A only", "Yalnızca A sütunu") },
+                { val: "pick",  label: tr("Pick specific columns…", "Belirli sütunları seç…") },
+              ].map(o => (
+                <label key={o.val} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, cursor: "pointer", color: colors.text, fontFamily: font }}>
+                  <input type="radio" name="eclScope" value={o.val} checked={scopeMode === o.val} onChange={() => setScopeMode(o.val)} style={{ accentColor: colors.primary }} />
+                  {o.label}
+                </label>
+              ))}
+              {scopeMode === "pick" && headers.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ display: "flex", gap: 5, marginBottom: 7 }}>
+                    <button onClick={() => setPickedCols(new Set(headers.map((_, i) => i)))}
+                      style={{ background: "none", border: `1px solid ${colors.border}`, borderRadius: 4, padding: "2px 8px", fontSize: 11, cursor: "pointer", color: colors.textMuted, fontFamily: font }}>
+                      {tr("✓ Select all", "✓ Tümünü seç")}
+                    </button>
+                    <button onClick={() => setPickedCols(new Set())}
+                      style={{ background: "none", border: `1px solid ${colors.border}`, borderRadius: 4, padding: "2px 8px", fontSize: 11, cursor: "pointer", color: colors.textMuted, fontFamily: font }}>
+                      {tr("○ Unselect all", "○ Hiçbirini seçme")}
+                    </button>
+                    <span style={{ fontSize: 10, color: colors.textDim, fontFamily: font, alignSelf: "center", marginLeft: 2 }}>{pickedCols.size}/{headers.length}</span>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {headers.map((h, i) => (
+                      <label key={i} style={{ display: "flex", alignItems: "center", gap: 3, background: pickedCols.has(i) ? `${colors.primary}20` : colors.bg, border: `1px solid ${pickedCols.has(i) ? colors.primary : colors.border}`, borderRadius: 12, padding: "2px 8px", fontSize: 11, cursor: "pointer", color: pickedCols.has(i) ? colors.primaryLight : colors.textMuted, fontFamily: font }}>
+                        <input type="checkbox" checked={pickedCols.has(i)} onChange={e => { const s = new Set(pickedCols); e.target.checked ? s.add(i) : s.delete(i); setPickedCols(s); }} style={{ accentColor: colors.primary }} />
+                        {h}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font }}>🏷️ {tr("3. Keywords", "3. Anahtar Kelimeler")}</div>
+            <div style={{ padding: 12 }}>
+              <div style={{ display: "flex", borderBottom: `1px solid ${colors.border}`, marginBottom: 10 }}>
+                {[
+                  { id: "company",    label: tr("🏢 Company", "🏢 Şirket"),   count: kwsC.filter(k => k.active).length },
+                  { id: "profession", label: tr("👤 Profession", "👤 Meslek"), count: kwsP.filter(k => k.active).length },
+                ].map(tab => (
+                  <button key={tab.id} onClick={() => setKwTab(tab.id)}
+                    style={{ flex: 1, padding: "7px 4px", background: "none", border: "none", borderBottom: `2px solid ${kwTab === tab.id ? colors.primary : "transparent"}`, color: kwTab === tab.id ? colors.primaryLight : colors.textMuted, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: font }}>
+                    {tab.label} ({tab.count})
+                  </button>
+                ))}
+              </div>
+              <KwPanelSection {...mkKwProps(kwTab)} />
+            </div>
+          </div>
+          <button onClick={runScan} disabled={!canScan}
+            style={{ width: "100%", padding: 13, background: canScan ? "#1a1a1a" : colors.border, border: `1px solid ${canScan ? "#333" : colors.border}`, borderRadius: 10, color: canScan ? colors.accent : colors.textDim, fontSize: 13, fontWeight: 700, cursor: canScan ? "pointer" : "not-allowed", fontFamily: font }}>
+            🔍 {tr("Scan for Matches", "Eşleşmeleri Tara")}
+          </button>
+          {scanResults !== null && scanResults.length > 0 && (
+            <button onClick={() => setScanResults(null)}
+              style={{ width: "100%", padding: 8, background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.textMuted, fontSize: 11, cursor: "pointer", fontFamily: font }}>
+              ↺ {tr("Clear results & start fresh", "Sonuçları temizle")}
+            </button>
+          )}
+        </div>
+        <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          {scanResults !== null && scanResults.length > 0 && (
+            <div style={{ padding: "10px 16px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, fontFamily: font }}>
+                <strong style={{ color: colors.danger }}>{markedCount} {tr("to delete", "silinecek")}</strong>
+                {" · "}
+                <strong style={{ color: colors.success }}>{keptCount} {tr("to keep", "korunacak")}</strong>
+                {" · "}
+                <span style={{ color: colors.textMuted }}>{scanResults.length} {tr("matches", "eşleşme")}</span>
+              </span>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                <button onClick={() => setScanResults(prev => prev.map(r => ({ ...r, marked: true })))}
+                  style={{ border: `1px solid ${colors.border}`, background: "transparent", borderRadius: 5, padding: "5px 10px", fontSize: 11, cursor: "pointer", color: colors.text, fontFamily: font }}>{tr("☑ Mark all", "☑ Tümünü İşaretle")}</button>
+                <button onClick={() => setScanResults(prev => prev.map(r => ({ ...r, marked: false })))}
+                  style={{ border: `1px solid ${colors.border}`, background: "transparent", borderRadius: 5, padding: "5px 10px", fontSize: 11, cursor: "pointer", color: colors.text, fontFamily: font }}>{tr("☐ Unmark all", "☐ İşaretsiz Bırak")}</button>
+                <button onClick={downloadCleaned} disabled={markedCount === 0}
+                  style={{ background: markedCount > 0 ? colors.success : colors.border, border: "none", borderRadius: 5, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: markedCount > 0 ? "pointer" : "not-allowed", color: markedCount > 0 ? "#fff" : colors.textDim, fontFamily: font }}>
+                  ⬇ {tr("Download Cleaned", "Temizlenmiş İndir")}
+                </button>
+              </div>
+            </div>
+          )}
+          {scanResults === null ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 60, textAlign: "center", minHeight: 400 }}>
+              <div style={{ fontSize: 48, marginBottom: 14 }}>📋</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: colors.textMuted, fontFamily: font, marginBottom: 6 }}>{hasFile ? fileName : tr("No file loaded yet", "Henüz dosya yüklenmedi")}</div>
+              <div style={{ fontSize: 12, color: colors.textDim, fontFamily: font, maxWidth: 320 }}>
+                {hasFile
+                  ? tr(`${(rows.length - 1).toLocaleString()} rows · ${headers.length} columns. Add keywords and click Scan.`, `${(rows.length - 1).toLocaleString()} satır · ${headers.length} sütun. Anahtar kelime ekle ve Tara'ya tıkla.`)
+                  : tr("Load a file, add keywords, then scan.", "Dosya yükle, anahtar kelimelerini ekle, ardından tara.")}
+              </div>
+            </div>
+          ) : scanResults.length === 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 60, textAlign: "center", minHeight: 400 }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>🎉</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: colors.textMuted, fontFamily: font }}>{tr("No matches found", "Eşleşme bulunamadı")}</div>
+              <div style={{ fontSize: 12, color: colors.textDim, fontFamily: font, marginTop: 6 }}>{tr("None of the active keywords matched any rows.", "Aktif anahtar kelimeler hiçbir satırla eşleşmedi.")}</div>
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, width: 36 }}>
+                      <input type="checkbox" checked={markedCount === scanResults.length}
+                        ref={el => { if (el) el.indeterminate = markedCount > 0 && keptCount > 0; }}
+                        onChange={e => setScanResults(prev => prev.map(r => ({ ...r, marked: e.target.checked })))}
+                        style={{ accentColor: colors.danger }} />
+                    </th>
+                    <th style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, fontFamily: font }}>#</th>
+                    {headers.slice(0, 6).map(h => (
+                      <th key={h} style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, whiteSpace: "nowrap", fontFamily: font }}>{h}</th>
+                    ))}
+                    <th style={{ background: "#1a1a1a", color: colors.accent, padding: "7px 10px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, fontFamily: font }}>{tr("Matched", "Eşleşen")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scanResults.map((res, ri) => (
+                    <tr key={ri} style={{ borderBottom: `1px solid ${colors.border}`, background: res.marked ? `${colors.danger}10` : `${colors.success}08`, borderLeft: `3px solid ${res.marked ? colors.danger : colors.success}` }}>
+                      <td style={{ padding: "5px 10px" }}>
+                        <input type="checkbox" checked={res.marked}
+                          onChange={e => setScanResults(prev => prev.map((r, i) => i === ri ? { ...r, marked: e.target.checked } : r))}
+                          style={{ accentColor: colors.danger, cursor: "pointer" }} />
+                      </td>
+                      <td style={{ padding: "5px 10px", color: colors.textDim, fontSize: 10, fontFamily: font }}>R{res.originalIndex + 1}</td>
+                      {headers.slice(0, 6).map((_, ci) => (
+                        <td key={ci} title={String(res.row[ci] ?? "")} style={{ padding: "5px 10px", color: colors.text, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: font }}>{String(res.row[ci] ?? "")}</td>
+                      ))}
+                      <td style={{ padding: "5px 10px" }}>
+                        {[...new Set(res.matches.map(m => m.keyword))].map(kw => (
+                          <span key={kw} style={{ display: "inline-block", background: `${colors.danger}25`, color: colors.danger, fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, marginRight: 3, fontFamily: font }}>{kw}</span>
+                        ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── MAIN APP ────────────────────────────────────────────────────
@@ -573,6 +1125,7 @@ function Dashboard({ authUser, onLogout: handleLogout }) {
     } catch { return []; }
   });
   const [view, setView] = useState("dashboard"); // dashboard | leads | agent | pipeline | detail
+  const [toolsSubView, setToolsSubView] = useState(null); // null | "keyword_hunter" | "excel_cleaner"
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
@@ -1733,6 +2286,7 @@ Kurallar:
     { id: "contracts", label: t("nav_contracts"), icon: <FileTextIcon size={18} /> },
     { id: "pricing", label: t("nav_pricing"), icon: <FileTextIcon size={18} /> },
     ...(isAdmin ? [
+      { id: "tools", label: t("nav_tools"), icon: <TableIcon size={18} /> },
       { id: "inbox", label: t("nav_inbox"), icon: <InboxIcon size={18} /> },
       { id: "agent", label: t("nav_agent"), icon: <BotIcon size={18} /> },
     ] : []),
@@ -5751,6 +6305,45 @@ Kurallar:
             </div>
           );
         })()}
+
+        {/* ══════════ EXCEL TOOLS ══════════ */}
+        {view === "tools" && (
+          <div style={{ animation: "slideIn .3s ease" }}>
+            {toolsSubView === null && (
+              <div>
+                <div style={{ marginBottom: 28 }}>
+                  <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("nav_tools")}</h1>
+                  <p style={{ color: colors.textMuted, fontSize: 13 }}>
+                    {lang === "tr" ? "Excel dosyalarınızı işlemek için bir araç seçin." : "Choose a tool to process your Excel files."}
+                  </p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, maxWidth: 680 }}>
+                  {[
+                    { id: "keyword_hunter", icon: "🔍", title: lang === "tr" ? "Anahtar Kelime Avcısı" : "Keyword Hunter", desc: lang === "tr" ? "Excel dosyasından anahtar kelimeyle eşleşen satırları çıkar ve indir." : "Extract rows matching your keywords from a large Excel file and download the results.", color: colors.primary },
+                    { id: "excel_cleaner",  icon: "🧹", title: lang === "tr" ? "Excel Temizleyici" : "Excel Cleaner", desc: lang === "tr" ? "Anahtar kelimeyle eşleşen satırları işaretle ve temizlenmiş dosyayı indir." : "Flag rows matching your keywords, review them, and download a cleaned file.", color: colors.success },
+                  ].map(tool => (
+                    <button key={tool.id} onClick={() => setToolsSubView(tool.id)}
+                      style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 28, cursor: "pointer", textAlign: "left", fontFamily: font, transition: "all .2s" }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = tool.color; e.currentTarget.style.background = colors.surfaceHover; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.background = colors.surface; }}
+                    >
+                      <div style={{ fontSize: 36, marginBottom: 14 }}>{tool.icon}</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: colors.text, marginBottom: 8 }}>{tool.title}</div>
+                      <div style={{ fontSize: 12, color: colors.textMuted, lineHeight: 1.6 }}>{tool.desc}</div>
+                      <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, color: tool.color }}>{lang === "tr" ? "Aç →" : "Open →"}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {toolsSubView === "keyword_hunter" && (
+              <KeywordHunterView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />
+            )}
+            {toolsSubView === "excel_cleaner" && (
+              <ExcelCleanerView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />
+            )}
+          </div>
+        )}
 
         {view === "settings" && !isAdmin && (
           <div style={{ animation: "slideIn .3s ease", maxWidth: 600 }}>

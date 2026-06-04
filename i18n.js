@@ -9,6 +9,7 @@ const TR = {
   nav_inbox: "Gelen Kutusu / ML",
   nav_agent: "Yapay Zeka Ajanı",
   nav_settings: "Ayarlar",
+  nav_tools: "Excel Araçları",
   nav_leadsInDb: n => `${n} aday kayıtlı`,
   nav_logout: "Çıkış Yap",
 
@@ -563,6 +564,7 @@ const EN = {
   nav_inbox: "Inbox / ML",
   nav_agent: "AI Agent",
   nav_settings: "Settings",
+  nav_tools: "Excel Tools",
   nav_leadsInDb: n => `${n} leads in database`,
   nav_logout: "Logout",
 
