@@ -692,6 +692,19 @@ const DEFAULT_CLEANER_COMPANY_KWS = [
   "Teknopark","Teknokent","Otel","Proje","Rehabilitasyon",
 ].map((text, i) => ({ id: i + 1, text, active: true, checked: false }));
 
+function highlightCell(text, kwsForCol) {
+  const str = String(text ?? "");
+  if (!kwsForCol || kwsForCol.length === 0) return str;
+  const escaped = kwsForCol.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const parts = str.split(new RegExp(`(${escaped.join("|")})`, "gi"));
+  if (parts.length <= 1) return str;
+  return parts.map((p, i) =>
+    i % 2 === 1
+      ? <mark key={i} style={{ background: "#ffd7d7", borderRadius: 2, padding: "0 1px", color: "#c0392b", fontWeight: 700 }}>{p}</mark>
+      : p
+  );
+}
+
 function ExcelCleanerView({ colors, font, lang, onBack }) {
   const K_COMPANY = "eccleaner_kw_company";
   const K_PROF    = "eccleaner_kw_profession";
@@ -969,9 +982,14 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
                           style={{ accentColor: colors.danger, cursor: "pointer" }} />
                       </td>
                       <td style={{ padding: "5px 10px", color: colors.textDim, fontSize: 10, fontFamily: font, position: "sticky", left: 36, zIndex: 1, background: res.marked ? `${colors.danger}18` : `${colors.success}10`, borderRight: `1px solid ${colors.border}` }}>R{res.originalIndex + 1}</td>
-                      {headers.map((_, ci) => (
-                        <td key={ci} title={String(res.row[ci] ?? "")} style={{ padding: "5px 10px", color: colors.text, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: font }}>{String(res.row[ci] ?? "")}</td>
-                      ))}
+                      {headers.map((_, ci) => {
+                        const colKws = res.matches.filter(m => m.colIndex === ci).map(m => m.keyword);
+                        return (
+                          <td key={ci} title={String(res.row[ci] ?? "")} style={{ padding: "5px 10px", color: colors.text, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: font }}>
+                            {highlightCell(res.row[ci], colKws)}
+                          </td>
+                        );
+                      })}
                       <td style={{ padding: "5px 10px" }}>
                         {[...new Set(res.matches.map(m => m.keyword))].map(kw => (
                           <span key={kw} style={{ display: "inline-block", background: `${colors.danger}25`, color: colors.danger, fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, marginRight: 3, fontFamily: font }}>{kw}</span>
