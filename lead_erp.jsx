@@ -1088,6 +1088,58 @@ function AttendanceView({ colors, font, lang, onBack }) {
     return total;
   }
 
+  function printMonthlyReport() {
+    const rows = employees.map(emp => ({
+      emp,
+      weekly: weeks.map(wd => empWeekDiff(emp, wd)),
+      total:  empMonthTotal(emp),
+    }));
+    const wHeaders = weeks.map((wd, wi) =>
+      `<th>${tr("W","H")}${wi+1}<br><small>${attFD(wd[0])}–${attFD(wd[wd.length-1])}</small></th>`
+    ).join("");
+    const wCells = (diffs) => diffs.map(d =>
+      `<td class="${d==null?"neutral":d>=0?"pos":"neg"}">${attFmt(d)}</td>`
+    ).join("");
+    const bodyRows = rows.map(({emp, weekly, total}) =>
+      `<tr><td class="name">${emp}</td>${wCells(weekly)}<td class="tot ${total==null?"neutral":total>=0?"pos":"neg"}">${attFmt(total)}</td></tr>`
+    ).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>${MONTHS[month]} ${year} — ${tr("Attendance Report","Mesai Raporu")}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1a1a1a;padding:32px}
+h1{font-size:20px;font-weight:700;margin-bottom:4px}
+.sub{font-size:11px;color:#666;margin-bottom:24px}
+table{width:100%;border-collapse:collapse}
+th{background:#1a1a1a;color:#FFD700;padding:8px 12px;text-align:center;font-size:11px;font-weight:700;white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:8px 12px;border-bottom:1px solid #e0e0e0;text-align:center;font-size:12px}
+td.name{text-align:left;font-weight:600}
+td.tot{background:#f0f4ff;font-weight:700}
+tr:nth-child(even){background:#f9f9f9}
+.pos{color:#16a34a;font-weight:700}
+.neg{color:#dc2626;font-weight:700}
+.neutral{color:#aaa}
+.footer{margin-top:20px;font-size:10px;color:#999}
+small{font-weight:400;font-size:10px;color:#aaa}
+@media print{body{padding:16px}@page{margin:20mm}}
+</style></head><body>
+<h1>Sun &amp; Sun — ${tr("Attendance Report","Mesai Raporu")}</h1>
+<div class="sub">${MONTHS[month]} ${year} &nbsp;·&nbsp; ${tr("Generated","Oluşturuldu")}: ${new Date().toLocaleDateString(lang==="tr"?"tr-TR":"en-GB")}</div>
+<table><thead><tr><th>${tr("Employee","Çalışan")}</th>${wHeaders}<th class="tot">${tr("Total","Toplam")}</th></tr></thead>
+<tbody>${bodyRows}</tbody></table>
+<div class="footer">${tr("Work schedule: 08:30–18:30 · 10h expected per working day","Mesai saatleri: 08:30–18:30 · Günlük beklenen: 10 saat")}</div>
+</body></html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { alert(tr("Pop-up blocked — please allow pop-ups for this page.","Pop-up engellendi — lütfen bu sayfa için pop-up'lara izin verin.")); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
+  }
+
   const thSt = { background: "#1a1a1a", color: colors.accent, padding: "8px 10px", textAlign: "center", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", fontFamily: font, borderRight: `1px solid ${colors.border}` };
   const tdSt = { padding: "6px 8px", borderRight: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, verticalAlign: "middle" };
   const inpSt = { background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 4, padding: "3px 5px", color: colors.text, fontSize: 11, fontFamily: font, outline: "none", width: 74, display: "block" };
@@ -1255,8 +1307,12 @@ function AttendanceView({ colors, font, lang, onBack }) {
       {/* DASHBOARD VIEW */}
       {screen === "dashboard" && (
         <div style={{ background:colors.surface, border:`1px solid ${colors.border}`, borderRadius:12, overflow:"hidden" }}>
-          <div style={{ padding:"12px 16px", borderBottom:`1px solid ${colors.border}`, fontSize:13, fontWeight:700, color:colors.text, fontFamily:font }}>
-            {MONTHS[month]} {year} — {tr("Monthly Overview","Aylık Özet")}
+          <div style={{ padding:"12px 16px", borderBottom:`1px solid ${colors.border}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <span style={{ fontSize:13, fontWeight:700, color:colors.text, fontFamily:font }}>{MONTHS[month]} {year} — {tr("Monthly Overview","Aylık Özet")}</span>
+            <button onClick={printMonthlyReport}
+              style={{ background:colors.primary, border:"none", borderRadius:7, padding:"7px 16px", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:font, display:"flex", alignItems:"center", gap:6 }}>
+              🖨 {tr("Print / PDF","Yazdır / PDF")}
+            </button>
           </div>
           <div style={{ overflowX:"auto" }}>
             <table style={{ borderCollapse:"collapse", width:"100%" }}>
