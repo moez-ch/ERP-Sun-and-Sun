@@ -990,323 +990,294 @@ function ExcelCleanerView({ colors, font, lang, onBack }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ATTENDANCE TRACKER
+// ATTENDANCE TRACKER — manual entry, week-by-week
 // ═══════════════════════════════════════════════════════════════
+const DEFAULT_ATT_EMPLOYEES = [
+  "Esra Serin","Merve Çöloğlu","Sude Solakoğlu","Şura Kurtoğlu",
+  "Anis Nakib","Moez Cherni","Mohamed Ali Naguez","Gökçe Kurnaz",
+];
+const ATT_MONTHS_TR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+const ATT_MONTHS_EN = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const ATT_DAYS_TR   = ["Pzt","Sal","Çar","Per","Cum"];
+const ATT_DAYS_EN   = ["Mon","Tue","Wed","Thu","Fri"];
+
+function attWeeks(year, month) {
+  const dates = [];
+  const d = new Date(year, month, 1);
+  while (d.getMonth() === month) {
+    const dow = d.getDay();
+    if (dow >= 1 && dow <= 5) dates.push(new Date(d));
+    d.setDate(d.getDate() + 1);
+  }
+  const weeks = [];
+  let i = 0;
+  while (i < dates.length) {
+    const w = [new Date(dates[i])]; i++;
+    while (i < dates.length && dates[i].getDay() !== 1) { w.push(new Date(dates[i])); i++; }
+    weeks.push(w);
+  }
+  return weeks;
+}
+function attDK(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function attFD(d) { return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}`; }
+function attT2M(s) { if (!s) return null; const m = s.match(/^(\d{1,2}):(\d{2})/); return m ? parseInt(m[1])*60+parseInt(m[2]) : null; }
+function attDiff(inS, outS) { const i = attT2M(inS), o = attT2M(outS); if (i==null||o==null) return null; let w=o-i; if(w<0) w+=1440; return w-600; }
+function attFmt(m) { if (m==null) return "—"; const s=m>=0?"+":"-", a=Math.abs(m); return `${s}${Math.floor(a/60)}h ${String(a%60).padStart(2,"0")}m`; }
+
 function AttendanceView({ colors, font, lang, onBack }) {
   const tr = (en, t) => lang === "tr" ? t : en;
+  const MONTHS = lang === "tr" ? ATT_MONTHS_TR : ATT_MONTHS_EN;
+  const DAYS   = lang === "tr" ? ATT_DAYS_TR   : ATT_DAYS_EN;
+  const now    = new Date();
 
-  const [headers, setHeaders]   = useState([]);
-  const [allRows, setAllRows]   = useState([]);
-  const [fileName, setFileName] = useState("");
-  const [colName, setColName]   = useState("");
-  const [colDate, setColDate]   = useState("");
-  const [colIn, setColIn]       = useState("");
-  const [colOut, setColOut]     = useState("");
-  const [workStart, setWorkStart] = useState("08:30");
-  const [workEnd,   setWorkEnd]   = useState("18:30");
-  const [results, setResults]   = useState(null);
-  const [resTab, setResTab]     = useState("summary");
-  const [filterEmp, setFilterEmp] = useState("__all__");
-  const fileRef = useRef(null);
+  const [year,    setYear]    = useState(now.getFullYear());
+  const [month,   setMonth]   = useState(now.getMonth());
+  const [weekIdx, setWeekIdx] = useState(0);
+  const [screen,  setScreen]  = useState("table"); // "table" | "dashboard"
+  const [showEmpMgr, setShowEmpMgr] = useState(false);
+  const [newEmp,  setNewEmp]  = useState("");
 
-  function toMinutes(val) {
-    if (val == null || val === "") return null;
-    if (val instanceof Date && !isNaN(val)) return val.getHours() * 60 + val.getMinutes();
-    if (typeof val === "number") {
-      const frac = val >= 1 ? val - Math.floor(val) : val;
-      if (frac > 0) return Math.round(frac * 24 * 60) % (24 * 60);
-    }
-    if (typeof val === "string") {
-      const m = val.trim().match(/(\d{1,2}):(\d{2})/);
-      if (m) {
-        let h = parseInt(m[1]), min = parseInt(m[2]);
-        if (/pm/i.test(val) && h < 12) h += 12;
-        if (/am/i.test(val) && h === 12) h = 0;
-        return h * 60 + min;
-      }
-    }
-    return null;
+  const [employees, setEmployees] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("sns_att_employees")) || DEFAULT_ATT_EMPLOYEES; }
+    catch { return DEFAULT_ATT_EMPLOYEES; }
+  });
+
+  const dataKey = `sns_att_${year}_${month}`;
+  const [data, setData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`sns_att_${now.getFullYear()}_${now.getMonth()}`)) || {}; }
+    catch { return {}; }
+  });
+
+  useEffect(() => {
+    try { setData(JSON.parse(localStorage.getItem(dataKey)) || {}); }
+    catch { setData({}); }
+  }, [year, month]);
+
+  function saveData(d) { setData(d); localStorage.setItem(dataKey, JSON.stringify(d)); }
+  function saveEmployees(list) { setEmployees(list); localStorage.setItem("sns_att_employees", JSON.stringify(list)); }
+
+  function setEntry(emp, dk, field, val) {
+    const next = { ...data };
+    if (!next[emp]) next[emp] = {};
+    if (!next[emp][dk]) next[emp][dk] = { in: "", out: "" };
+    next[emp][dk] = { ...next[emp][dk], [field]: val };
+    saveData(next);
   }
 
-  function toDateStr(val) {
-    if (val == null || val === "") return "";
-    if (val instanceof Date && !isNaN(val)) {
-      if (val.getFullYear() < 1901) return "";
-      return `${val.getFullYear()}-${String(val.getMonth()+1).padStart(2,"0")}-${String(val.getDate()).padStart(2,"0")}`;
-    }
-    if (typeof val === "string") {
-      const s = val.trim();
-      const m1 = s.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})/);
-      if (m1) return `${m1[3]}-${String(m1[2]).padStart(2,"0")}-${String(m1[1]).padStart(2,"0")}`;
-      return s.split(" ")[0];
-    }
-    if (typeof val === "number") {
-      const d = new Date(Math.round((val - 25569) * 86400 * 1000));
-      if (!isNaN(d)) return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
-    }
-    return String(val);
-  }
+  const weeks = attWeeks(year, month);
+  const wi    = Math.min(weekIdx, Math.max(0, weeks.length - 1));
+  const wDays = weeks[wi] || [];
 
-  const fmtTime = m => { if (m == null) return "—"; const h = Math.floor(((m%1440)+1440)%1440/60), min = ((m%1440)+1440)%1440%60; return `${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`; };
-  const fmtDur  = m => { if (m == null) return "—"; const h = Math.floor(Math.abs(m)/60), min = Math.abs(m)%60; return `${h}h ${String(min).padStart(2,"0")}m`; };
-  const fmtDiff = m => { if (m == null) return "—"; const sign = m >= 0 ? "+" : "-", h = Math.floor(Math.abs(m)/60), min = Math.abs(m)%60; return `${sign}${h}h ${String(min).padStart(2,"0")}m`; };
+  useEffect(() => { if (weekIdx >= weeks.length && weeks.length > 0) setWeekIdx(0); }, [year, month]);
 
-  function loadFile(file) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      try {
-        const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array", cellDates: true });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-        if (!raw || raw.length === 0) { alert(tr("File appears empty.", "Dosya boş görünüyor.")); return; }
-        const hdrs = (raw[0] || []).map((h, i) => h ? String(h) : `Col ${i+1}`);
-        setHeaders(hdrs); setAllRows(raw); setFileName(file.name); setResults(null);
-        const lower = hdrs.map(h => h.toLowerCase());
-        const detect = terms => { const i = lower.findIndex(h => terms.some(t => h.includes(t))); return i >= 0 ? hdrs[i] : ""; };
-        setColName(detect(["ad soyad","full name","employee","çalışan","personel","isim","ad","name"]));
-        setColDate(detect(["tarih","date","gün","gun"]));
-        setColIn(detect(["giriş","giris","check-in","checkin","ilk giriş","in time","in"]));
-        setColOut(detect(["çıkış","cikis","check-out","checkout","son çıkış","out time","out"]));
-      } catch (err) { alert(tr("Could not read: ", "Okunamadı: ") + err.message); }
-    };
-    reader.readAsArrayBuffer(file);
-  }
-
-  function calculate() {
-    const [sh, sm] = workStart.split(":").map(Number);
-    const [eh, em] = workEnd.split(":").map(Number);
-    const expectedMins = (eh * 60 + em) - (sh * 60 + sm);
-    const nameIdx = headers.indexOf(colName);
-    const dateIdx = headers.indexOf(colDate);
-    const inIdx   = headers.indexOf(colIn);
-    const outIdx  = headers.indexOf(colOut);
-    if (nameIdx < 0 || inIdx < 0 || outIdx < 0) {
-      alert(tr("Please map Name, Check-in and Check-out columns.", "Lütfen Ad, Giriş ve Çıkış sütunlarını seçin.")); return;
-    }
-    const empMap = {};
-    allRows.slice(1).forEach((row, idx) => {
-      const name = String(row[nameIdx] ?? "").trim();
-      if (!name) return;
-      const dateStr  = dateIdx >= 0 ? (toDateStr(row[dateIdx]) || `Row ${idx+2}`) : `Row ${idx+2}`;
-      const inMins   = toMinutes(row[inIdx]);
-      const outMins  = toMinutes(row[outIdx]);
-      if (inMins == null && outMins == null) return;
-      let workedMins = (inMins != null && outMins != null) ? (outMins - inMins < 0 ? outMins - inMins + 1440 : outMins - inMins) : null;
-      const diff     = workedMins != null ? workedMins - expectedMins : null;
-      if (!empMap[name]) empMap[name] = { name, days: [], totalWorked: 0, totalExpected: 0, missingDays: 0 };
-      empMap[name].days.push({ date: dateStr, inMins, outMins, workedMins, diff });
-      empMap[name].totalExpected += expectedMins;
-      if (workedMins != null) empMap[name].totalWorked += workedMins;
-      else empMap[name].missingDays++;
+  function empWeekDiff(emp, wd) {
+    let total = null;
+    wd.forEach(d => {
+      const e = data[emp]?.[attDK(d)];
+      if (!e?.in || !e?.out) return;
+      const v = attDiff(e.in, e.out);
+      if (v != null) total = (total ?? 0) + v;
     });
-    const summaries = Object.values(empMap).sort((a, b) => a.name.localeCompare(b.name));
-    setResults({ summaries, expectedMins });
-    setResTab("summary");
-    setFilterEmp("__all__");
+    return total;
   }
 
-  function downloadResults() {
-    if (!results) return;
-    const data = [];
-    results.summaries.forEach(emp => emp.days.forEach(d => data.push({
-      [tr("Employee","Çalışan")]: emp.name,
-      [tr("Date","Tarih")]: d.date,
-      [tr("Check-in","Giriş")]: d.inMins != null ? fmtTime(d.inMins) : "—",
-      [tr("Check-out","Çıkış")]: d.outMins != null ? fmtTime(d.outMins) : "—",
-      [tr("Worked","Çalışılan")]: d.workedMins != null ? fmtDur(d.workedMins) : "—",
-      [tr("Expected","Beklenen")]: fmtDur(results.expectedMins),
-      [tr("Diff","Fark")]: d.diff != null ? fmtDiff(d.diff) : "—",
-    })));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb2 = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb2, ws, "Attendance");
-    XLSX.writeFile(wb2, fileName.replace(/\.[^.]+$/, "") + "_attendance.xlsx");
+  function empMonthTotal(emp) {
+    let total = null;
+    weeks.forEach(wd => { const v = empWeekDiff(emp, wd); if (v != null) total = (total ?? 0) + v; });
+    return total;
   }
 
-  const canCalc = allRows.length > 0 && colName && colIn && colOut;
-  const allEmployees = results ? results.summaries.map(s => s.name) : [];
-  const detailRows   = results
-    ? (filterEmp === "__all__"
-        ? results.summaries.flatMap(s => s.days.map(d => ({ ...d, name: s.name })))
-        : (results.summaries.find(s => s.name === filterEmp)?.days || []).map(d => ({ ...d, name: filterEmp })))
-    : [];
-
-  const thStyle = { background: colors.bg, color: colors.accent, padding: "8px 12px", textAlign: "left", fontSize: 11, fontWeight: 700, position: "sticky", top: 0, zIndex: 2, whiteSpace: "nowrap", fontFamily: font };
+  const thSt = { background: "#1a1a1a", color: colors.accent, padding: "8px 10px", textAlign: "center", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", fontFamily: font, borderRight: `1px solid ${colors.border}` };
+  const tdSt = { padding: "6px 8px", borderRight: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, verticalAlign: "middle" };
+  const inpSt = { background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 4, padding: "3px 5px", color: colors.text, fontSize: 11, fontFamily: font, outline: "none", width: 74, display: "block" };
 
   return (
     <div style={{ animation: "slideIn .3s ease" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <button onClick={onBack} style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, padding: "6px 14px", cursor: "pointer", color: colors.textMuted, fontSize: 12, fontFamily: font }}>← {tr("Back","Geri")}</button>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: font, marginBottom: 2 }}>⏱ {tr("Attendance Tracker","Mesai Takibi")}</h1>
-          <p style={{ color: colors.textMuted, fontSize: 12, fontFamily: font }}>{tr("Upload a check-in/out sheet and calculate overtime & undertime per employee.","Giriş/çıkış tablosunu yükle, çalışan başına fazla/eksik mesaiyi hesapla.")}</p>
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "290px 1fr", gap: 18, alignItems: "start" }}>
-        {/* Sidebar */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {/* Upload */}
-          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font }}>📂 {tr("1. Load File","1. Dosya Yükle")}</div>
-            <div style={{ padding: 14 }}>
-              <div onClick={() => fileRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); }}
-                style={{ border: `2px dashed ${fileName ? colors.success : colors.borderLight}`, borderRadius: 8, padding: "14px 10px", textAlign: "center", cursor: "pointer", background: fileName ? `${colors.success}10` : "transparent" }}>
-                <div style={{ fontSize: 22, marginBottom: 5 }}>{fileName ? "✅" : "📊"}</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: fileName ? colors.success : colors.text, fontFamily: font, wordBreak: "break-all" }}>{fileName || tr("Click or drag & drop","Tıkla veya sürükle & bırak")}</div>
-                {!fileName && <div style={{ fontSize: 11, color: colors.textDim, marginTop: 3, fontFamily: font }}>.xlsx / .xls</div>}
-                {allRows.length > 0 && <div style={{ fontSize: 10, color: colors.textDim, marginTop: 3, fontFamily: font }}>{(allRows.length-1).toLocaleString()} {tr("rows","satır")} · {headers.length} {tr("cols","sütun")}</div>}
-              </div>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) loadFile(e.target.files[0]); }} />
-            </div>
-          </div>
-
-          {/* Column mapping */}
-          {headers.length > 0 && (
-            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
-              <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font }}>🗂 {tr("2. Map Columns","2. Sütunları Eşle")}</div>
-              <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 9 }}>
-                {[
-                  { label: tr("Employee Name *","Çalışan Adı *"), val: colName, set: setColName },
-                  { label: tr("Date","Tarih"),                    val: colDate, set: setColDate },
-                  { label: tr("Check-in *","Giriş *"),            val: colIn,   set: setColIn   },
-                  { label: tr("Check-out *","Çıkış *"),           val: colOut,  set: setColOut  },
-                ].map(({ label, val, set }) => (
-                  <div key={label}>
-                    <div style={{ fontSize: 10, color: colors.textMuted, fontFamily: font, marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
-                    <select value={val} onChange={e => set(e.target.value)}
-                      style={{ width: "100%", background: colors.bg, border: `1px solid ${val ? colors.primary : colors.border}`, borderRadius: 6, padding: "6px 8px", color: colors.text, fontSize: 12, fontFamily: font, outline: "none" }}>
-                      <option value="">{tr("— not set —","— seçilmedi —")}</option>
-                      {headers.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Work schedule */}
-          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ padding: "9px 14px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: colors.textMuted, fontFamily: font }}>⏰ {tr("3. Work Hours","3. Mesai Saatleri")}</div>
-            <div style={{ padding: "12px 14px", display: "flex", gap: 10 }}>
-              {[
-                { label: tr("Start","Başlangıç"), val: workStart, set: setWorkStart },
-                { label: tr("End","Bitiş"),       val: workEnd,   set: setWorkEnd   },
-              ].map(({ label, val, set }) => (
-                <div key={label} style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: colors.textMuted, fontFamily: font, marginBottom: 3 }}>{label}</div>
-                  <input type="time" value={val} onChange={e => set(e.target.value)}
-                    style={{ width: "100%", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "6px 8px", color: colors.text, fontSize: 12, fontFamily: font, outline: "none" }} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button onClick={calculate} disabled={!canCalc}
-            style={{ width: "100%", padding: 13, background: canCalc ? colors.primary : colors.border, border: "none", borderRadius: 10, color: canCalc ? "#fff" : colors.textDim, fontSize: 13, fontWeight: 700, cursor: canCalc ? "pointer" : "not-allowed", fontFamily: font }}>
-            ⏱ {tr("Calculate","Hesapla")}
+        <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: font }}>⏱ {tr("Attendance Tracker","Mesai Takibi")}</h1>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+          {[{ id:"table", label:`📋 ${tr("Table","Tablo")}` }, { id:"dashboard", label:`📊 ${tr("Dashboard","Özet")}` }].map((s,si) => (
+            <button key={s.id} onClick={() => setScreen(s.id)}
+              style={{ padding: "6px 14px", background: screen===s.id ? colors.primary : "transparent", border: `1px solid ${screen===s.id ? colors.primary : colors.border}`, borderRadius: si===0 ? "6px 0 0 6px" : "0 6px 6px 0", color: screen===s.id ? "#fff" : colors.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font, marginLeft: si===1 ? -1 : 0 }}>
+              {s.label}
+            </button>
+          ))}
+          <button onClick={() => setShowEmpMgr(s => !s)}
+            style={{ padding: "6px 14px", background: showEmpMgr ? `${colors.primary}20` : "transparent", border: `1px solid ${showEmpMgr ? colors.primary : colors.border}`, borderRadius: 6, color: showEmpMgr ? colors.primaryLight : colors.textMuted, fontSize: 12, cursor: "pointer", fontFamily: font }}>
+            👥 {tr("Employees","Çalışanlar")}
           </button>
         </div>
+      </div>
 
-        {/* Results panel */}
-        <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 400 }}>
-          {!results ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 60, textAlign: "center", minHeight: 400 }}>
-              <div style={{ fontSize: 48, marginBottom: 14 }}>⏱</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: colors.textMuted, fontFamily: font, marginBottom: 6 }}>{tr("No results yet","Henüz sonuç yok")}</div>
-              <div style={{ fontSize: 12, color: colors.textDim, fontFamily: font, maxWidth: 300 }}>{tr("Load your attendance file, map the columns, then click Calculate.","Mesai dosyasını yükle, sütunları eşle, ardından Hesapla'ya tıkla.")}</div>
-            </div>
-          ) : (
-            <>
-              {/* Tabs + actions */}
-              <div style={{ padding: "10px 16px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <div style={{ display: "flex" }}>
-                  {[{ id:"summary", label: tr("Summary","Özet") }, { id:"detail", label: tr("Detail","Detay") }].map((tab, ti) => (
-                    <button key={tab.id} onClick={() => setResTab(tab.id)}
-                      style={{ padding: "5px 14px", background: resTab === tab.id ? colors.primary : "transparent", border: `1px solid ${resTab === tab.id ? colors.primary : colors.border}`, borderRadius: ti === 0 ? "6px 0 0 6px" : "0 6px 6px 0", color: resTab === tab.id ? "#fff" : colors.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-                {resTab === "detail" && (
-                  <select value={filterEmp} onChange={e => setFilterEmp(e.target.value)}
-                    style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "5px 8px", color: colors.text, fontSize: 12, fontFamily: font, outline: "none" }}>
-                    <option value="__all__">{tr("All employees","Tüm çalışanlar")}</option>
-                    {allEmployees.map(n => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                )}
-                <span style={{ fontSize: 11, color: colors.textDim, fontFamily: font }}>
-                  {results.summaries.length} {tr("employees","çalışan")}
-                  {" · "}
-                  {tr("Expected","Beklenen")}: {workStart}–{workEnd} ({fmtDur(results.expectedMins)})
-                </span>
-                <button onClick={downloadResults} style={{ marginLeft: "auto", background: colors.success, border: "none", borderRadius: 6, padding: "6px 14px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}>
-                  ⬇ {tr("Export","Dışa Aktar")}
-                </button>
+      {/* Employee manager */}
+      {showEmpMgr && (
+        <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 10, fontFamily: font }}>{tr("Manage employees — click × to remove","Çalışanları yönet — kaldırmak için × tıkla")}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+            {employees.map((emp, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 20, padding: "3px 10px", fontSize: 12, color: colors.text, fontFamily: font }}>
+                {emp}
+                <button onClick={() => saveEmployees(employees.filter((_,j) => j!==i))} style={{ background:"none", border:"none", color:colors.textDim, cursor:"pointer", fontSize:14, padding:0, lineHeight:1, marginLeft:2 }}>×</button>
               </div>
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <input value={newEmp} onChange={e=>setNewEmp(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&newEmp.trim()){saveEmployees([...employees,newEmp.trim()]);setNewEmp("");}}}
+              placeholder={tr("Type name and press Enter…","İsim yaz ve Enter'a bas…")}
+              style={{ flex:1, background:colors.bg, border:`1px solid ${colors.border}`, borderRadius:6, padding:"6px 10px", color:colors.text, fontSize:12, fontFamily:font, outline:"none" }} />
+            <button onClick={()=>{if(newEmp.trim()){saveEmployees([...employees,newEmp.trim()]);setNewEmp("");}}}
+              style={{ background:colors.primary, border:"none", borderRadius:6, padding:"6px 14px", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:font }}>
+              {tr("Add","Ekle")}
+            </button>
+          </div>
+        </div>
+      )}
 
-              {/* Summary */}
-              {resTab === "summary" && (
-                <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        {[tr("Employee","Çalışan"), tr("Days","Gün"), tr("Total Worked","Toplam Çalışılan"), tr("Expected","Beklenen"), tr("Difference","Fark")].map(h => <th key={h} style={thStyle}>{h}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results.summaries.map((emp, i) => {
-                        const diff = emp.totalWorked - emp.totalExpected;
-                        return (
-                          <tr key={i} style={{ borderBottom: `1px solid ${colors.border}`, cursor: "pointer" }}
-                            onMouseEnter={e => e.currentTarget.style.background = colors.surfaceHover}
-                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                            onClick={() => { setResTab("detail"); setFilterEmp(emp.name); }}>
-                            <td style={{ padding: "8px 12px", color: colors.text, fontWeight: 600, fontFamily: font }}>{emp.name}</td>
-                            <td style={{ padding: "8px 12px", color: colors.textMuted, fontFamily: font }}>
-                              {emp.days.length}
-                              {emp.missingDays > 0 && <span style={{ color: colors.warning, fontSize: 10, marginLeft: 5 }}>({emp.missingDays} {tr("missing","eksik")})</span>}
-                            </td>
-                            <td style={{ padding: "8px 12px", color: colors.text, fontFamily: font }}>{fmtDur(emp.totalWorked)}</td>
-                            <td style={{ padding: "8px 12px", color: colors.textMuted, fontFamily: font }}>{fmtDur(emp.totalExpected)}</td>
-                            <td style={{ padding: "8px 12px", fontWeight: 700, color: diff >= 0 ? colors.success : colors.danger, fontFamily: font }}>{fmtDiff(diff)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Detail */}
-              {resTab === "detail" && (
-                <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        {[tr("Employee","Çalışan"), tr("Date","Tarih"), tr("Check-in","Giriş"), tr("Check-out","Çıkış"), tr("Worked","Çalışılan"), tr("Expected","Beklenen"), tr("Diff","Fark")].map(h => <th key={h} style={thStyle}>{h}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detailRows.map((d, i) => (
-                        <tr key={i} style={{ borderBottom: `1px solid ${colors.border}`, background: d.diff != null && d.diff < -30 ? `${colors.danger}08` : "transparent" }}>
-                          <td style={{ padding: "6px 12px", color: colors.text, fontFamily: font, whiteSpace: "nowrap" }}>{d.name}</td>
-                          <td style={{ padding: "6px 12px", color: colors.textMuted, fontFamily: font }}>{d.date}</td>
-                          <td style={{ padding: "6px 12px", color: d.inMins != null ? colors.text : colors.danger, fontFamily: font }}>{fmtTime(d.inMins)}</td>
-                          <td style={{ padding: "6px 12px", color: d.outMins != null ? colors.text : colors.danger, fontFamily: font }}>{fmtTime(d.outMins)}</td>
-                          <td style={{ padding: "6px 12px", color: colors.text, fontFamily: font }}>{fmtDur(d.workedMins)}</td>
-                          <td style={{ padding: "6px 12px", color: colors.textMuted, fontFamily: font }}>{fmtDur(results.expectedMins)}</td>
-                          <td style={{ padding: "6px 12px", fontWeight: 600, fontFamily: font, color: d.diff == null ? colors.textDim : d.diff >= 0 ? colors.success : colors.danger }}>{fmtDiff(d.diff)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
+      {/* Year + Month strip */}
+      <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: "8px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <button onClick={()=>setYear(y=>y-1)} style={{ background:"none", border:"none", color:colors.textMuted, cursor:"pointer", fontSize:18, padding:"0 2px", lineHeight:1 }}>‹</button>
+        <span style={{ fontSize:12, fontWeight:700, color:colors.textMuted, fontFamily:font, minWidth:36, textAlign:"center" }}>{year}</span>
+        <button onClick={()=>setYear(y=>y+1)} style={{ background:"none", border:"none", color:colors.textMuted, cursor:"pointer", fontSize:18, padding:"0 2px", lineHeight:1 }}>›</button>
+        <div style={{ width:1, height:18, background:colors.border, margin:"0 4px" }} />
+        <div style={{ display:"flex", gap:2, flexWrap:"wrap" }}>
+          {MONTHS.map((m,mi) => (
+            <button key={mi} onClick={()=>{setMonth(mi);setWeekIdx(0);}}
+              style={{ padding:"4px 9px", background:month===mi ? colors.primary : "transparent", border:`1px solid ${month===mi ? colors.primary : "transparent"}`, borderRadius:6, color: month===mi ? "#fff" : (mi===now.getMonth()&&year===now.getFullYear() ? colors.accent : colors.textMuted), fontSize:11, fontWeight:month===mi?700:400, cursor:"pointer", fontFamily:font }}>
+              {m.slice(0,3)}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Week tabs */}
+      <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap" }}>
+        {weeks.map((wd,wii) => (
+          <button key={wii} onClick={()=>setWeekIdx(wii)}
+            style={{ padding:"6px 16px", background: wi===wii ? colors.surface : "transparent", border:`1px solid ${wi===wii ? colors.primaryLight : colors.border}`, borderRadius:8, color: wi===wii ? colors.primaryLight : colors.textMuted, fontSize:12, fontWeight:wi===wii?700:400, cursor:"pointer", fontFamily:font, transition:"all .15s" }}>
+            {tr("W","H")}{wii+1} · {attFD(wd[0])}–{attFD(wd[wd.length-1])}
+          </button>
+        ))}
+      </div>
+
+      {/* TABLE VIEW */}
+      {screen === "table" && wDays.length > 0 && (
+        <div style={{ overflowX:"auto", background:colors.surface, border:`1px solid ${colors.border}`, borderRadius:12, overflow:"hidden" }}>
+          <table style={{ borderCollapse:"collapse", width:"100%" }}>
+            <thead>
+              <tr>
+                <th style={{ ...thSt, textAlign:"left", minWidth:160, position:"sticky", left:0, zIndex:3 }}>{tr("Employee","Ad Soyad")}</th>
+                {wDays.map((d,di) => (
+                  <th key={di} style={{ ...thSt, minWidth:96 }}>
+                    {DAYS[d.getDay()-1]}
+                    <br /><span style={{ fontWeight:400, fontSize:10, color:colors.textMuted }}>{attFD(d)}</span>
+                  </th>
+                ))}
+                <th style={{ ...thSt, minWidth:100, background:`${colors.primary}30`, color:colors.primaryLight, borderRight:"none" }}>
+                  {tr("Week Diff","Haftalık Fark")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map((emp,ei) => {
+                const wdiff = empWeekDiff(emp, wDays);
+                return (
+                  <tr key={ei} style={{ background: ei%2===0 ? "transparent" : `${colors.bg}99` }}>
+                    <td style={{ ...tdSt, fontFamily:font, fontSize:12, fontWeight:600, color:colors.text, padding:"10px 14px", position:"sticky", left:0, background: ei%2===0 ? colors.surface : `${colors.bg}ee`, zIndex:1 }}>{emp}</td>
+                    {wDays.map((d,di) => {
+                      const dk  = attDK(d);
+                      const ent = data[emp]?.[dk] || { in:"", out:"" };
+                      const dv  = attDiff(ent.in, ent.out);
+                      return (
+                        <td key={di} style={{ ...tdSt, minWidth:96 }}>
+                          <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:3 }}>
+                              <span style={{ fontSize:9, color:colors.success, width:8, flexShrink:0 }}>↑</span>
+                              <input type="time" value={ent.in||""} onChange={e=>setEntry(emp,dk,"in",e.target.value)} style={inpSt} />
+                            </div>
+                            <div style={{ display:"flex", alignItems:"center", gap:3 }}>
+                              <span style={{ fontSize:9, color:colors.danger, width:8, flexShrink:0 }}>↓</span>
+                              <input type="time" value={ent.out||""} onChange={e=>setEntry(emp,dk,"out",e.target.value)} style={inpSt} />
+                            </div>
+                            {dv!=null && (
+                              <div style={{ fontSize:9, fontWeight:700, color:dv>=0?colors.success:colors.danger, textAlign:"center", fontFamily:font }}>
+                                {attFmt(dv)}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                    <td style={{ ...tdSt, textAlign:"center", background:`${colors.primary}11`, borderRight:"none" }}>
+                      <span style={{ fontSize:14, fontWeight:700, color: wdiff==null?colors.textDim:wdiff>=0?colors.success:colors.danger, fontFamily:font }}>
+                        {attFmt(wdiff)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {screen === "table" && wDays.length === 0 && (
+        <div style={{ background:colors.surface, border:`1px solid ${colors.border}`, borderRadius:12, padding:48, textAlign:"center" }}>
+          <div style={{ fontSize:36, marginBottom:12 }}>📅</div>
+          <div style={{ color:colors.textMuted, fontSize:14, fontFamily:font }}>{tr("No working days in this week.","Bu haftada çalışma günü yok.")}</div>
+        </div>
+      )}
+
+      {/* DASHBOARD VIEW */}
+      {screen === "dashboard" && (
+        <div style={{ background:colors.surface, border:`1px solid ${colors.border}`, borderRadius:12, overflow:"hidden" }}>
+          <div style={{ padding:"12px 16px", borderBottom:`1px solid ${colors.border}`, fontSize:13, fontWeight:700, color:colors.text, fontFamily:font }}>
+            {MONTHS[month]} {year} — {tr("Monthly Overview","Aylık Özet")}
+          </div>
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ borderCollapse:"collapse", width:"100%" }}>
+              <thead>
+                <tr>
+                  <th style={{ ...thSt, textAlign:"left", minWidth:160 }}>{tr("Employee","Çalışan")}</th>
+                  {weeks.map((wd,wii) => (
+                    <th key={wii} style={thSt}>
+                      {tr("W","H")}{wii+1}
+                      <br /><span style={{ fontSize:9, fontWeight:400, color:colors.textMuted }}>{attFD(wd[0])}–{attFD(wd[wd.length-1])}</span>
+                    </th>
+                  ))}
+                  <th style={{ ...thSt, background:`${colors.primary}30`, color:colors.primaryLight, borderRight:"none" }}>{tr("Total","Toplam")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.map((emp,ei) => {
+                  const total = empMonthTotal(emp);
+                  return (
+                    <tr key={ei} style={{ background: ei%2===0 ? "transparent" : `${colors.bg}99` }}>
+                      <td style={{ ...tdSt, fontFamily:font, fontSize:12, fontWeight:600, color:colors.text, padding:"10px 14px" }}>{emp}</td>
+                      {weeks.map((wd,wii) => {
+                        const v = empWeekDiff(emp, wd);
+                        return (
+                          <td key={wii} style={{ ...tdSt, textAlign:"center" }}>
+                            <span style={{ fontSize:12, fontWeight:600, color: v==null?colors.textDim:v>=0?colors.success:colors.danger, fontFamily:font }}>{attFmt(v)}</span>
+                          </td>
+                        );
+                      })}
+                      <td style={{ ...tdSt, textAlign:"center", background:`${colors.primary}11`, borderRight:"none" }}>
+                        <span style={{ fontSize:14, fontWeight:700, color: total==null?colors.textDim:total>=0?colors.success:colors.danger, fontFamily:font }}>{attFmt(total)}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {employees.every(emp => empMonthTotal(emp) == null) && (
+            <div style={{ padding:"32px 24px", textAlign:"center", color:colors.textDim, fontSize:12, fontFamily:font }}>
+              {tr("No data entered yet for this month. Fill in the weekly tables first.","Bu ay için henüz veri girilmedi. Önce haftalık tabloları doldurun.")}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
