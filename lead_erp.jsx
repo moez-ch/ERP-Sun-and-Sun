@@ -1967,6 +1967,13 @@ Kurallar:
   const [newTemplateDraft, setNewTemplateDraft] = useState({ label: "", subject: "", body: "" });
   const [editingTemplateId, setEditingTemplateId] = useState(null);
   const mondaySavedSelectionRef = useRef(null);
+  const newTplEditorRef = useRef(null);
+  const newTplSavedSelRef = useRef(null);
+  useEffect(() => {
+    if (newTemplateModal && newTplEditorRef.current) {
+      newTplEditorRef.current.innerHTML = newTemplateDraft.body || "";
+    }
+  }, [newTemplateModal]);
   const [showOnlyWithEmail, setShowOnlyWithEmail] = useState(false);
   const [mondayBulkDraft, setMondayBulkDraft] = useState({ subject: "", body: "", _bk: 0 });
   const [mondayBulkSending, setMondayBulkSending] = useState(false);
@@ -4618,8 +4625,56 @@ Kurallar:
                     </div>
                     <div style={{ marginBottom: 22 }}>
                       <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 5 }}>İçerik</div>
-                      <textarea value={newTemplateDraft.body} onChange={e => setNewTemplateDraft(p => ({ ...p, body: e.target.value }))} rows={8}
-                        style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }} />
+                      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, overflow: "hidden" }}>
+                        {/* Toolbar */}
+                        <div style={{ display:"flex", alignItems:"center", gap:2, padding:"5px 8px", background:colors.bg, borderBottom:`1px solid ${colors.border}`, flexWrap:"wrap", rowGap:4 }}>
+                          {[["bold","B","700"],["italic","I","400"],["underline","U","400"]].map(([cmd,lbl,fw]) => (
+                            <button key={cmd} onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                              style={{ padding:"2px 7px", background:"none", border:`1px solid ${colors.border}`, borderRadius:4, cursor:"pointer", fontSize:12, fontWeight:fw, fontStyle:cmd==="italic"?"italic":"normal", textDecoration:cmd==="underline"?"underline":"none", color:colors.text, lineHeight:1.4 }}>{lbl}</button>
+                          ))}
+                          <div style={{ width:1, height:16, background:colors.border, margin:"0 3px" }} />
+                          <select onChange={e => {
+                              const px = e.target.value; e.target.value = "";
+                              if (!px) return;
+                              const saved = newTplSavedSelRef.current;
+                              if (saved) { const s = window.getSelection(); s.removeAllRanges(); s.addRange(saved); }
+                              document.execCommand("fontSize", false, "7");
+                              newTplEditorRef.current?.querySelectorAll('font[size="7"]').forEach(el => {
+                                const span = document.createElement("span");
+                                span.style.fontSize = px + "px";
+                                span.innerHTML = el.innerHTML;
+                                el.replaceWith(span);
+                              });
+                            }}
+                            style={{ padding:"2px 4px", background:colors.bg, border:`1px solid ${colors.border}`, borderRadius:4, color:colors.text, fontSize:11, cursor:"pointer", outline:"none" }}>
+                            <option value="">px</option>
+                            {[10,11,12,13,14,15,16,18,20,22,24,28,32].map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                          <div style={{ width:1, height:16, background:colors.border, margin:"0 3px" }} />
+                          {[["justifyLeft","L"],["justifyCenter","C"],["justifyRight","R"],["justifyFull","J"]].map(([cmd,lbl]) => (
+                            <button key={cmd} onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                              style={{ padding:"2px 6px", background:"none", border:`1px solid ${colors.border}`, borderRadius:4, cursor:"pointer", fontSize:11, fontWeight:700, color:colors.text, lineHeight:1.4 }}>{lbl}</button>
+                          ))}
+                          <div style={{ width:1, height:16, background:colors.border, margin:"0 3px" }} />
+                          {[["insertUnorderedList","• List"],["insertOrderedList","1. List"]].map(([cmd,lbl]) => (
+                            <button key={cmd} onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                              style={{ padding:"2px 7px", background:"none", border:`1px solid ${colors.border}`, borderRadius:4, cursor:"pointer", fontSize:11, color:colors.text, lineHeight:1.4 }}>{lbl}</button>
+                          ))}
+                          <div style={{ width:1, height:16, background:colors.border, margin:"0 3px" }} />
+                          {["#111111","#dc2626","#ea580c","#d97706","#2563eb","#16a34a","#7c3aed","#0891b2"].map(c => (
+                            <button key={c} onMouseDown={e => { e.preventDefault(); document.execCommand("foreColor", false, c); }}
+                              style={{ width:14, height:14, borderRadius:"50%", background:c, border:"none", cursor:"pointer", padding:0, flexShrink:0 }} />
+                          ))}
+                          <div style={{ width:1, height:16, background:colors.border, margin:"0 3px" }} />
+                          <button onMouseDown={e => { e.preventDefault(); document.execCommand("removeFormat"); }}
+                            style={{ padding:"2px 7px", background:"none", border:`1px solid ${colors.border}`, borderRadius:4, cursor:"pointer", fontSize:10, color:colors.textMuted, lineHeight:1.4 }}>✕ fmt</button>
+                        </div>
+                        {/* Editor */}
+                        <div ref={newTplEditorRef} contentEditable suppressContentEditableWarning
+                          onPaste={handleRichPaste}
+                          onBlur={() => { const s = window.getSelection(); if (s?.rangeCount) newTplSavedSelRef.current = s.getRangeAt(0).cloneRange(); }}
+                          style={{ minHeight:180, padding:"8px 12px", background:colors.bg, color:colors.text, fontSize:13, outline:"none", fontFamily:font, lineHeight:1.6 }} />
+                      </div>
                     </div>
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
                       <button onClick={() => { setNewTemplateModal(false); setNewTemplateDraft({ label: "", subject: "", body: "" }); setEditingTemplateId(null); }}
@@ -4628,11 +4683,12 @@ Kurallar:
                       </button>
                       <button onClick={async () => {
                         if (!newTemplateDraft.label.trim() || !newTemplateDraft.subject.trim()) { alert("Ad ve konu zorunludur."); return; }
+                        const body = newTplEditorRef.current?.innerHTML || "";
                         const token = localStorage.getItem("sns_token");
                         if (editingTemplateId) {
-                          await fetch(`/email/templates/${editingTemplateId}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ label: newTemplateDraft.label, color: "#088FC4", subject: newTemplateDraft.subject, body: newTemplateDraft.body }) });
+                          await fetch(`/email/templates/${editingTemplateId}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ label: newTemplateDraft.label, color: "#088FC4", subject: newTemplateDraft.subject, body }) });
                         } else {
-                          await fetch("/email/templates", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ label: newTemplateDraft.label, color: "#088FC4", subject: newTemplateDraft.subject, body: newTemplateDraft.body }) });
+                          await fetch("/email/templates", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ label: newTemplateDraft.label, color: "#088FC4", subject: newTemplateDraft.subject, body }) });
                         }
                         await fetchEmailTemplates();
                         setNewTemplateModal(false);
