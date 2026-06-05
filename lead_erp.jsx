@@ -1829,6 +1829,8 @@ Kurallar:
   const [selectedSignature, setSelectedSignature] = useState("merve");
   const [newTemplateModal, setNewTemplateModal] = useState(false);
   const [newTemplateDraft, setNewTemplateDraft] = useState({ label: "", subject: "", body: "" });
+  const [editingTemplateId, setEditingTemplateId] = useState(null);
+  const mondaySavedSelectionRef = useRef(null);
   const [showOnlyWithEmail, setShowOnlyWithEmail] = useState(false);
   const [mondayBulkDraft, setMondayBulkDraft] = useState({ subject: "", body: "", _bk: 0 });
   const [mondayBulkSending, setMondayBulkSending] = useState(false);
@@ -4465,7 +4467,7 @@ Kurallar:
               {newTemplateModal && (
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <div style={{ background: colors.surface, borderRadius: 12, padding: 28, width: 500, maxWidth: "92vw", border: `1px solid ${colors.border}` }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>Yeni Şablon Oluştur</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>{editingTemplateId ? "Şablonu Düzenle" : "Yeni Şablon Oluştur"}</div>
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 5 }}>Şablon Adı</div>
                       <input value={newTemplateDraft.label} onChange={e => setNewTemplateDraft(p => ({ ...p, label: e.target.value }))}
@@ -4484,17 +4486,22 @@ Kurallar:
                         style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-                      <button onClick={() => { setNewTemplateModal(false); setNewTemplateDraft({ label: "", subject: "", body: "" }); }}
+                      <button onClick={() => { setNewTemplateModal(false); setNewTemplateDraft({ label: "", subject: "", body: "" }); setEditingTemplateId(null); }}
                         style={{ padding: "8px 18px", background: "none", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 13, cursor: "pointer" }}>
                         İptal
                       </button>
                       <button onClick={async () => {
                         if (!newTemplateDraft.label.trim() || !newTemplateDraft.subject.trim()) { alert("Ad ve konu zorunludur."); return; }
                         const token = localStorage.getItem("sns_token");
-                        await fetch("/email/templates", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ label: newTemplateDraft.label, color: "#088FC4", subject: newTemplateDraft.subject, body: newTemplateDraft.body }) });
+                        if (editingTemplateId) {
+                          await fetch(`/email/templates/${editingTemplateId}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ label: newTemplateDraft.label, color: "#088FC4", subject: newTemplateDraft.subject, body: newTemplateDraft.body }) });
+                        } else {
+                          await fetch("/email/templates", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ label: newTemplateDraft.label, color: "#088FC4", subject: newTemplateDraft.subject, body: newTemplateDraft.body }) });
+                        }
                         await fetchEmailTemplates();
                         setNewTemplateModal(false);
                         setNewTemplateDraft({ label: "", subject: "", body: "" });
+                        setEditingTemplateId(null);
                       }}
                         style={{ padding: "8px 18px", background: colors.primary, border: "none", borderRadius: 6, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                         Kaydet
@@ -4526,14 +4533,16 @@ Kurallar:
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 52 }}>
                         {emailTemplates.map(tpl => (
-                          <span key={tpl.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 10, fontSize: 11, color: colors.textMuted }}>
+                          <span key={tpl.id} style={{ display: "flex", alignItems: "center", gap: 3, padding: "2px 8px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 10, fontSize: 11, color: colors.textMuted }}>
                             {tpl.label}
+                            <button onClick={() => { setNewTemplateDraft({ label: tpl.label, subject: tpl.subject, body: tpl.body }); setEditingTemplateId(tpl.id); setNewTemplateModal(true); }}
+                              style={{ background: "none", border: "none", color: colors.textMuted, cursor: "pointer", fontSize: 11, padding: "0 0 0 2px", lineHeight: 1 }}>✏</button>
                             <button onClick={async () => {
                               if (!window.confirm(`"${tpl.label}" şablonu silinsin mi?`)) return;
                               const token = localStorage.getItem("sns_token");
                               await fetch(`/email/templates/${tpl.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
                               fetchEmailTemplates();
-                            }} style={{ background: "none", border: "none", color: "#e57373", cursor: "pointer", fontSize: 12, padding: "0 0 0 2px", lineHeight: 1 }}>✕</button>
+                            }} style={{ background: "none", border: "none", color: "#e57373", cursor: "pointer", fontSize: 12, padding: "0 0 0 1px", lineHeight: 1 }}>✕</button>
                           </span>
                         ))}
                       </div>
@@ -4549,26 +4558,54 @@ Kurallar:
                   </div>
                   <div style={{ marginBottom: 10, border: `1px solid ${colors.border}`, borderRadius: 6, overflow: "hidden" }}>
                     {/* Formatting toolbar */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "4px 6px", background: colors.bg, borderBottom: `1px solid ${colors.border}`, flexWrap: "wrap" }}>
-                      {[["bold","B","700"],["italic","I","400"],["underline","U","400"]].map(([cmd, lbl, fw]) => (
-                        <button key={cmd} title={cmd}
-                          onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
-                          style={{ padding: "2px 7px", background: "none", border: `1px solid ${colors.border}`, borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: fw, fontStyle: cmd==="italic"?"italic":"normal", textDecoration: cmd==="underline"?"underline":"none", color: colors.text, lineHeight: 1.4 }}>
-                          {lbl}
-                        </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "5px 8px", background: colors.bg, borderBottom: `1px solid ${colors.border}`, flexWrap: "wrap", rowGap: 4 }}>
+                      {/* B I U */}
+                      {[["bold","B","700"],["italic","I","400"],["underline","U","400"]].map(([cmd,lbl,fw]) => (
+                        <button key={cmd} onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                          style={{ padding:"2px 7px", background:"none", border:`1px solid ${colors.border}`, borderRadius:4, cursor:"pointer", fontSize:12, fontWeight:fw, fontStyle:cmd==="italic"?"italic":"normal", textDecoration:cmd==="underline"?"underline":"none", color:colors.text, lineHeight:1.4 }}>{lbl}</button>
                       ))}
-                      <div style={{ width: 1, height: 16, background: colors.border, margin: "0 3px" }} />
+                      <div style={{ width:1, height:16, background:colors.border, margin:"0 3px" }} />
+                      {/* Font size */}
+                      <select onChange={e => {
+                          const px = e.target.value; e.target.value = "";
+                          if (!px) return;
+                          const saved = mondaySavedSelectionRef.current;
+                          if (saved) { const s = window.getSelection(); s.removeAllRanges(); s.addRange(saved); }
+                          document.execCommand("fontSize", false, "7");
+                          mondaySidebarEditorRef.current?.querySelectorAll('font[size="7"]').forEach(el => {
+                            const span = document.createElement("span");
+                            span.style.fontSize = px + "px";
+                            span.innerHTML = el.innerHTML;
+                            el.replaceWith(span);
+                          });
+                          mondaySidebarEditorRef.current?.dispatchEvent(new Event("input", { bubbles: true }));
+                        }}
+                        style={{ padding:"2px 4px", background:colors.bg, border:`1px solid ${colors.border}`, borderRadius:4, color:colors.text, fontSize:11, cursor:"pointer", outline:"none" }}>
+                        <option value="">px</option>
+                        {[10,11,12,13,14,15,16,18,20,22,24,28,32].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <div style={{ width:1, height:16, background:colors.border, margin:"0 3px" }} />
+                      {/* Alignment */}
+                      {[["justifyLeft","L"],["justifyCenter","C"],["justifyRight","R"],["justifyFull","J"]].map(([cmd,lbl]) => (
+                        <button key={cmd} title={cmd} onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                          style={{ padding:"2px 6px", background:"none", border:`1px solid ${colors.border}`, borderRadius:4, cursor:"pointer", fontSize:11, fontWeight:700, color:colors.text, lineHeight:1.4 }}>{lbl}</button>
+                      ))}
+                      <div style={{ width:1, height:16, background:colors.border, margin:"0 3px" }} />
+                      {/* Lists */}
+                      {[["insertUnorderedList","• List"],["insertOrderedList","1. List"]].map(([cmd,lbl]) => (
+                        <button key={cmd} title={cmd} onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                          style={{ padding:"2px 7px", background:"none", border:`1px solid ${colors.border}`, borderRadius:4, cursor:"pointer", fontSize:11, color:colors.text, lineHeight:1.4 }}>{lbl}</button>
+                      ))}
+                      <div style={{ width:1, height:16, background:colors.border, margin:"0 3px" }} />
+                      {/* Colors */}
                       {["#111111","#dc2626","#ea580c","#d97706","#2563eb","#16a34a","#7c3aed","#0891b2"].map(c => (
-                        <button key={c} title={c}
-                          onMouseDown={e => { e.preventDefault(); document.execCommand("foreColor", false, c); }}
-                          style={{ width: 14, height: 14, borderRadius: "50%", background: c, border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }} />
+                        <button key={c} title={c} onMouseDown={e => { e.preventDefault(); document.execCommand("foreColor", false, c); }}
+                          style={{ width:14, height:14, borderRadius:"50%", background:c, border:"none", cursor:"pointer", padding:0, flexShrink:0 }} />
                       ))}
-                      <div style={{ width: 1, height: 16, background: colors.border, margin: "0 3px" }} />
-                      <button title="Remove formatting"
-                        onMouseDown={e => { e.preventDefault(); document.execCommand("removeFormat"); }}
-                        style={{ padding: "2px 7px", background: "none", border: `1px solid ${colors.border}`, borderRadius: 4, cursor: "pointer", fontSize: 10, color: colors.textMuted, lineHeight: 1.4 }}>
-                        ✕ fmt
-                      </button>
+                      <div style={{ width:1, height:16, background:colors.border, margin:"0 3px" }} />
+                      {/* Clear */}
+                      <button onMouseDown={e => { e.preventDefault(); document.execCommand("removeFormat"); }}
+                        style={{ padding:"2px 7px", background:"none", border:`1px solid ${colors.border}`, borderRadius:4, cursor:"pointer", fontSize:10, color:colors.textMuted, lineHeight:1.4 }}>✕ fmt</button>
                     </div>
                     {/* Editor */}
                     <div
@@ -4578,6 +4615,7 @@ Kurallar:
                       suppressContentEditableWarning
                       onInput={e => { mondayBodyRef.current = e.currentTarget.innerHTML; }}
                       onPaste={handleRichPaste}
+                      onBlur={() => { const s = window.getSelection(); if (s?.rangeCount) mondaySavedSelectionRef.current = s.getRangeAt(0).cloneRange(); }}
                       data-placeholder={t("monday_bodyPlaceholder")}
                       style={{ minHeight: 100, padding: "8px 12px", background: colors.bg, color: colors.text, fontSize: 13, outline: "none", fontFamily: font, lineHeight: 1.6 }}
                     />
