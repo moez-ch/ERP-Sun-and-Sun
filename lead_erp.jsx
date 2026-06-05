@@ -1805,6 +1805,11 @@ function EmailHistory({ colors, token, lang }) {
 }
 
 // Converts pasted Word HTML to inline-styled HTML so Gmail can't strip it
+function toEditorHtml(text) {
+  if (!text) return "";
+  return /<[a-z][\s\S]*>/i.test(text) ? text : text.replace(/\n/g, "<br>");
+}
+
 function inlinePastedHtml(html) {
   const parser = new DOMParser();
   const parsed = parser.parseFromString(html, 'text/html');
@@ -1971,7 +1976,7 @@ Kurallar:
   const newTplSavedSelRef = useRef(null);
   useEffect(() => {
     if (newTemplateModal && newTplEditorRef.current) {
-      newTplEditorRef.current.innerHTML = newTemplateDraft.body || "";
+      newTplEditorRef.current.innerHTML = toEditorHtml(newTemplateDraft.body);
     }
   }, [newTemplateModal]);
   const [showOnlyWithEmail, setShowOnlyWithEmail] = useState(false);
@@ -1981,7 +1986,7 @@ Kurallar:
   const [mondayAttachments, setMondayAttachments] = useState([]);
   const mondayBodyRef = useRef("");
   const mondaySidebarEditorRef = useRef(null);
-  const mondaySidebarEditorInit = useCallback((el) => { mondaySidebarEditorRef.current = el; if (el) el.innerHTML = mondayBodyRef.current; }, []);
+  const mondaySidebarEditorInit = useCallback((el) => { mondaySidebarEditorRef.current = el; if (el) el.innerHTML = toEditorHtml(mondayBodyRef.current); }, []);
   const mondayModalEditorInit   = useCallback((el) => { if (el) el.innerHTML = mondayBodyRef.current; }, []);
   const [mondayEmailVerification, setMondayEmailVerification] = useState({});
   const [mondayVerifying, setMondayVerifying] = useState(false);
@@ -4717,7 +4722,7 @@ Kurallar:
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                         <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: "nowrap" }}>Şablon:</span>
-                        <select defaultValue="" onChange={e => { const tpl = emailTemplates.find(t => String(t.id) === e.target.value); if (tpl) { mondayBodyRef.current = tpl.body; setMondayBulkDraft(p => ({ ...p, subject: tpl.subject, body: tpl.body, _bk: p._bk + 1 })); } e.target.value = ""; }}
+                        <select defaultValue="" onChange={e => { const tpl = emailTemplates.find(t => String(t.id) === e.target.value); if (tpl) { const b = toEditorHtml(tpl.body); mondayBodyRef.current = b; setMondayBulkDraft(p => ({ ...p, subject: tpl.subject, body: b, _bk: p._bk + 1 })); } e.target.value = ""; }}
                           style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer", flex: 1 }}>
                           <option value="">— Şablon seç —</option>
                           {emailTemplates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.label}</option>)}
