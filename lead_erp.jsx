@@ -1158,6 +1158,86 @@ small{font-weight:400;font-size:10px;color:#aaa}
     setTimeout(() => { win.print(); }, 400);
   }
 
+  function printEmployeeDetail(emp) {
+    const allDays = weeks.flat();
+    const leaveMap = { paid_leave: tr("Paid Leave","Ücretli İzin"), unpaid_leave: tr("Unpaid Leave","Ücretsiz İzin"), holiday: tr("Holiday","Resmi Tatil") };
+    const FULL_DAYS = lang === "tr" ? ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma"] : ["Monday","Tuesday","Wednesday","Thursday","Friday"];
+
+    const rows = allDays.map(d => {
+      const dk  = attDK(d);
+      const ent = data[emp]?.[dk] || { in:"", out:"", type:"" };
+      const type = ent.type || "";
+      const arrDelta = !type && ent.in  ? attT2M(ent.in)  - 510  : null;
+      const depDelta = !type && ent.out ? attT2M(ent.out) - 1110 : null;
+      const dayDiff  = !type && ent.in && ent.out ? attDiff(ent.in, ent.out) : null;
+      const arrLabel = arrDelta == null ? "—" : arrDelta === 0 ? tr("On time","Tam") : arrDelta > 0 ? `+${attAbsStr(arrDelta)} ${tr("late","geç")}` : `-${attAbsStr(arrDelta)} ${tr("early","erken")}`;
+      const depLabel = depDelta == null ? "—" : depDelta === 0 ? tr("On time","Tam") : depDelta > 0 ? `+${attAbsStr(depDelta)}` : `-${attAbsStr(depDelta)} ${tr("early","erken")}`;
+      return { d, dk, ent, type, arrDelta, depDelta, dayDiff, arrLabel, depLabel };
+    });
+
+    const workedCount = rows.filter(r => !r.type && r.ent.in && r.ent.out).length;
+    const lateCount   = rows.filter(r => r.arrDelta != null && r.arrDelta > 0).length;
+    const earlyCount  = rows.filter(r => r.depDelta != null && r.depDelta < 0).length;
+
+    const bodyRows = rows.map(({ d, ent, type, arrDelta, depDelta, dayDiff, arrLabel, depLabel }) => {
+      const dayName = FULL_DAYS[d.getDay() - 1];
+      if (type) return `<tr class="leave"><td>${attFD(d)}</td><td>${dayName}</td><td colspan="4" style="text-align:center;font-style:italic">${leaveMap[type] || type}</td><td>—</td></tr>`;
+      if (!ent.in && !ent.out) return `<tr><td>${attFD(d)}</td><td>${dayName}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
+      return `<tr>
+        <td>${attFD(d)}</td><td>${dayName}</td>
+        <td>${ent.in || "—"}</td>
+        <td class="${arrDelta==null?"neutral":arrDelta>0?"neg":"pos"}">${arrLabel}</td>
+        <td>${ent.out || "—"}</td>
+        <td class="${depDelta==null?"neutral":depDelta<0?"neg":"pos"}">${depLabel}</td>
+        <td class="${dayDiff==null?"neutral":dayDiff>=0?"pos":"neg"}">${attFmt(dayDiff)}</td>
+      </tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>${emp} — ${MONTHS[month]} ${year}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1a1a1a;padding:32px}
+h1{font-size:20px;font-weight:700;margin-bottom:4px}
+.sub{font-size:11px;color:#666;margin-bottom:8px}
+.stats{display:flex;gap:16px;margin-bottom:20px;font-size:11px}
+.stat{padding:4px 12px;border-radius:20px;font-weight:600}
+.stat-w{background:#e8f0fe;color:#1a56db}.stat-l{background:#fde8e8;color:#c81e1e}.stat-e{background:#fef3c7;color:#92400e}
+table{width:100%;border-collapse:collapse}
+th{background:#1a1a1a;color:#FFD700;padding:7px 10px;text-align:center;font-size:11px;font-weight:700}
+th:first-child,th:nth-child(2){text-align:left}
+td{padding:7px 10px;border-bottom:1px solid #e0e0e0;font-size:11px;text-align:center}
+td:first-child,td:nth-child(2){text-align:left}
+tr:nth-child(even){background:#f9f9f9}
+tr.leave{background:#f0f9ff}
+.pos{color:#16a34a;font-weight:700}.neg{color:#dc2626;font-weight:700}.neutral{color:#aaa}
+.footer{margin-top:20px;font-size:10px;color:#999}
+@media print{body{padding:16px}@page{margin:15mm}}
+</style></head><body>
+<h1>Sun &amp; Sun — ${emp}</h1>
+<div class="sub">${MONTHS[month]} ${year} &nbsp;·&nbsp; ${tr("Generated","Oluşturuldu")}: ${new Date().toLocaleDateString(lang==="tr"?"tr-TR":"en-GB")}</div>
+<div class="stats">
+  <span class="stat stat-w">${tr("Days worked","Çalışma günü")}: ${workedCount}</span>
+  <span class="stat stat-l">${tr("Late arrivals","Geç giriş")}: ${lateCount}</span>
+  <span class="stat stat-e">${tr("Early departures","Erken çıkış")}: ${earlyCount}</span>
+</div>
+<table><thead><tr>
+  <th>${tr("Date","Tarih")}</th><th>${tr("Day","Gün")}</th>
+  <th>${tr("Arrival","Giriş")}</th><th>${tr("Status","Durum")}</th>
+  <th>${tr("Departure","Çıkış")}</th><th>${tr("Status","Durum")}</th>
+  <th>${tr("Day diff","Gün farkı")}</th>
+</tr></thead><tbody>${bodyRows}</tbody></table>
+<div class="footer">${tr("Work schedule: 08:30–18:30 · 10h expected per working day","Mesai saatleri: 08:30–18:30 · Günlük beklenen: 10 saat")}</div>
+</body></html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { alert(tr("Pop-up blocked.","Pop-up engellendi.")); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
+  }
+
   const thSt = { background: "#1a1a1a", color: colors.accent, padding: "8px 10px", textAlign: "center", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", fontFamily: font, borderRight: `1px solid ${colors.border}` };
   const tdSt = { padding: "6px 8px", borderRight: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}`, verticalAlign: "middle" };
   const inpSt = { background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 4, padding: "3px 5px", color: colors.text, fontSize: 11, fontFamily: font, outline: "none", width: 74, display: "block" };
@@ -1411,10 +1491,16 @@ small{font-weight:400;font-size:10px;color:#aaa}
                     </span>
                   ))}
                 </div>
-                <button onClick={() => setSelectedEmp(null)}
-                  style={{ background:"none", border:`1px solid ${colors.border}`, borderRadius:6, padding:"4px 12px", cursor:"pointer", color:colors.textMuted, fontSize:12, fontFamily:font }}>
-                  ✕ {tr("Close","Kapat")}
-                </button>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={() => printEmployeeDetail(selectedEmp)}
+                    style={{ background:colors.primary, border:"none", borderRadius:6, padding:"5px 14px", cursor:"pointer", color:"#fff", fontSize:12, fontWeight:700, fontFamily:font, display:"flex", alignItems:"center", gap:5 }}>
+                    🖨 {tr("Print / PDF","Yazdır / PDF")}
+                  </button>
+                  <button onClick={() => setSelectedEmp(null)}
+                    style={{ background:"none", border:`1px solid ${colors.border}`, borderRadius:6, padding:"4px 12px", cursor:"pointer", color:colors.textMuted, fontSize:12, fontFamily:font }}>
+                    ✕ {tr("Close","Kapat")}
+                  </button>
+                </div>
               </div>
 
               {/* Calendar grid */}
