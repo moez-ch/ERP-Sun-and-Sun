@@ -1968,6 +1968,7 @@ Kurallar:
   const [mondaySelected, setMondaySelected] = useState(new Set());
   const [mondayBulkModal, setMondayBulkModal] = useState(false);
   const [selectedSignature, setSelectedSignature] = useState("merve");
+  const [useSalutation, setUseSalutation] = useState(true);
   const [newTemplateModal, setNewTemplateModal] = useState(false);
   const [newTemplateDraft, setNewTemplateDraft] = useState({ label: "", subject: "", body: "" });
   const [editingTemplateId, setEditingTemplateId] = useState(null);
@@ -4817,16 +4818,21 @@ Kurallar:
                       style={{ minHeight: 100, padding: "8px 12px", background: colors.bg, color: colors.text, fontSize: 13, outline: "none", fontFamily: font, lineHeight: 1.6 }}
                     />
                   </div>
-                  <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: "nowrap" }}>İmza:</span>
                     <select value={selectedSignature} onChange={e => setSelectedSignature(e.target.value)}
-                      style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer" }}>
+                      style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer", flex: 1 }}>
                       <option value="merve">Merve Çöloğlu — merve.cologlu@sundanismanlik.net</option>
                       <option value="sura">Şura Kurtoğlu — sura.kurtoglu@sundanismanlik.net</option>
                       <option value="ahmet">Ahmet Sungur — ahmet.sungur@sundanismanlik.net</option>
                       <option value="esra">Esra Serin — esra.serin@sundanismanlik.net</option>
                       <option value="melek">Melek Çıtak — melek.citak@sundanismanlik.net</option>
                     </select>
+                    <label style={{ display:"flex", alignItems:"center", gap:5, cursor:"pointer", whiteSpace:"nowrap" }}>
+                      <input type="checkbox" checked={useSalutation} onChange={e => setUseSalutation(e.target.checked)}
+                        style={{ accentColor: colors.primary, width:14, height:14, cursor:"pointer" }} />
+                      <span style={{ fontSize:12, color: useSalutation ? colors.text : colors.textDim }}>Selam</span>
+                    </label>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -5397,7 +5403,7 @@ Kurallar:
                               const colMap = {};
                               item.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
                               const salutation = buildSalutation(item.name, colMap);
-                              const personalizedBody = `${salutation}<br><br>${currentBodyHtml}`;
+                              const personalizedBody = useSalutation ? `${salutation}<br><br>${currentBodyHtml}` : currentBodyHtml;
                               return { email: colMap[emailCol.id], name: item.name, htmlBody: personalizedBody };
                             });
                             const r = await fetch("/email/send", {
@@ -5436,7 +5442,8 @@ Kurallar:
                               const colMap = {};
                               item.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
                               const salutation = buildSalutation(item.name, colMap);
-                              const plainBody = `${salutation}\n\n${(mondayBodyRef.current || "").replace(/<[^>]+>/g, "")}`;
+                              const plainText = (mondayBodyRef.current || "").replace(/<[^>]+>/g, "");
+                              const plainBody = useSalutation ? `${salutation}\n\n${plainText}` : plainText;
                               return {
                                 itemId: item.id,
                                 body: `📧 E-posta gönderildi — ${now}\nGönderen: ${authUser.email}\nKonu: ${mondayBulkDraft.subject}\n\n${plainBody}`,
