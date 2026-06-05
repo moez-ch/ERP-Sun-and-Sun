@@ -1766,10 +1766,14 @@ Kurallar:
   const [newTemplateModal, setNewTemplateModal] = useState(false);
   const [newTemplateDraft, setNewTemplateDraft] = useState({ label: "", subject: "", body: "" });
   const [showOnlyWithEmail, setShowOnlyWithEmail] = useState(false);
-  const [mondayBulkDraft, setMondayBulkDraft] = useState({ subject: "", body: "" });
+  const [mondayBulkDraft, setMondayBulkDraft] = useState({ subject: "", body: "", _bk: 0 });
   const [mondayBulkSending, setMondayBulkSending] = useState(false);
   const [mondayCampaigns, setMondayCampaigns] = useState([]);
   const [mondayAttachments, setMondayAttachments] = useState([]);
+  const mondayBodyRef = useRef("");
+  const mondaySidebarEditorRef = useRef(null);
+  const mondaySidebarEditorInit = useCallback((el) => { mondaySidebarEditorRef.current = el; if (el) el.innerHTML = mondayBodyRef.current; }, []);
+  const mondayModalEditorInit   = useCallback((el) => { if (el) el.innerHTML = mondayBodyRef.current; }, []);
   const [mondayEmailVerification, setMondayEmailVerification] = useState({});
   const [mondayVerifying, setMondayVerifying] = useState(false);
   const [mondayBounces, setMondayBounces] = useState(new Set());
@@ -2978,6 +2982,7 @@ Kurallar:
           ::-webkit-scrollbar { width: 6px; }
           ::-webkit-scrollbar-track { background: ${colors.bg}; }
           ::-webkit-scrollbar-thumb { background: ${colors.border}; border-radius: 3px; }
+          [contenteditable][data-placeholder]:empty:before { content: attr(data-placeholder); color: ${colors.textDim}; pointer-events: none; }
         `}</style>
 
         {/* ══════════ DASHBOARD ══════════ */}
@@ -4351,7 +4356,7 @@ Kurallar:
                 <div style={{ display: "flex", gap: 8 }}>
                   {mondaySelected.size > 0 && (
                     <button
-                      onClick={() => { if (!mondayBulkDraft.subject) setMondayBulkDraft({ subject: t("monday_defaultSubject"), body: t("monday_defaultBody") }); setMondayBulkModal(true); }}
+                      onClick={() => { if (!mondayBulkDraft.subject) { const db = t("monday_defaultBody"); mondayBodyRef.current = db; setMondayBulkDraft({ subject: t("monday_defaultSubject"), body: db, _bk: 1 }); } setMondayBulkModal(true); }}
                       style={{ padding: "8px 18px", background: colors.success || "#2e7d32", border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
                     >
                       {t("monday_sendBulk", mondaySelected.size)}
@@ -4449,7 +4454,7 @@ Kurallar:
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                         <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: "nowrap" }}>Şablon:</span>
-                        <select defaultValue="" onChange={e => { const tpl = emailTemplates.find(t => String(t.id) === e.target.value); if (tpl) setMondayBulkDraft(p => ({ ...p, subject: tpl.subject, body: tpl.body })); e.target.value = ""; }}
+                        <select defaultValue="" onChange={e => { const tpl = emailTemplates.find(t => String(t.id) === e.target.value); if (tpl) { mondayBodyRef.current = tpl.body; setMondayBulkDraft(p => ({ ...p, subject: tpl.subject, body: tpl.body, _bk: p._bk + 1 })); } e.target.value = ""; }}
                           style={{ padding: "6px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 12, outline: "none", cursor: "pointer", flex: 1 }}>
                           <option value="">— Şablon seç —</option>
                           {emailTemplates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.label}</option>)}
@@ -4478,12 +4483,38 @@ Kurallar:
                       style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
-                  <div style={{ marginBottom: 10 }}>
-                    <textarea
-                      value={mondayBulkDraft.body}
-                      placeholder={t("monday_bodyPlaceholder")}
-                      onChange={e => setMondayBulkDraft(p => ({ ...p, body: e.target.value }))}
-                      style={{ width: "100%", minHeight: 100, padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
+                  <div style={{ marginBottom: 10, border: `1px solid ${colors.border}`, borderRadius: 6, overflow: "hidden" }}>
+                    {/* Formatting toolbar */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "4px 6px", background: colors.bg, borderBottom: `1px solid ${colors.border}`, flexWrap: "wrap" }}>
+                      {[["bold","B","700"],["italic","I","400"],["underline","U","400"]].map(([cmd, lbl, fw]) => (
+                        <button key={cmd} title={cmd}
+                          onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                          style={{ padding: "2px 7px", background: "none", border: `1px solid ${colors.border}`, borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: fw, fontStyle: cmd==="italic"?"italic":"normal", textDecoration: cmd==="underline"?"underline":"none", color: colors.text, lineHeight: 1.4 }}>
+                          {lbl}
+                        </button>
+                      ))}
+                      <div style={{ width: 1, height: 16, background: colors.border, margin: "0 3px" }} />
+                      {["#111111","#dc2626","#ea580c","#d97706","#2563eb","#16a34a","#7c3aed","#0891b2"].map(c => (
+                        <button key={c} title={c}
+                          onMouseDown={e => { e.preventDefault(); document.execCommand("foreColor", false, c); }}
+                          style={{ width: 14, height: 14, borderRadius: "50%", background: c, border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }} />
+                      ))}
+                      <div style={{ width: 1, height: 16, background: colors.border, margin: "0 3px" }} />
+                      <button title="Remove formatting"
+                        onMouseDown={e => { e.preventDefault(); document.execCommand("removeFormat"); }}
+                        style={{ padding: "2px 7px", background: "none", border: `1px solid ${colors.border}`, borderRadius: 4, cursor: "pointer", fontSize: 10, color: colors.textMuted, lineHeight: 1.4 }}>
+                        ✕ fmt
+                      </button>
+                    </div>
+                    {/* Editor */}
+                    <div
+                      key={mondayBulkDraft._bk}
+                      ref={mondaySidebarEditorInit}
+                      contentEditable
+                      suppressContentEditableWarning
+                      onInput={e => { mondayBodyRef.current = e.currentTarget.innerHTML; }}
+                      data-placeholder={t("monday_bodyPlaceholder")}
+                      style={{ minHeight: 100, padding: "8px 12px", background: colors.bg, color: colors.text, fontSize: 13, outline: "none", fontFamily: font, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}
                     />
                   </div>
                   <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
@@ -5055,11 +5086,13 @@ Kurallar:
                     </div>
                     <div style={{ marginBottom: 20 }}>
                       <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{t("monday_body")}</div>
-                      <textarea
-                        value={mondayBulkDraft.body}
-                        placeholder={t("monday_bodyPlaceholder")}
-                        onChange={e => setMondayBulkDraft(p => ({ ...p, body: e.target.value }))}
-                        style={{ width: "100%", minHeight: 140, padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", resize: "vertical", fontFamily: font, boxSizing: "border-box" }}
+                      <div
+                        key={`mel-${mondayBulkDraft._bk}`}
+                        ref={mondayModalEditorInit}
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={e => { mondayBodyRef.current = e.currentTarget.innerHTML; }}
+                        style={{ width: "100%", minHeight: 140, padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", fontFamily: font, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", boxSizing: "border-box" }}
                       />
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
@@ -5070,11 +5103,12 @@ Kurallar:
                           setMondayBulkSending(true);
                           try {
                             const token = localStorage.getItem("sns_token");
+                            const currentBodyHtml = mondayBodyRef.current || mondaySidebarEditorRef.current?.innerHTML || "";
                             const recipients = selectedWithEmail.map(item => {
                               const colMap = {};
                               item.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
                               const salutation = buildSalutation(item.name, colMap);
-                              const personalizedBody = `${salutation}<br><br>${mondayBulkDraft.body.replace(/\n/g, "<br>")}`;
+                              const personalizedBody = `${salutation}<br><br>${currentBodyHtml}`;
                               return { email: colMap[emailCol.id], name: item.name, htmlBody: personalizedBody };
                             });
                             const r = await fetch("/email/send", {
@@ -5085,7 +5119,7 @@ Kurallar:
                                 fromEmail: authUser.email,
                                 fromName: authUser.name || settings.sendgridFromName,
                                 subject: mondayBulkDraft.subject,
-                                body: mondayBulkDraft.body,
+                                body: currentBodyHtml,
                                 recipients,
                                 signatureKey: selectedSignature,
                                 attachments: mondayAttachments,
@@ -5113,7 +5147,7 @@ Kurallar:
                               const colMap = {};
                               item.column_values.forEach(cv => { colMap[cv.id] = cv.text; });
                               const salutation = buildSalutation(item.name, colMap);
-                              const plainBody = `${salutation}\n\n${mondayBulkDraft.body}`;
+                              const plainBody = `${salutation}\n\n${(mondayBodyRef.current || "").replace(/<[^>]+>/g, "")}`;
                               return {
                                 itemId: item.id,
                                 body: `📧 E-posta gönderildi — ${now}\nGönderen: ${authUser.email}\nKonu: ${mondayBulkDraft.subject}\n\n${plainBody}`,
@@ -5184,7 +5218,7 @@ Kurallar:
                             setMondaySelected(new Set());
                             setMondayMailKonulari("");
                             setMondayOrtakMail("");
-                            setMondayBulkDraft({ subject: t("monday_defaultSubject"), body: t("monday_defaultBody") });
+                            const db2 = t("monday_defaultBody"); mondayBodyRef.current = db2; setMondayBulkDraft(p => ({ subject: t("monday_defaultSubject"), body: db2, _bk: p._bk + 1 }));
                           } catch (e) { alert("Error: " + e.message); }
                           finally { setMondayBulkSending(false); }
                         }}
