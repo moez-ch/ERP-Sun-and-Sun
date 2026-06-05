@@ -721,27 +721,27 @@ function buildSignature(key) {
   const s = SIGNATORIES[key] || SIGNATORIES.merve;
   return `
 <br><br>
-<div style="font-family:Arial,sans-serif;color:#333;font-size:12px;">
+<div style="font-family:Arial,sans-serif;color:#333;font-size:13px;width:680px;">
 
   <!-- Contact card -->
-  <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px;">
+  <table cellpadding="0" cellspacing="0" border="0" width="680" style="margin-bottom:12px;">
     <tr>
-      <td style="padding-right:18px;vertical-align:middle;">
+      <td width="120" style="padding-right:20px;vertical-align:middle;">
         <a href="https://www.sunandsun.com.tr/" target="_blank">
-          <img src="${_logoSrc}" alt="Sun &amp; Sun" width="88" style="display:block;" />
+          <img src="${_logoSrc}" alt="Sun &amp; Sun" width="110" style="display:block;" />
         </a>
       </td>
-      <td style="vertical-align:top;border-left:2px solid #ddd;padding-left:18px;">
-        <div style="font-weight:bold;font-size:14px;color:#c0392b;margin-bottom:2px;">${s.name}</div>
-        <div style="color:#555;font-size:12px;padding-bottom:7px;border-bottom:1px solid #ddd;margin-bottom:7px;">${s.title}</div>
-        <div style="margin-bottom:4px;">&#128222;&nbsp;<a href="tel:${s.tel}" style="color:#333;text-decoration:none;">${s.phone}</a></div>
-        <div style="margin-bottom:10px;">&#127760;&nbsp;<a href="https://www.sunandsun.com.tr/" style="color:#0A3E62;text-decoration:none;">www.sunandsun.com.tr</a></div>
+      <td style="vertical-align:top;border-left:2px solid #ddd;padding-left:20px;">
+        <div style="font-weight:bold;font-size:16px;color:#c0392b;margin-bottom:3px;">${s.name}</div>
+        <div style="color:#555;font-size:13px;padding-bottom:8px;border-bottom:1px solid #ddd;margin-bottom:8px;">${s.title}</div>
+        <div style="margin-bottom:5px;font-size:13px;">&#128222;&nbsp;<a href="tel:${s.tel}" style="color:#333;text-decoration:none;">${s.phone}</a></div>
+        <div style="margin-bottom:12px;font-size:13px;">&#127760;&nbsp;<a href="https://www.sunandsun.com.tr/" style="color:#0A3E62;text-decoration:none;">www.sunandsun.com.tr</a></div>
         <div>
-          <a href="https://www.instagram.com/sunandsuninternational/" target="_blank" style="display:inline-block;margin-right:6px;text-decoration:none;">
-            <img src="${_igSrc}" alt="Instagram" width="34" height="34" style="display:block;border-radius:8px;" />
+          <a href="https://www.instagram.com/sunandsuninternational/" target="_blank" style="display:inline-block;margin-right:8px;text-decoration:none;">
+            <img src="${_igSrc}" alt="Instagram" width="40" height="40" style="display:block;border-radius:8px;" />
           </a>
           <a href="https://www.linkedin.com/company/sun-and-sun-consulting/" target="_blank" style="display:inline-block;text-decoration:none;">
-            <img src="${_liSrc}" alt="LinkedIn" width="34" height="34" style="display:block;border-radius:6px;" />
+            <img src="${_liSrc}" alt="LinkedIn" width="40" height="40" style="display:block;border-radius:6px;" />
           </a>
         </div>
       </td>
@@ -749,14 +749,14 @@ function buildSignature(key) {
   </table>
 
   <!-- Banner GIF -->
-  <div style="margin-bottom:12px;">
+  <div style="margin-bottom:14px;">
     <a href="https://www.sunandsun.com.tr/" target="_blank" style="display:block;">
-      <img src="${_gifSrc}" alt="Sun &amp; Sun" style="display:block;width:100%;max-width:700px;border:none;" />
+      <img src="${_gifSrc}" alt="Sun &amp; Sun" width="680" style="display:block;border:none;" />
     </a>
   </div>
 
   <!-- Office locations -->
-  <table cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:700px;margin-bottom:12px;font-size:11px;">
+  <table cellpadding="0" cellspacing="0" border="0" width="680" style="margin-bottom:12px;font-size:12px;">
     <tr>
       <td style="vertical-align:top;width:25%;padding-right:10px;">
         <div style="font-weight:bold;text-decoration:underline;margin-bottom:4px;">Ankara</div>
@@ -780,7 +780,7 @@ function buildSignature(key) {
   </table>
 
   <!-- Legal -->
-  <div style="font-size:10px;color:#888;border-top:1px solid #eee;padding-top:8px;line-height:1.6;">
+  <div style="font-size:11px;color:#888;border-top:1px solid #eee;padding-top:8px;line-height:1.6;width:680px;">
     <strong>YASAL UYARI</strong><br>
     Bu e-posta ve ilişkili dosyalar sadece alması amaçlanan şahsi veya tüzel kişiye özeldir. Eğer yetkili alıcı değilseniz içeriği açmanız, açıklamanız, kopyalamanız, yönlendirmeniz ve kullanmanız yasaktır ve bu e-postayı derhal silmeniz gerekmektedir. Veri sorumluları olarak Sun Proje Tercüme Danışmanlık Eğitim İthalat İhracat ve Sanayi Ticaret Limited Şirketi ve Sun ve Sun Danışmanlık Bilişim Sanayi ve Ticaret Anonim Şirketi (Hepsi birlikte bundan sonra "SUN DANIŞMANLIK" veya "Veri Sorumlusu" olarak anılacaktır.), bu mesajın içerdiği bilgilerin mutlak doğruluğu veya eksiksiz olduğu konusunda herhangi bir garanti vermez. Bu nedenle bu bilgilerin kullanımı ile ilgili kayıplardan sorumlu tutulamaz. Bu mesajın içeriğiyle ilgili sorumluluk yalnızca gönderen kişiye aittir ve bu içerik veri sorumlusunun görüşlerini yansıtmayabilir. Bu e-posta bilinen bilgisayar virüslerine karşı taranmıştır. 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında Veri Sorumlusu sıfatıyla, e-posta ortamında toplanan kişisel verilerinizi internet sitemizde bulunan kişisel verilerin işlenmesine ilişkin aydınlatma metninde belirtilen amaçlara uygun olarak işlemekte ve saklamaktayız. Kişisel Verilerle ilgili bilgilendirmeyi <a href="https://www.sundanismanlik.net" style="color:#0A3E62;">www.sundanismanlik.net</a> adresinden okuyabilirsiniz.
     <br><br>
