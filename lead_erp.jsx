@@ -4514,7 +4514,7 @@ Kurallar:
                       suppressContentEditableWarning
                       onInput={e => { mondayBodyRef.current = e.currentTarget.innerHTML; }}
                       data-placeholder={t("monday_bodyPlaceholder")}
-                      style={{ minHeight: 100, padding: "8px 12px", background: colors.bg, color: colors.text, fontSize: 13, outline: "none", fontFamily: font, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                      style={{ minHeight: 100, padding: "8px 12px", background: colors.bg, color: colors.text, fontSize: 13, outline: "none", fontFamily: font, lineHeight: 1.6 }}
                     />
                   </div>
                   <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
@@ -5092,7 +5092,7 @@ Kurallar:
                         contentEditable
                         suppressContentEditableWarning
                         onInput={e => { mondayBodyRef.current = e.currentTarget.innerHTML; }}
-                        style={{ width: "100%", minHeight: 140, padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", fontFamily: font, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", boxSizing: "border-box" }}
+                        style={{ width: "100%", minHeight: 140, padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", fontFamily: font, lineHeight: 1.6, boxSizing: "border-box" }}
                       />
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
