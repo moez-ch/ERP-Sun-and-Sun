@@ -721,7 +721,7 @@ function buildSignature(key) {
   const s = SIGNATORIES[key] || SIGNATORIES.merve;
   return `
 <br><br>
-<div style="font-family:Arial,sans-serif;color:#333;max-width:600px;font-size:12px;">
+<div style="font-family:Arial,sans-serif;color:#333;font-size:12px;">
 
   <!-- Contact card -->
   <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px;">
@@ -751,12 +751,12 @@ function buildSignature(key) {
   <!-- Banner GIF -->
   <div style="margin-bottom:12px;">
     <a href="https://www.sunandsun.com.tr/" target="_blank" style="display:block;">
-      <img src="${_gifSrc}" alt="Sun &amp; Sun" width="500" style="display:block;max-width:100%;border:none;" />
+      <img src="${_gifSrc}" alt="Sun &amp; Sun" style="display:block;width:100%;max-width:700px;border:none;" />
     </a>
   </div>
 
   <!-- Office locations -->
-  <table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-bottom:12px;font-size:11px;">
+  <table cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:700px;margin-bottom:12px;font-size:11px;">
     <tr>
       <td style="vertical-align:top;width:25%;padding-right:10px;">
         <div style="font-weight:bold;text-decoration:underline;margin-bottom:4px;">Ankara</div>
@@ -838,7 +838,7 @@ app.post("/email/send", authenticate, async (req, res) => {
         personalizations: chunk.map((r) => ({ to: [{ email: r.email, name: r.name || "" }] })),
         from: { email: effectiveFromEmail, name: effectiveFromName },
         subject,
-        content: [{ type: "text/html", value: `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#222;max-width:600px;">${groupBody}</div>${buildSignature(signatureKey)}` }],
+        content: [{ type: "text/html", value: `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#222;">${groupBody}</div>${buildSignature(signatureKey)}` }],
         ...(Array.isArray(attachments) && attachments.length > 0 ? {
           attachments: attachments.map(a => ({ content: a.content, filename: a.name, type: a.type || "application/octet-stream", disposition: "attachment" }))
         } : {}),
