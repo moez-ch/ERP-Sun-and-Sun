@@ -1678,30 +1678,41 @@ function inlinePastedHtml(html) {
   const tmpStyle = document.createElement('style');
   tmpStyle.textContent = Array.from(parsed.querySelectorAll('style')).map(s => s.textContent).join('\n');
 
+  // Force a white/black baseline so dark-mode ERP styles don't pollute computed values
   const tmpDiv = document.createElement('div');
-  tmpDiv.style.cssText = 'position:fixed;top:-9999px;left:-9999px;visibility:hidden';
+  tmpDiv.style.cssText = 'position:fixed;top:-9999px;left:-9999px;visibility:hidden;color:rgb(0,0,0);background:white;font-weight:400;font-style:normal;text-decoration:none;font-size:14px';
   tmpDiv.innerHTML = parsed.body.innerHTML;
 
   document.body.appendChild(tmpStyle);
   document.body.appendChild(tmpDiv);
 
-  const KEEP = ['color','font-weight','font-style','text-decoration','text-align'];
-  const SKIP = { color:'rgb(34, 34, 34)', 'font-weight':'400', 'font-style':'normal', 'text-decoration':'none solid rgb(34, 34, 34)', 'text-align':'start' };
-
   tmpDiv.querySelectorAll('*').forEach(el => {
-    const tag = el.tagName;
-    if (['STYLE','SCRIPT','META','LINK','XML'].includes(tag)) { el.remove(); return; }
+    if (['STYLE','SCRIPT','META','LINK'].includes(el.tagName)) { el.remove(); return; }
     const cs = window.getComputedStyle(el);
-    const inlined = KEEP
-      .map(p => [p, cs.getPropertyValue(p)])
-      .filter(([p, v]) => v && v !== SKIP[p] && !v.includes('initial'))
-      .map(([p, v]) => `${p}:${v}`)
-      .join(';');
-    el.removeAttribute('class');
-    el.removeAttribute('lang');
-    el.removeAttribute('style');
-    Array.from(el.attributes).filter(a => a.name.startsWith('xmlns') || a.name.startsWith('x:')).forEach(a => el.removeAttribute(a.name));
-    if (inlined) el.setAttribute('style', inlined);
+    const styles = [];
+
+    // Bold
+    const fw = cs.fontWeight;
+    if (fw === '700' || fw === 'bold') styles.push('font-weight:bold');
+
+    // Italic
+    if (cs.fontStyle === 'italic') styles.push('font-style:italic');
+
+    // Underline / strikethrough
+    const tdLine = cs.textDecorationLine || '';
+    if (tdLine && tdLine !== 'none') styles.push(`text-decoration:${tdLine}`);
+
+    // Text alignment (non-default)
+    const ta = cs.textAlign;
+    if (ta === 'center' || ta === 'right' || ta === 'justify') styles.push(`text-align:${ta}`);
+
+    // Color — only keep clearly non-black values
+    const col = cs.color;
+    if (col && col !== 'rgb(0, 0, 0)' && col !== 'rgba(0, 0, 0, 0)') styles.push(`color:${col}`);
+
+    // Strip Word junk, keep only inline styles we computed
+    [...el.attributes].forEach(a => el.removeAttribute(a.name));
+    if (styles.length) el.setAttribute('style', styles.join(';'));
   });
 
   const result = tmpDiv.innerHTML;
@@ -1715,7 +1726,20 @@ function handleRichPaste(e) {
   if (!html) return; // let browser handle plain-text paste natively
   e.preventDefault();
   const clean = inlinePastedHtml(html);
-  document.execCommand('insertHTML', false, clean);
+
+  // Use Selection API (more reliable than deprecated execCommand)
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const frag = range.createContextualFragment(clean);
+  range.insertNode(frag);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  // Manually trigger onInput so mondayBodyRef stays in sync
+  e.currentTarget.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function Dashboard({ authUser, onLogout: handleLogout }) {
