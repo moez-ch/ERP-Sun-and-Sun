@@ -562,15 +562,6 @@ if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR);
 // Remove default seeded templates
 db.prepare(`DELETE FROM email_templates WHERE label IN ('İlgileniyoruz ✓','Sektör Dışı ✗','İlgilenmiyoruz ✗','Hibe Duyurusu 📢')`).run();
 
-// Seed daily update template if not already present
-if (!db.prepare("SELECT id FROM email_templates WHERE label = '📋 Daily Update'").get()) {
-  db.prepare("INSERT INTO email_templates (label, color, subject, body) VALUES (?, ?, ?, ?)").run(
-    '📋 Daily Update',
-    '#0b3e64',
-    `Daily Update — ${new Date().toLocaleDateString('en-GB')}`,
-    `<p>Hello team,</p><p>Here's a quick update on today's work:</p><ul><li>&nbsp;</li><li>&nbsp;</li><li>&nbsp;</li></ul><p>Let me know if you have any questions.</p><p>Best,<br>Moez</p>`
-  );
-}
 
 // Seed default admin on first run
 const count = db.prepare("SELECT COUNT(*) AS n FROM users").get().n;
