@@ -1107,20 +1107,62 @@ function AttendanceView({ colors, font, lang, onBack }) {
   }
 
   function printMonthlyReport() {
-    const rows = employees.map(emp => ({
-      emp,
-      weekly: weeks.map(wd => empWeekDiff(emp, wd)),
-      total:  empMonthTotal(emp),
-    }));
+    const allDays = weeks.flat();
+    const FULL_DAYS = lang === "tr" ? ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma"] : ["Monday","Tuesday","Wednesday","Thursday","Friday"];
+    const leaveMap = { paid_leave: tr("Paid Leave","Ücretli İzin"), unpaid_leave: tr("Unpaid Leave","Ücretsiz İzin"), holiday: tr("Holiday","Resmi Tatil") };
+
+    // ── Monthly summary table ──
     const wHeaders = weeks.map((wd, wi) =>
       `<th>${tr("W","H")}${wi+1}<br><small>${attFD(wd[0])}–${attFD(wd[wd.length-1])}</small></th>`
     ).join("");
-    const wCells = (diffs) => diffs.map(d =>
-      `<td class="${d==null?"neutral":d>=0?"pos":"neg"}">${attFmt(d)}</td>`
-    ).join("");
-    const bodyRows = rows.map(({emp, weekly, total}) =>
-      `<tr><td class="name">${emp}</td>${wCells(weekly)}<td class="tot ${total==null?"neutral":total>=0?"pos":"neg"}">${attFmt(total)}</td></tr>`
-    ).join("");
+    const summaryRows = employees.map(emp => {
+      const weekly = weeks.map(wd => empWeekDiff(emp, wd));
+      const total  = empMonthTotal(emp);
+      const wCells = weekly.map(d => `<td class="${d==null?"neutral":d>=0?"pos":"neg"}">${attFmt(d)}</td>`).join("");
+      return `<tr><td class="name">${emp}</td>${wCells}<td class="tot ${total==null?"neutral":total>=0?"pos":"neg"}">${attFmt(total)}</td></tr>`;
+    }).join("");
+
+    // ── Per-employee detail sections ──
+    const detailSections = employees.map(emp => {
+      const workedCount = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; return e?.in && e?.out && !e?.type; }).length;
+      const lateCount   = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; return e?.in && !e?.type && attT2M(e.in) > 510; }).length;
+      const earlyCount  = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; return e?.out && !e?.type && attT2M(e.out) < 1110; }).length;
+
+      const dayRows = allDays.map(d => {
+        const dk  = attDK(d);
+        const ent = data[emp]?.[dk] || { in:"", out:"", type:"" };
+        const type = ent.type || "";
+        const dayName = FULL_DAYS[d.getDay()-1];
+        if (type) return `<tr class="leave"><td>${attFD(d)}</td><td>${dayName}</td><td colspan="4" style="text-align:center;font-style:italic;color:#555">${leaveMap[type]||type}</td><td>—</td></tr>`;
+        const arrDelta = ent.in  ? attT2M(ent.in)  - 510  : null;
+        const depDelta = ent.out ? attT2M(ent.out) - 1110 : null;
+        const dayDiff  = ent.in && ent.out ? attDiff(ent.in, ent.out) : null;
+        const arrLabel = arrDelta==null?"—":arrDelta===0?tr("On time","Tam"):arrDelta>0?`+${attAbsStr(arrDelta)} ${tr("late","geç")}`:`-${attAbsStr(arrDelta)} ${tr("early","erken")}`;
+        const depLabel = depDelta==null?"—":depDelta===0?tr("On time","Tam"):depDelta>0?`+${attAbsStr(depDelta)}`:`-${attAbsStr(depDelta)} ${tr("early","erken")}`;
+        return `<tr>
+          <td>${attFD(d)}</td><td>${dayName}</td>
+          <td>${ent.in||"—"}</td><td class="${arrDelta==null?"neutral":arrDelta>0?"neg":"pos"}">${arrLabel}</td>
+          <td>${ent.out||"—"}</td><td class="${depDelta==null?"neutral":depDelta<0?"neg":"pos"}">${depLabel}</td>
+          <td class="${dayDiff==null?"neutral":dayDiff>=0?"pos":"neg"}">${attFmt(dayDiff)}</td>
+        </tr>`;
+      }).join("");
+
+      return `
+        <div class="emp-section">
+          <div class="emp-header">
+            <span class="emp-name">👤 ${emp}</span>
+            <span class="stat stat-w">${tr("Worked","Çalışma")}: <b>${workedCount}</b></span>
+            <span class="stat stat-l">${tr("Late arrivals","Geç giriş")}: <b>${lateCount}</b></span>
+            <span class="stat stat-e">${tr("Early departures","Erken çıkış")}: <b>${earlyCount}</b></span>
+          </div>
+          <table><thead><tr>
+            <th>${tr("Date","Tarih")}</th><th>${tr("Day","Gün")}</th>
+            <th>${tr("Arrival","Giriş")}</th><th>${tr("Status","Durum")}</th>
+            <th>${tr("Departure","Çıkış")}</th><th>${tr("Status","Durum")}</th>
+            <th>${tr("Diff","Fark")}</th>
+          </tr></thead><tbody>${dayRows}</tbody></table>
+        </div>`;
+    }).join("");
 
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <title>${MONTHS[month]} ${year} — ${tr("Attendance Report","Mesai Raporu")}</title>
@@ -1128,25 +1170,33 @@ function AttendanceView({ colors, font, lang, onBack }) {
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1a1a1a;padding:32px}
 h1{font-size:20px;font-weight:700;margin-bottom:4px}
+h2{font-size:14px;font-weight:700;margin:28px 0 12px;padding-bottom:6px;border-bottom:2px solid #1a1a1a}
 .sub{font-size:11px;color:#666;margin-bottom:24px}
-table{width:100%;border-collapse:collapse}
-th{background:#1a1a1a;color:#FFD700;padding:8px 12px;text-align:center;font-size:11px;font-weight:700;white-space:nowrap}
-th:first-child{text-align:left}
-td{padding:8px 12px;border-bottom:1px solid #e0e0e0;text-align:center;font-size:12px}
-td.name{text-align:left;font-weight:600}
+table{width:100%;border-collapse:collapse;margin-bottom:0}
+th{background:#1a1a1a;color:#FFD700;padding:7px 10px;text-align:center;font-size:11px;font-weight:700;white-space:nowrap}
+th:first-child,th:nth-child(2){text-align:left}
+td{padding:7px 10px;border-bottom:1px solid #e0e0e0;text-align:center;font-size:11px}
+td:first-child,td:nth-child(2),td.name{text-align:left;font-weight:600}
 td.tot{background:#f0f4ff;font-weight:700}
 tr:nth-child(even){background:#f9f9f9}
-.pos{color:#16a34a;font-weight:700}
-.neg{color:#dc2626;font-weight:700}
-.neutral{color:#aaa}
-.footer{margin-top:20px;font-size:10px;color:#999}
+tr.leave{background:#f0f9ff}
+.pos{color:#16a34a;font-weight:700}.neg{color:#dc2626;font-weight:700}.neutral{color:#aaa}
+.emp-section{margin-top:24px;page-break-inside:avoid}
+.emp-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.emp-name{font-size:13px;font-weight:700}
+.stat{font-size:10px;padding:2px 10px;border-radius:20px;font-weight:600}
+.stat-w{background:#e8f0fe;color:#1a56db}.stat-l{background:#fde8e8;color:#c81e1e}.stat-e{background:#fef3c7;color:#92400e}
+.footer{margin-top:24px;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:8px}
 small{font-weight:400;font-size:10px;color:#aaa}
-@media print{body{padding:16px}@page{margin:20mm}}
+@media print{body{padding:16px}@page{margin:15mm}.emp-section{page-break-before:auto}}
 </style></head><body>
 <h1>Sun &amp; Sun — ${tr("Attendance Report","Mesai Raporu")}</h1>
 <div class="sub">${MONTHS[month]} ${year} &nbsp;·&nbsp; ${tr("Generated","Oluşturuldu")}: ${new Date().toLocaleDateString(lang==="tr"?"tr-TR":"en-GB")}</div>
+<h2>${tr("Monthly Overview","Aylık Özet")}</h2>
 <table><thead><tr><th>${tr("Employee","Çalışan")}</th>${wHeaders}<th class="tot">${tr("Total","Toplam")}</th></tr></thead>
-<tbody>${bodyRows}</tbody></table>
+<tbody>${summaryRows}</tbody></table>
+<h2>${tr("Daily Breakdown","Günlük Detay")}</h2>
+${detailSections}
 <div class="footer">${tr("Work schedule: 08:30–18:30 · 10h expected per working day","Mesai saatleri: 08:30–18:30 · Günlük beklenen: 10 saat")}</div>
 </body></html>`;
 
