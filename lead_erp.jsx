@@ -1668,6 +1668,56 @@ function EmailHistory({ colors, token, lang }) {
   );
 }
 
+// Converts pasted Word HTML to inline-styled HTML so Gmail can't strip it
+function inlinePastedHtml(html) {
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(html, 'text/html');
+
+  // Inject Word's <style> block into the live document temporarily so
+  // getComputedStyle can resolve class-based rules (.MsoNormal etc.)
+  const tmpStyle = document.createElement('style');
+  tmpStyle.textContent = Array.from(parsed.querySelectorAll('style')).map(s => s.textContent).join('\n');
+
+  const tmpDiv = document.createElement('div');
+  tmpDiv.style.cssText = 'position:fixed;top:-9999px;left:-9999px;visibility:hidden';
+  tmpDiv.innerHTML = parsed.body.innerHTML;
+
+  document.body.appendChild(tmpStyle);
+  document.body.appendChild(tmpDiv);
+
+  const KEEP = ['color','font-weight','font-style','text-decoration','text-align'];
+  const SKIP = { color:'rgb(34, 34, 34)', 'font-weight':'400', 'font-style':'normal', 'text-decoration':'none solid rgb(34, 34, 34)', 'text-align':'start' };
+
+  tmpDiv.querySelectorAll('*').forEach(el => {
+    const tag = el.tagName;
+    if (['STYLE','SCRIPT','META','LINK','XML'].includes(tag)) { el.remove(); return; }
+    const cs = window.getComputedStyle(el);
+    const inlined = KEEP
+      .map(p => [p, cs.getPropertyValue(p)])
+      .filter(([p, v]) => v && v !== SKIP[p] && !v.includes('initial'))
+      .map(([p, v]) => `${p}:${v}`)
+      .join(';');
+    el.removeAttribute('class');
+    el.removeAttribute('lang');
+    el.removeAttribute('style');
+    Array.from(el.attributes).filter(a => a.name.startsWith('xmlns') || a.name.startsWith('x:')).forEach(a => el.removeAttribute(a.name));
+    if (inlined) el.setAttribute('style', inlined);
+  });
+
+  const result = tmpDiv.innerHTML;
+  tmpStyle.remove();
+  tmpDiv.remove();
+  return result;
+}
+
+function handleRichPaste(e) {
+  const html = e.clipboardData.getData('text/html');
+  if (!html) return; // let browser handle plain-text paste natively
+  e.preventDefault();
+  const clean = inlinePastedHtml(html);
+  document.execCommand('insertHTML', false, clean);
+}
+
 function Dashboard({ authUser, onLogout: handleLogout }) {
   // ── LEADS STATE ─────────────────────────────────────────────────
   const [leads, setLeads] = useState(() => {
@@ -4513,6 +4563,7 @@ Kurallar:
                       contentEditable
                       suppressContentEditableWarning
                       onInput={e => { mondayBodyRef.current = e.currentTarget.innerHTML; }}
+                      onPaste={handleRichPaste}
                       data-placeholder={t("monday_bodyPlaceholder")}
                       style={{ minHeight: 100, padding: "8px 12px", background: colors.bg, color: colors.text, fontSize: 13, outline: "none", fontFamily: font, lineHeight: 1.6 }}
                     />
@@ -5092,6 +5143,7 @@ Kurallar:
                         contentEditable
                         suppressContentEditableWarning
                         onInput={e => { mondayBodyRef.current = e.currentTarget.innerHTML; }}
+                        onPaste={handleRichPaste}
                         style={{ width: "100%", minHeight: 140, padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", fontFamily: font, lineHeight: 1.6, boxSizing: "border-box" }}
                       />
                     </div>
