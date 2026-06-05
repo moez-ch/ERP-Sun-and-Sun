@@ -4614,7 +4614,7 @@ Kurallar:
               {/* ── New Template Modal ── */}
               {newTemplateModal && (
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <div style={{ background: colors.surface, borderRadius: 12, padding: 28, width: 500, maxWidth: "92vw", maxHeight: "90vh", overflowY: "auto", border: `1px solid ${colors.border}` }}>
+                  <div style={{ background: colors.surface, borderRadius: 12, padding: 28, width: 500, maxWidth: "92vw", maxHeight: "60vh", overflowY: "auto", border: `1px solid ${colors.border}` }}>
                     <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>{editingTemplateId ? "Şablonu Düzenle" : "Yeni Şablon Oluştur"}</div>
                     <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 5 }}>Şablon Adı</div>
