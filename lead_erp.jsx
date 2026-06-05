@@ -1041,6 +1041,7 @@ function attFD(d) { return `${String(d.getDate()).padStart(2,"0")}.${String(d.ge
 function attT2M(s) { if (!s) return null; const m = s.match(/^(\d{1,2}):(\d{2})/); return m ? parseInt(m[1])*60+parseInt(m[2]) : null; }
 function attDiff(inS, outS) { const i = attT2M(inS), o = attT2M(outS); if (i==null||o==null) return null; let w=o-i; if(w<0) w+=1440; return w-600; }
 function attFmt(m) { if (m==null) return "—"; const s=m>=0?"+":"-", a=Math.abs(m); return `${s}${Math.floor(a/60)}h ${String(a%60).padStart(2,"0")}m`; }
+function attAbsStr(mins) { const a=Math.abs(mins); return a<60?`${a}m`:`${Math.floor(a/60)}h${a%60>0?` ${a%60}m`:""}`; }
 
 function AttendanceView({ colors, font, lang, onBack }) {
   const tr = (en, t) => lang === "tr" ? t : en;
@@ -1053,6 +1054,7 @@ function AttendanceView({ colors, font, lang, onBack }) {
   const [weekIdx, setWeekIdx] = useState(0);
   const [screen,  setScreen]  = useState("table"); // "table" | "dashboard"
   const [showEmpMgr, setShowEmpMgr] = useState(false);
+  const [selectedEmp, setSelectedEmp] = useState(null);
   const [newEmp,  setNewEmp]  = useState("");
 
   const [employees, setEmployees] = useState(() => {
@@ -1075,18 +1077,16 @@ function AttendanceView({ colors, font, lang, onBack }) {
   function saveEmployees(list) { setEmployees(list); localStorage.setItem("sns_att_employees", JSON.stringify(list)); }
 
   function setEntry(emp, dk, field, val) {
-    const next = { ...data };
-    if (!next[emp]) next[emp] = {};
-    if (!next[emp][dk]) next[emp][dk] = { in: "", out: "", type: "" };
-    next[emp][dk] = { ...next[emp][dk], [field]: val };
-    saveData(next);
+    const empData = { ...(data[emp] || {}) };
+    empData[dk] = { in: "", out: "", type: "", ...(empData[dk] || {}), [field]: val };
+    saveData({ ...data, [emp]: empData });
   }
 
   const weeks = attWeeks(year, month);
   const wi    = Math.min(weekIdx, Math.max(0, weeks.length - 1));
   const wDays = weeks[wi] || [];
 
-  useEffect(() => { if (weekIdx >= weeks.length && weeks.length > 0) setWeekIdx(0); }, [year, month]);
+  useEffect(() => { if (weekIdx >= weeks.length && weeks.length > 0) setWeekIdx(0); setSelectedEmp(null); }, [year, month]);
 
   function empWeekDiff(emp, wd) {
     let total = null;
@@ -1271,13 +1271,13 @@ small{font-weight:400;font-size:10px;color:#aaa}
                           <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
                             <div style={{ display:"flex", alignItems:"center", gap:3 }}>
                               <span style={{ fontSize:9, color:colors.success, width:8, flexShrink:0 }}>↑</span>
-                              <input type="time" value={ent.in||""} disabled={!!type}
+                              <input type="text" value={ent.in||""} disabled={!!type} placeholder="HH:MM" maxLength={5}
                                 onChange={e=>setEntry(emp,dk,"in",e.target.value)}
                                 style={{ ...inpSt, opacity: type ? 0.3 : 1 }} />
                             </div>
                             <div style={{ display:"flex", alignItems:"center", gap:3 }}>
                               <span style={{ fontSize:9, color:colors.danger, width:8, flexShrink:0 }}>↓</span>
-                              <input type="time" value={ent.out||""} disabled={!!type}
+                              <input type="text" value={ent.out||""} disabled={!!type} placeholder="HH:MM" maxLength={5}
                                 onChange={e=>setEntry(emp,dk,"out",e.target.value)}
                                 style={{ ...inpSt, opacity: type ? 0.3 : 1 }} />
                             </div>
@@ -1324,6 +1324,7 @@ small{font-weight:400;font-size:10px;color:#aaa}
 
       {/* DASHBOARD VIEW */}
       {screen === "dashboard" && (
+        <>
         <div style={{ background:colors.surface, border:`1px solid ${colors.border}`, borderRadius:12, overflow:"hidden" }}>
           <div style={{ padding:"12px 16px", borderBottom:`1px solid ${colors.border}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
             <span style={{ fontSize:13, fontWeight:700, color:colors.text, fontFamily:font }}>{MONTHS[month]} {year} — {tr("Monthly Overview","Aylık Özet")}</span>
@@ -1351,7 +1352,10 @@ small{font-weight:400;font-size:10px;color:#aaa}
                   const total = empMonthTotal(emp);
                   return (
                     <tr key={ei} style={{ background: ei%2===0 ? "transparent" : `${colors.bg}99` }}>
-                      <td style={{ ...tdSt, fontFamily:font, fontSize:12, fontWeight:600, color:colors.text, padding:"10px 14px" }}>{emp}</td>
+                      <td onClick={() => setSelectedEmp(selectedEmp === emp ? null : emp)}
+                        style={{ ...tdSt, fontFamily:font, fontSize:12, fontWeight:600, padding:"10px 14px", cursor:"pointer", color: selectedEmp===emp ? colors.primaryLight : colors.text, background: selectedEmp===emp ? `${colors.primary}18` : undefined, userSelect:"none" }}>
+                        {emp}{selectedEmp===emp ? " ▾" : " ›"}
+                      </td>
                       {weeks.map((wd,wii) => {
                         const v = empWeekDiff(emp, wd);
                         return (
@@ -1375,6 +1379,137 @@ small{font-weight:400;font-size:10px;color:#aaa}
             </div>
           )}
         </div>
+
+        {/* ── Employee performance detail ── */}
+        {selectedEmp && (() => {
+          const allDays = weeks.flat();
+          const workedDays = allDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; return e?.in && e?.out && !e?.type; });
+          const lateDays   = workedDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; return attT2M(e.in)  > 510;  });
+          const earlyOuts  = workedDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; return attT2M(e.out) < 1110; });
+
+          const leaveLabels = {
+            paid_leave:   { label: tr("Paid Leave","Ücretli İzin"),    color: colors.success },
+            unpaid_leave: { label: tr("Unpaid Leave","Ücretsiz İzin"), color: colors.warning },
+            holiday:      { label: tr("Holiday","Resmi Tatil"),        color: colors.primary },
+          };
+
+          const cellSt = { padding: 5, verticalAlign: "top" };
+
+          return (
+            <div style={{ marginTop: 16, background: colors.surface, border: `2px solid ${colors.primary}35`, borderRadius: 14, overflow: "hidden" }}>
+              {/* Header */}
+              <div style={{ padding:"14px 18px", background:`${colors.primary}12`, borderBottom:`1px solid ${colors.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                  <span style={{ fontSize:14, fontWeight:700, color:colors.text, fontFamily:font }}>👤 {selectedEmp} — {MONTHS[month]} {year}</span>
+                  {[
+                    { label: tr("Days worked","Çalışma günü"), val: workedDays.length, bg: `${colors.primary}18`, border: `${colors.primary}40`, color: colors.primaryLight },
+                    { label: tr("Late arrivals","Geç giriş"),     val: lateDays.length,   bg: `${colors.danger}12`,  border: `${colors.danger}40`,  color: colors.danger },
+                    { label: tr("Early departures","Erken çıkış"), val: earlyOuts.length,  bg: `${colors.warning}12`, border: `${colors.warning}40`, color: colors.warning },
+                  ].map((s,i) => (
+                    <span key={i} style={{ fontSize:11, background:s.bg, border:`1px solid ${s.border}`, borderRadius:20, padding:"3px 11px", color:s.color, fontFamily:font }}>
+                      {s.label}: <b>{s.val}</b>
+                    </span>
+                  ))}
+                </div>
+                <button onClick={() => setSelectedEmp(null)}
+                  style={{ background:"none", border:`1px solid ${colors.border}`, borderRadius:6, padding:"4px 12px", cursor:"pointer", color:colors.textMuted, fontSize:12, fontFamily:font }}>
+                  ✕ {tr("Close","Kapat")}
+                </button>
+              </div>
+
+              {/* Calendar grid */}
+              <div style={{ overflowX:"auto", padding:16 }}>
+                <table style={{ borderCollapse:"collapse", width:"100%", tableLayout:"fixed" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width:38, padding:"6px 4px", fontSize:10, color:colors.textMuted, fontFamily:font, textAlign:"center" }}></th>
+                      {DAYS.map((d,di) => (
+                        <th key={di} style={{ padding:"6px 8px", fontSize:12, fontWeight:700, color:colors.text, fontFamily:font, textAlign:"center", borderBottom:`2px solid ${colors.primary}40`, minWidth:110 }}>
+                          {d}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weeks.map((wd, wii) => (
+                      <tr key={wii}>
+                        <td style={{ padding:"4px 2px", fontSize:10, color:colors.textMuted, fontWeight:700, fontFamily:font, textAlign:"center", verticalAlign:"middle" }}>
+                          {tr("W","H")}{wii+1}
+                        </td>
+                        {[1,2,3,4,5].map(dow => {
+                          const d = wd.find(day => day.getDay() === dow);
+                          if (!d) return (
+                            <td key={dow} style={cellSt}>
+                              <div style={{ minHeight:82, borderRadius:8, background:`${colors.border}25` }} />
+                            </td>
+                          );
+
+                          const dk   = attDK(d);
+                          const ent  = data[selectedEmp]?.[dk] || { in:"", out:"", type:"" };
+                          const type = ent.type || "";
+
+                          if (type) {
+                            const info = leaveLabels[type] || { label: type, color: colors.textMuted };
+                            return (
+                              <td key={dow} style={cellSt}>
+                                <div style={{ minHeight:82, borderRadius:8, border:`1px solid ${info.color}40`, background:`${info.color}12`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:5, padding:6 }}>
+                                  <div style={{ fontSize:10, fontWeight:700, color:colors.textMuted, fontFamily:font }}>{attFD(d)}</div>
+                                  <div style={{ fontSize:11, fontWeight:700, color:info.color, fontFamily:font, textAlign:"center" }}>{info.label}</div>
+                                </div>
+                              </td>
+                            );
+                          }
+
+                          const noData    = !ent.in && !ent.out;
+                          const arrMins   = attT2M(ent.in);
+                          const depMins   = attT2M(ent.out);
+                          const arrDelta  = arrMins  != null ? arrMins  - 510  : null;
+                          const depDelta  = depMins  != null ? depMins  - 1110 : null;
+
+                          const arrColor = arrDelta == null ? colors.textDim : arrDelta > 0 ? colors.danger : colors.success;
+                          const depColor = depDelta == null ? colors.textDim : depDelta < 0 ? colors.danger : colors.success;
+
+                          const arrLabel = arrDelta == null ? "" : arrDelta === 0 ? tr("On time","Tam zamanında") : arrDelta > 0 ? `+${attAbsStr(arrDelta)} ${tr("late","geç")}` : `-${attAbsStr(arrDelta)} ${tr("early","erken")}`;
+                          const depLabel = depDelta == null ? "" : depDelta === 0 ? tr("On time","Tam zamanında") : depDelta > 0 ? `+${attAbsStr(depDelta)}` : `-${attAbsStr(depDelta)} ${tr("early","erken")}`;
+
+                          return (
+                            <td key={dow} style={cellSt}>
+                              <div style={{ borderRadius:8, border:`1px solid ${colors.border}`, background:colors.bg, overflow:"hidden", minHeight:82 }}>
+                                {/* Date header */}
+                                <div style={{ padding:"3px 6px", borderBottom:`1px solid ${colors.border}`, fontSize:9, color:colors.textMuted, fontFamily:font, textAlign:"center", fontWeight:700, background:colors.surface }}>
+                                  {attFD(d)}
+                                </div>
+                                {/* Morning / Arrival */}
+                                <div style={{ padding:"6px 8px", borderBottom:`1px solid ${colors.border}50`, background: noData ? "transparent" : arrDelta != null && arrDelta > 0 ? `${colors.danger}08` : `${colors.success}06` }}>
+                                  <div style={{ fontSize:9, color:colors.textDim, fontFamily:font, marginBottom:2 }}>↑ {tr("Arrival","Giriş")}</div>
+                                  <div style={{ fontSize:12, fontWeight:700, color: noData ? colors.textDim : arrColor, fontFamily:font }}>{ent.in || "—"}</div>
+                                  {!noData && arrLabel && <div style={{ fontSize:9, color:arrColor, fontFamily:font, marginTop:1 }}>{arrLabel}</div>}
+                                </div>
+                                {/* Evening / Departure */}
+                                <div style={{ padding:"6px 8px", background: noData ? "transparent" : depDelta != null && depDelta < 0 ? `${colors.danger}08` : `${colors.success}06` }}>
+                                  <div style={{ fontSize:9, color:colors.textDim, fontFamily:font, marginBottom:2 }}>↓ {tr("Departure","Çıkış")}</div>
+                                  <div style={{ fontSize:12, fontWeight:700, color: noData ? colors.textDim : depColor, fontFamily:font }}>{ent.out || "—"}</div>
+                                  {!noData && depLabel && <div style={{ fontSize:9, color:depColor, fontFamily:font, marginTop:1 }}>{depLabel}</div>}
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {workedDays.length === 0 && (
+                <div style={{ padding:"24px", textAlign:"center", color:colors.textDim, fontSize:12, fontFamily:font }}>
+                  {tr("No attendance data for this employee this month.","Bu ay için bu çalışana ait veri bulunamadı.")}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+        </>
       )}
     </div>
   );
