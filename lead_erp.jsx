@@ -1726,19 +1726,9 @@ function handleRichPaste(e) {
   if (!html) return; // let browser handle plain-text paste natively
   e.preventDefault();
   const clean = inlinePastedHtml(html);
-
-  // Use Selection API (more reliable than deprecated execCommand)
-  const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return;
-  const range = sel.getRangeAt(0);
-  range.deleteContents();
-  const frag = range.createContextualFragment(clean);
-  range.insertNode(frag);
-  range.collapse(false);
-  sel.removeAllRanges();
-  sel.addRange(range);
-
-  // Manually trigger onInput so mondayBodyRef stays in sync
+  // execCommand correctly handles inserting block-level elements (paragraphs etc.)
+  document.execCommand('insertHTML', false, clean);
+  // Manually sync mondayBodyRef after insert
   e.currentTarget.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
@@ -5130,45 +5120,33 @@ Kurallar:
               {/* Bulk Email Modal */}
               {mondayBulkModal && (
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }} onClick={() => !mondayBulkSending && setMondayBulkModal(false)}>
-                  <div style={{ background: colors.surface, borderRadius: 12, padding: 28, width: 500, border: `1px solid ${colors.border}` }} onClick={e => e.stopPropagation()}>
-                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("monday_bulkTitle")}</h3>
-                    <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 4 }}>
-                      {t("monday_willSend", selectedWithEmail.length)}
-                    </p>
-                    {(selectedItems.length - selectedWithEmail.length - selectedInvalidEmail.length) > 0 && (
-                      <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>
-                        {t("monday_willSkipNoEmail", selectedItems.length - selectedWithEmail.length - selectedInvalidEmail.length)}
-                      </p>
-                    )}
-                    {selectedInvalidEmail.length > 0 && (
-                      <p style={{ fontSize: 11, color: "#e57373", marginBottom: 4 }}>
-                        {t("monday_willSkipInvalid", selectedInvalidEmail.length, selectedInvalidEmail.map(i => i.name).join(", "))}
-                      </p>
-                    )}
-                    {genderCol ? (
-                      <p style={{ fontSize: 11, color: "#81c784", marginBottom: 16 }}>{t("monday_genderFound", mondayColTitle(genderCol, lang))}</p>
-                    ) : (
-                      <p style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>{t("monday_genderNotFound")}</p>
-                    )}
-                    <div style={{ marginBottom: 12 }}>
+                  <div style={{ background: colors.surface, borderRadius: 12, padding: 24, width: 420, border: `1px solid ${colors.border}` }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{t("monday_bulkTitle")}</h3>
+                      <button onClick={() => !mondayBulkSending && setMondayBulkModal(false)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: colors.textMuted, lineHeight: 1 }}>×</button>
+                    </div>
+                    {/* Recipient summary */}
+                    <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, padding: "10px 14px", marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ fontSize: 13, color: colors.text }}>{t("monday_willSend", selectedWithEmail.length)}</div>
+                      {(selectedItems.length - selectedWithEmail.length - selectedInvalidEmail.length) > 0 && (
+                        <div style={{ fontSize: 11, color: colors.textMuted }}>{t("monday_willSkipNoEmail", selectedItems.length - selectedWithEmail.length - selectedInvalidEmail.length)}</div>
+                      )}
+                      {selectedInvalidEmail.length > 0 && (
+                        <div style={{ fontSize: 11, color: "#e57373" }}>{t("monday_willSkipInvalid", selectedInvalidEmail.length, selectedInvalidEmail.map(i => i.name).join(", "))}</div>
+                      )}
+                      {genderCol
+                        ? <div style={{ fontSize: 11, color: "#81c784" }}>{t("monday_genderFound", mondayColTitle(genderCol, lang))}</div>
+                        : <div style={{ fontSize: 11, color: colors.textMuted }}>{t("monday_genderNotFound")}</div>
+                      }
+                    </div>
+                    {/* Subject (editable) */}
+                    <div style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{t("monday_subject")}</div>
                       <input
                         value={mondayBulkDraft.subject}
                         placeholder={t("monday_subjectPlaceholder")}
                         onChange={e => setMondayBulkDraft(p => ({ ...p, subject: e.target.value }))}
                         style={{ width: "100%", padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}
-                      />
-                    </div>
-                    <div style={{ marginBottom: 20 }}>
-                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>{t("monday_body")}</div>
-                      <div
-                        key={`mel-${mondayBulkDraft._bk}`}
-                        ref={mondayModalEditorInit}
-                        contentEditable
-                        suppressContentEditableWarning
-                        onInput={e => { mondayBodyRef.current = e.currentTarget.innerHTML; }}
-                        onPaste={handleRichPaste}
-                        style={{ width: "100%", minHeight: 140, padding: "8px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", fontFamily: font, lineHeight: 1.6, boxSizing: "border-box" }}
                       />
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
