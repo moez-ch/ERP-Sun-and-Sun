@@ -1147,6 +1147,10 @@ function AttendanceView({ colors, font, lang, onBack }) {
     return total;
   }
 
+  // true once any entry exists for the month — separate from empMonthTotal, which is null
+  // for employees whose days are all leave/holiday (excluded from the diff, but still "data")
+  const monthHasData = employees.some(emp => Object.values(data[emp] || {}).some(ent => ent && (ent.type || ent.in || ent.out)));
+
   function printMonthlyReport() {
     const allDays = weeks.flat();
     const FULL_DAYS = lang === "tr" ? ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma"] : ["Monday","Tuesday","Wednesday","Thursday","Friday"];
@@ -1567,7 +1571,7 @@ tr.leave{background:#f0f9ff}
               </tbody>
             </table>
           </div>
-          {employees.every(emp => empMonthTotal(emp) == null) && (
+          {!monthHasData && (
             <div style={{ padding:"32px 24px", textAlign:"center", color:colors.textDim, fontSize:12, fontFamily:font }}>
               {tr("No data entered yet for this month. Fill in the weekly tables first.","Bu ay için henüz veri girilmedi. Önce haftalık tabloları doldurun.")}
             </div>
