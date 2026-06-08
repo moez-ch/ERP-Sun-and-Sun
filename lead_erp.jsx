@@ -1039,7 +1039,16 @@ function attWeeks(year, month) {
 function attDK(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function attFD(d) { return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}`; }
 function attT2M(s) { if (!s) return null; const m = s.match(/^(\d{1,2}):(\d{2})/); return m ? parseInt(m[1])*60+parseInt(m[2]) : null; }
-function attDiff(inS, outS) { const i = attT2M(inS), o = attT2M(outS); if (i==null||o==null) return null; let w=o-i; if(w<0) w+=1440; return w-600; }
+function attDayDiff(ent) {
+  const type = ent?.type || "";
+  if (type === "holiday" || type === "paid_leave" || type === "unpaid_leave") return null; // excluded from diff — leave hours are tracked as a record only
+  if (!ent?.in || !ent?.out) return null;
+  const i = attT2M(ent.in), o = attT2M(ent.out);
+  if (i == null || o == null) return null;
+  let w = o - i;
+  if (w < 0) w += 1440;
+  return w - (type === "half_holiday" ? 300 : 600); // half-day public holiday expects 5h instead of 10h
+}
 function attFmt(m) { if (m==null) return "—"; const s=m>=0?"+":"-", a=Math.abs(m); return `${s}${Math.floor(a/60)}h ${String(a%60).padStart(2,"0")}m`; }
 function attAbsStr(mins) { const a=Math.abs(mins); return a<60?`${a}m`:`${Math.floor(a/60)}h${a%60>0?` ${a%60}m`:""}`; }
 
@@ -1078,7 +1087,7 @@ function AttendanceView({ colors, font, lang, onBack }) {
 
   function setEntry(emp, dk, field, val) {
     const empData = { ...(data[emp] || {}) };
-    empData[dk] = { in: "", out: "", type: "", ...(empData[dk] || {}), [field]: val };
+    empData[dk] = { in: "", out: "", type: "", leaveHours: "", ...(empData[dk] || {}), [field]: val };
     saveData({ ...data, [emp]: empData });
   }
 
@@ -1091,10 +1100,7 @@ function AttendanceView({ colors, font, lang, onBack }) {
   function empWeekDiff(emp, wd) {
     let total = null;
     wd.forEach(d => {
-      const e = data[emp]?.[attDK(d)];
-      if (e?.type) return; // leave or holiday — excluded from diff
-      if (!e?.in || !e?.out) return;
-      const v = attDiff(e.in, e.out);
+      const v = attDayDiff(data[emp]?.[attDK(d)]);
       if (v != null) total = (total ?? 0) + v;
     });
     return total;
@@ -1109,7 +1115,8 @@ function AttendanceView({ colors, font, lang, onBack }) {
   function printMonthlyReport() {
     const allDays = weeks.flat();
     const FULL_DAYS = lang === "tr" ? ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma"] : ["Monday","Tuesday","Wednesday","Thursday","Friday"];
-    const leaveMap = { paid_leave: tr("Paid Leave","Ücretli İzin"), unpaid_leave: tr("Unpaid Leave","Ücretsiz İzin"), holiday: tr("Holiday","Resmi Tatil") };
+    const leaveMap = { paid_leave: tr("Paid Leave","Ücretli İzin"), unpaid_leave: tr("Unpaid Leave","Ücretsiz İzin"), holiday: tr("Holiday","Resmi Tatil"), half_holiday: tr("Half-day Holiday","Yarım Gün Resmi Tatil") };
+    const leaveNote = ent => { const lh = parseFloat(ent.leaveHours); return (ent.type === "paid_leave" || ent.type === "unpaid_leave") && lh > 0 ? `${leaveMap[ent.type]} · ${lh} ${tr("h","sa")}` : (leaveMap[ent.type] || ent.type); };
 
     // ── Monthly summary table ──
     const wHeaders = weeks.map((wd, wi) =>
@@ -1124,25 +1131,29 @@ function AttendanceView({ colors, font, lang, onBack }) {
 
     // ── Per-employee detail sections ──
     const detailSections = employees.map(emp => {
-      const workedCount = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; return e?.in && e?.out && !e?.type; }).length;
-      const lateCount   = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; return e?.in && !e?.type && attT2M(e.in) > 510; }).length;
+      const workedCount = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; const t = e?.type || ""; return e?.in && e?.out && (!t || t === "half_holiday"); }).length;
+      const lateCount   = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; const t = e?.type || ""; return e?.in && (!t || t === "half_holiday") && attT2M(e.in) > 510; }).length;
       const earlyCount  = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; return e?.out && !e?.type && attT2M(e.out) < 1110; }).length;
 
       const dayRows = allDays.map(d => {
         const dk  = attDK(d);
-        const ent = data[emp]?.[dk] || { in:"", out:"", type:"" };
+        const ent = data[emp]?.[dk] || { in:"", out:"", type:"", leaveHours:"" };
         const type = ent.type || "";
         const dayName = FULL_DAYS[d.getDay()-1];
-        if (type) return `<tr class="leave"><td>${attFD(d)}</td><td>${dayName}</td><td colspan="4" style="text-align:center;font-style:italic;color:#555">${leaveMap[type]||type}</td><td>—</td></tr>`;
-        const arrDelta = ent.in  ? attT2M(ent.in)  - 510  : null;
-        const depDelta = ent.out ? attT2M(ent.out) - 1110 : null;
-        const dayDiff  = ent.in && ent.out ? attDiff(ent.in, ent.out) : null;
+        if (type === "holiday" || type === "paid_leave" || type === "unpaid_leave") {
+          return `<tr class="leave"><td>${attFD(d)}</td><td>${dayName}</td><td colspan="4" style="text-align:center;font-style:italic;color:#555">${leaveNote(ent)}</td><td>—</td></tr>`;
+        }
+        const isHalf = type === "half_holiday";
+        const arrDelta = ent.in ? attT2M(ent.in) - 510 : null;
+        const depDelta = !isHalf && ent.out ? attT2M(ent.out) - 1110 : null;
+        const dayDiff  = attDayDiff(ent);
         const arrLabel = arrDelta==null?"—":arrDelta===0?tr("On time","Tam"):arrDelta>0?`+${attAbsStr(arrDelta)} ${tr("late","geç")}`:`-${attAbsStr(arrDelta)} ${tr("early","erken")}`;
-        const depLabel = depDelta==null?"—":depDelta===0?tr("On time","Tam"):depDelta>0?`+${attAbsStr(depDelta)}`:`-${attAbsStr(depDelta)} ${tr("early","erken")}`;
+        const depLabel = isHalf ? "—" : (depDelta==null?"—":depDelta===0?tr("On time","Tam"):depDelta>0?`+${attAbsStr(depDelta)}`:`-${attAbsStr(depDelta)} ${tr("early","erken")}`);
+        const dayLabel = isHalf ? `${dayName}<br><small style="font-style:italic;color:#888">${leaveMap.half_holiday}</small>` : dayName;
         return `<tr>
-          <td>${attFD(d)}</td><td>${dayName}</td>
+          <td>${attFD(d)}</td><td>${dayLabel}</td>
           <td>${ent.in||"—"}</td><td class="${arrDelta==null?"neutral":arrDelta>0?"neg":"pos"}">${arrLabel}</td>
-          <td>${ent.out||"—"}</td><td class="${depDelta==null?"neutral":depDelta<0?"neg":"pos"}">${depLabel}</td>
+          <td>${ent.out||"—"}</td><td class="${isHalf||depDelta==null?"neutral":depDelta<0?"neg":"pos"}">${depLabel}</td>
           <td class="${dayDiff==null?"neutral":dayDiff>=0?"pos":"neg"}">${attFmt(dayDiff)}</td>
         </tr>`;
       }).join("");
@@ -1210,35 +1221,39 @@ ${detailSections}
 
   function printEmployeeDetail(emp) {
     const allDays = weeks.flat();
-    const leaveMap = { paid_leave: tr("Paid Leave","Ücretli İzin"), unpaid_leave: tr("Unpaid Leave","Ücretsiz İzin"), holiday: tr("Holiday","Resmi Tatil") };
+    const leaveMap = { paid_leave: tr("Paid Leave","Ücretli İzin"), unpaid_leave: tr("Unpaid Leave","Ücretsiz İzin"), holiday: tr("Holiday","Resmi Tatil"), half_holiday: tr("Half-day Holiday","Yarım Gün Resmi Tatil") };
+    const leaveNote = ent => { const lh = parseFloat(ent.leaveHours); return (ent.type === "paid_leave" || ent.type === "unpaid_leave") && lh > 0 ? `${leaveMap[ent.type]} · ${lh} ${tr("h","sa")}` : (leaveMap[ent.type] || ent.type); };
     const FULL_DAYS = lang === "tr" ? ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma"] : ["Monday","Tuesday","Wednesday","Thursday","Friday"];
 
     const rows = allDays.map(d => {
       const dk  = attDK(d);
-      const ent = data[emp]?.[dk] || { in:"", out:"", type:"" };
+      const ent = data[emp]?.[dk] || { in:"", out:"", type:"", leaveHours:"" };
       const type = ent.type || "";
-      const arrDelta = !type && ent.in  ? attT2M(ent.in)  - 510  : null;
-      const depDelta = !type && ent.out ? attT2M(ent.out) - 1110 : null;
-      const dayDiff  = !type && ent.in && ent.out ? attDiff(ent.in, ent.out) : null;
+      const isOff  = type === "holiday" || type === "paid_leave" || type === "unpaid_leave";
+      const isHalf = type === "half_holiday";
+      const arrDelta = !isOff && ent.in  ? attT2M(ent.in)  - 510  : null;
+      const depDelta = !isOff && !isHalf && ent.out ? attT2M(ent.out) - 1110 : null;
+      const dayDiff  = attDayDiff(ent);
       const arrLabel = arrDelta == null ? "—" : arrDelta === 0 ? tr("On time","Tam") : arrDelta > 0 ? `+${attAbsStr(arrDelta)} ${tr("late","geç")}` : `-${attAbsStr(arrDelta)} ${tr("early","erken")}`;
-      const depLabel = depDelta == null ? "—" : depDelta === 0 ? tr("On time","Tam") : depDelta > 0 ? `+${attAbsStr(depDelta)}` : `-${attAbsStr(depDelta)} ${tr("early","erken")}`;
-      return { d, dk, ent, type, arrDelta, depDelta, dayDiff, arrLabel, depLabel };
+      const depLabel = isHalf ? "—" : (depDelta == null ? "—" : depDelta === 0 ? tr("On time","Tam") : depDelta > 0 ? `+${attAbsStr(depDelta)}` : `-${attAbsStr(depDelta)} ${tr("early","erken")}`);
+      return { d, dk, ent, type, isOff, isHalf, arrDelta, depDelta, dayDiff, arrLabel, depLabel };
     });
 
-    const workedCount = rows.filter(r => !r.type && r.ent.in && r.ent.out).length;
+    const workedCount = rows.filter(r => !r.isOff && r.ent.in && r.ent.out).length;
     const lateCount   = rows.filter(r => r.arrDelta != null && r.arrDelta > 0).length;
-    const earlyCount  = rows.filter(r => r.depDelta != null && r.depDelta < 0).length;
+    const earlyCount  = rows.filter(r => !r.isHalf && r.depDelta != null && r.depDelta < 0).length;
 
-    const bodyRows = rows.map(({ d, ent, type, arrDelta, depDelta, dayDiff, arrLabel, depLabel }) => {
+    const bodyRows = rows.map(({ d, ent, type, isOff, isHalf, arrDelta, depDelta, dayDiff, arrLabel, depLabel }) => {
       const dayName = FULL_DAYS[d.getDay() - 1];
-      if (type) return `<tr class="leave"><td>${attFD(d)}</td><td>${dayName}</td><td colspan="4" style="text-align:center;font-style:italic">${leaveMap[type] || type}</td><td>—</td></tr>`;
-      if (!ent.in && !ent.out) return `<tr><td>${attFD(d)}</td><td>${dayName}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
+      if (isOff) return `<tr class="leave"><td>${attFD(d)}</td><td>${dayName}</td><td colspan="4" style="text-align:center;font-style:italic">${leaveNote(ent)}</td><td>—</td></tr>`;
+      const dayLabel = isHalf ? `${dayName} <small style="font-style:italic;color:#888">(${leaveMap.half_holiday})</small>` : dayName;
+      if (!ent.in && !ent.out) return `<tr><td>${attFD(d)}</td><td>${dayLabel}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
       return `<tr>
-        <td>${attFD(d)}</td><td>${dayName}</td>
+        <td>${attFD(d)}</td><td>${dayLabel}</td>
         <td>${ent.in || "—"}</td>
         <td class="${arrDelta==null?"neutral":arrDelta>0?"neg":"pos"}">${arrLabel}</td>
         <td>${ent.out || "—"}</td>
-        <td class="${depDelta==null?"neutral":depDelta<0?"neg":"pos"}">${depLabel}</td>
+        <td class="${isHalf||depDelta==null?"neutral":depDelta<0?"neg":"pos"}">${depLabel}</td>
         <td class="${dayDiff==null?"neutral":dayDiff>=0?"pos":"neg"}">${attFmt(dayDiff)}</td>
       </tr>`;
     }).join("");
@@ -1388,28 +1403,30 @@ tr.leave{background:#f0f9ff}
                     <td style={{ ...tdSt, fontFamily:font, fontSize:12, fontWeight:600, color:colors.text, padding:"10px 14px", position:"sticky", left:0, background: ei%2===0 ? colors.surface : `${colors.bg}ee`, zIndex:1 }}>{emp}</td>
                     {wDays.map((d,di) => {
                       const dk   = attDK(d);
-                      const ent  = data[emp]?.[dk] || { in:"", out:"", type:"" };
+                      const ent  = data[emp]?.[dk] || { in:"", out:"", type:"", leaveHours:"" };
                       const type = ent.type || "";
-                      const dv   = type ? null : attDiff(ent.in, ent.out);
+                      const offType = type === "holiday" || type === "paid_leave" || type === "unpaid_leave";
+                      const dv   = attDayDiff(ent);
                       const leaveOpts = [
-                        { key:"paid_leave",   label:tr("PL","Üİ"),  title:tr("Paid Leave","Ücretli İzin"),    color:colors.success },
-                        { key:"unpaid_leave", label:tr("UL","ÜSİ"), title:tr("Unpaid Leave","Ücretsiz İzin"), color:colors.warning },
-                        { key:"holiday",      label:tr("PH","RT"),  title:tr("Public Holiday","Resmi Tatil"),  color:colors.primary },
+                        { key:"paid_leave",   label:tr("PL","Üİ"),   title:tr("Paid Leave","Ücretli İzin"),                       color:colors.success },
+                        { key:"unpaid_leave", label:tr("UL","ÜSİ"),  title:tr("Unpaid Leave","Ücretsiz İzin"),                    color:colors.warning },
+                        { key:"holiday",      label:tr("PH","RT"),   title:tr("Public Holiday","Resmi Tatil"),                     color:colors.primary },
+                        { key:"half_holiday", label:tr("½PH","½RT"), title:tr("Half-day Public Holiday","Yarım Gün Resmi Tatil"),  color:colors.accent },
                       ];
                       return (
-                        <td key={di} style={{ ...tdSt, minWidth:100, background: type ? (type==="paid_leave"?`${colors.success}08`:type==="unpaid_leave"?`${colors.warning}08`:`${colors.primary}08`) : "transparent" }}>
+                        <td key={di} style={{ ...tdSt, minWidth:100, background: type ? `${leaveOpts.find(o=>o.key===type)?.color}08` : "transparent" }}>
                           <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
                             <div style={{ display:"flex", alignItems:"center", gap:3 }}>
                               <span style={{ fontSize:9, color:colors.success, width:8, flexShrink:0 }}>↑</span>
-                              <input type="text" value={ent.in||""} disabled={!!type} placeholder="HH:MM" maxLength={5}
+                              <input type="text" value={ent.in||""} disabled={offType} placeholder="HH:MM" maxLength={5}
                                 onChange={e=>setEntry(emp,dk,"in",e.target.value)}
-                                style={{ ...inpSt, opacity: type ? 0.3 : 1 }} />
+                                style={{ ...inpSt, opacity: offType ? 0.3 : 1 }} />
                             </div>
                             <div style={{ display:"flex", alignItems:"center", gap:3 }}>
                               <span style={{ fontSize:9, color:colors.danger, width:8, flexShrink:0 }}>↓</span>
-                              <input type="text" value={ent.out||""} disabled={!!type} placeholder="HH:MM" maxLength={5}
+                              <input type="text" value={ent.out||""} disabled={offType} placeholder="HH:MM" maxLength={5}
                                 onChange={e=>setEntry(emp,dk,"out",e.target.value)}
-                                style={{ ...inpSt, opacity: type ? 0.3 : 1 }} />
+                                style={{ ...inpSt, opacity: offType ? 0.3 : 1 }} />
                             </div>
                             {dv!=null && (
                               <div style={{ fontSize:9, fontWeight:700, color:dv>=0?colors.success:colors.danger, textAlign:"center", fontFamily:font }}>{attFmt(dv)}</div>
@@ -1417,6 +1434,14 @@ tr.leave{background:#f0f9ff}
                             {type && (
                               <div style={{ fontSize:9, fontWeight:700, textAlign:"center", fontFamily:font, color: leaveOpts.find(o=>o.key===type)?.color }}>
                                 {leaveOpts.find(o=>o.key===type)?.title}
+                              </div>
+                            )}
+                            {(type === "paid_leave" || type === "unpaid_leave") && (
+                              <div style={{ display:"flex", alignItems:"center", gap:3, justifyContent:"center" }}>
+                                <input type="text" value={ent.leaveHours||""} placeholder={tr("hrs","saat")} maxLength={4}
+                                  onChange={e=>setEntry(emp,dk,"leaveHours",e.target.value)}
+                                  style={{ ...inpSt, width:48, textAlign:"center", fontSize:10, padding:"2px 4px" }} />
+                                <span style={{ fontSize:8, color:colors.textDim, fontFamily:font }}>{tr("h","sa")}</span>
                               </div>
                             )}
                             <div style={{ display:"flex", gap:3, marginTop:2, flexWrap:"wrap" }}>
@@ -1513,14 +1538,15 @@ tr.leave{background:#f0f9ff}
         {/* ── Employee performance detail ── */}
         {selectedEmp && (() => {
           const allDays = weeks.flat();
-          const workedDays = allDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; return e?.in && e?.out && !e?.type; });
+          const workedDays = allDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; const t = e?.type || ""; return e?.in && e?.out && (!t || t === "half_holiday"); });
           const lateDays   = workedDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; return attT2M(e.in)  > 510;  });
-          const earlyOuts  = workedDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; return attT2M(e.out) < 1110; });
+          const earlyOuts  = workedDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; return e.type !== "half_holiday" && attT2M(e.out) < 1110; });
 
           const leaveLabels = {
-            paid_leave:   { label: tr("Paid Leave","Ücretli İzin"),    color: colors.success },
-            unpaid_leave: { label: tr("Unpaid Leave","Ücretsiz İzin"), color: colors.warning },
-            holiday:      { label: tr("Holiday","Resmi Tatil"),        color: colors.primary },
+            paid_leave:   { label: tr("Paid Leave","Ücretli İzin"),       color: colors.success },
+            unpaid_leave: { label: tr("Unpaid Leave","Ücretsiz İzin"),    color: colors.warning },
+            holiday:      { label: tr("Holiday","Resmi Tatil"),           color: colors.primary },
+            half_holiday: { label: tr("Half-day Holiday","Yarım Gün Resmi Tatil"), color: colors.accent },
           };
 
           const cellSt = { padding: 5, verticalAlign: "top" };
@@ -1581,16 +1607,21 @@ tr.leave{background:#f0f9ff}
                           );
 
                           const dk   = attDK(d);
-                          const ent  = data[selectedEmp]?.[dk] || { in:"", out:"", type:"" };
+                          const ent  = data[selectedEmp]?.[dk] || { in:"", out:"", type:"", leaveHours:"" };
                           const type = ent.type || "";
+                          const isOff  = type === "holiday" || type === "paid_leave" || type === "unpaid_leave";
+                          const isHalf = type === "half_holiday";
 
-                          if (type) {
+                          if (isOff) {
                             const info = leaveLabels[type] || { label: type, color: colors.textMuted };
+                            const lh = parseFloat(ent.leaveHours);
+                            const sub = (type === "paid_leave" || type === "unpaid_leave") && lh > 0 ? `${lh} ${tr("h","sa")}` : null;
                             return (
                               <td key={dow} style={cellSt}>
                                 <div style={{ minHeight:82, borderRadius:8, border:`1px solid ${info.color}40`, background:`${info.color}12`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:5, padding:6 }}>
                                   <div style={{ fontSize:10, fontWeight:700, color:colors.textMuted, fontFamily:font }}>{attFD(d)}</div>
                                   <div style={{ fontSize:11, fontWeight:700, color:info.color, fontFamily:font, textAlign:"center" }}>{info.label}</div>
+                                  {sub && <div style={{ fontSize:9, fontWeight:600, color:info.color, fontFamily:font }}>{sub}</div>}
                                 </div>
                               </td>
                             );
@@ -1600,7 +1631,7 @@ tr.leave{background:#f0f9ff}
                           const arrMins   = attT2M(ent.in);
                           const depMins   = attT2M(ent.out);
                           const arrDelta  = arrMins  != null ? arrMins  - 510  : null;
-                          const depDelta  = depMins  != null ? depMins  - 1110 : null;
+                          const depDelta  = isHalf ? null : (depMins  != null ? depMins  - 1110 : null);
 
                           const arrColor = arrDelta == null ? colors.textDim : arrDelta > 0 ? colors.danger : colors.success;
                           const depColor = depDelta == null ? colors.textDim : depDelta < 0 ? colors.danger : colors.success;
@@ -1610,10 +1641,10 @@ tr.leave{background:#f0f9ff}
 
                           return (
                             <td key={dow} style={cellSt}>
-                              <div style={{ borderRadius:8, border:`1px solid ${colors.border}`, background:colors.bg, overflow:"hidden", minHeight:82 }}>
+                              <div style={{ borderRadius:8, border:`1px solid ${isHalf ? `${colors.accent}50` : colors.border}`, background:colors.bg, overflow:"hidden", minHeight:82 }}>
                                 {/* Date header */}
-                                <div style={{ padding:"3px 6px", borderBottom:`1px solid ${colors.border}`, fontSize:9, color:colors.textMuted, fontFamily:font, textAlign:"center", fontWeight:700, background:colors.surface }}>
-                                  {attFD(d)}
+                                <div style={{ padding:"3px 6px", borderBottom:`1px solid ${colors.border}`, fontSize:9, color: isHalf ? colors.accent : colors.textMuted, fontFamily:font, textAlign:"center", fontWeight:700, background:colors.surface }}>
+                                  {attFD(d)}{isHalf ? ` · ${tr("½ Holiday","½ Tatil")}` : ""}
                                 </div>
                                 {/* Morning / Arrival */}
                                 <div style={{ padding:"6px 8px", borderBottom:`1px solid ${colors.border}50`, background: noData ? "transparent" : arrDelta != null && arrDelta > 0 ? `${colors.danger}08` : `${colors.success}06` }}>
@@ -1622,10 +1653,10 @@ tr.leave{background:#f0f9ff}
                                   {!noData && arrLabel && <div style={{ fontSize:9, color:arrColor, fontFamily:font, marginTop:1 }}>{arrLabel}</div>}
                                 </div>
                                 {/* Evening / Departure */}
-                                <div style={{ padding:"6px 8px", background: noData ? "transparent" : depDelta != null && depDelta < 0 ? `${colors.danger}08` : `${colors.success}06` }}>
+                                <div style={{ padding:"6px 8px", background: noData || isHalf ? "transparent" : depDelta != null && depDelta < 0 ? `${colors.danger}08` : `${colors.success}06` }}>
                                   <div style={{ fontSize:9, color:colors.textDim, fontFamily:font, marginBottom:2 }}>↓ {tr("Departure","Çıkış")}</div>
-                                  <div style={{ fontSize:12, fontWeight:700, color: noData ? colors.textDim : depColor, fontFamily:font }}>{ent.out || "—"}</div>
-                                  {!noData && depLabel && <div style={{ fontSize:9, color:depColor, fontFamily:font, marginTop:1 }}>{depLabel}</div>}
+                                  <div style={{ fontSize:12, fontWeight:700, color: noData ? colors.textDim : (isHalf ? colors.text : depColor), fontFamily:font }}>{ent.out || "—"}</div>
+                                  {!noData && !isHalf && depLabel && <div style={{ fontSize:9, color:depColor, fontFamily:font, marginTop:1 }}>{depLabel}</div>}
                                 </div>
                               </div>
                             </td>
