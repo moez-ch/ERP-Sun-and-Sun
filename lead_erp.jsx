@@ -1069,7 +1069,11 @@ function attDayDiff(ent) {
   let w = o - i;
   if (w < 0) w += 1440;
   // unpaid leave taken during a working day isn't compensated — it doesn't count as time worked
-  if (partial && type === "unpaid_leave") w -= attRangeMins(ent.leaveStart, ent.leaveEnd);
+  // (unless it overlaps the 1h lunch break, which was never counted as work time to begin with)
+  if (partial && type === "unpaid_leave") {
+    const lunchDed = ent?.lunchBreak ? 60 : 0;
+    w -= Math.max(0, attRangeMins(ent.leaveStart, ent.leaveEnd) - lunchDed);
+  }
   return w - (type === "half_holiday" ? 300 : 600); // half-day public holiday expects 5h instead of 10h
 }
 function attFmt(m) { if (m==null) return "—"; const s=m>=0?"+":"-", a=Math.abs(m); return `${s}${Math.floor(a/60)}h ${String(a%60).padStart(2,"0")}m`; }
@@ -1080,13 +1084,15 @@ function attDayBreakdown(ent) {
   const b = { earlyArrMins: 0, lateArrMins: 0, earlyDepMins: 0, lateDepMins: 0, paidMins: 0, unpaidMins: 0 };
   const rangeMins = attRangeMins(ent?.leaveStart, ent?.leaveEnd);
   const partial = attIsPartialLeave(ent);
+  // "lunch break included" — that hour was never counted as work time, so it shouldn't count against the leave total either
+  const lunchDed = ent?.lunchBreak ? 60 : 0;
 
   if (type === "paid_leave" || type === "unpaid_leave") {
-    const mins = rangeMins != null ? rangeMins : 600;
+    const mins = Math.max(0, (rangeMins != null ? rangeMins : 600) - lunchDed);
     if (type === "paid_leave") b.paidMins = mins; else b.unpaidMins = mins;
     if (!partial) return b; // full day off — no clock-in/out to evaluate
   } else if (type === "half_holiday" && halfWith) {
-    const mins = rangeMins != null ? rangeMins : 300;
+    const mins = Math.max(0, (rangeMins != null ? rangeMins : 300) - lunchDed);
     if (halfWith === "paid_leave") b.paidMins = mins; else b.unpaidMins = mins;
     return b;
   } else if (type === "holiday") {
@@ -1135,7 +1141,12 @@ function AttendanceView({ colors, font, lang, onBack }) {
   };
   const attRangeStr = ent => {
     const m = attRangeMins(ent?.leaveStart, ent?.leaveEnd);
-    return (ent?.leaveStart && ent?.leaveEnd && m != null) ? `${ent.leaveStart}–${ent.leaveEnd} (${attAbsStr(m)})` : null;
+    if (!ent?.leaveStart || !ent?.leaveEnd || m == null) return null;
+    if (ent?.lunchBreak) {
+      const net = Math.max(0, m - 60);
+      return `${ent.leaveStart}–${ent.leaveEnd} (${attAbsStr(m)} − ${tr("1h lunch","1s mola")} = ${attAbsStr(net)})`;
+    }
+    return `${ent.leaveStart}–${ent.leaveEnd} (${attAbsStr(m)})`;
   };
   const attLeaveNote = ent => { const range = attRangeStr(ent); return range ? `${attLeaveLabel(ent)} · ${range}` : attLeaveLabel(ent); };
 
@@ -1552,14 +1563,25 @@ tr.leave{background:#f0f9ff}
                               </select>
                             )}
                             {showRange && (
-                              <div style={{ display:"flex", alignItems:"center", gap:2, justifyContent:"center" }}>
-                                <input type="text" value={ent.leaveStart||""} placeholder="HH:MM" maxLength={5}
-                                  onChange={e=>setEntry(emp,dk,"leaveStart",attFmtTime(e.target.value))}
-                                  style={{ ...inpSt, width:42, textAlign:"center", fontSize:9, padding:"2px 3px" }} />
-                                <span style={{ fontSize:8, color:colors.textDim }}>–</span>
-                                <input type="text" value={ent.leaveEnd||""} placeholder="HH:MM" maxLength={5}
-                                  onChange={e=>setEntry(emp,dk,"leaveEnd",attFmtTime(e.target.value))}
-                                  style={{ ...inpSt, width:42, textAlign:"center", fontSize:9, padding:"2px 3px" }} />
+                              <div style={{ display:"flex", flexDirection:"column", gap:3, alignItems:"center" }}>
+                                <div style={{ display:"flex", alignItems:"center", gap:2, justifyContent:"center" }}>
+                                  <input type="text" value={ent.leaveStart||""} placeholder="HH:MM" maxLength={5}
+                                    onChange={e=>setEntry(emp,dk,"leaveStart",attFmtTime(e.target.value))}
+                                    style={{ ...inpSt, width:42, textAlign:"center", fontSize:9, padding:"2px 3px" }} />
+                                  <span style={{ fontSize:8, color:colors.textDim }}>–</span>
+                                  <input type="text" value={ent.leaveEnd||""} placeholder="HH:MM" maxLength={5}
+                                    onChange={e=>setEntry(emp,dk,"leaveEnd",attFmtTime(e.target.value))}
+                                    style={{ ...inpSt, width:42, textAlign:"center", fontSize:9, padding:"2px 3px" }} />
+                                </div>
+                                <label title={tr("This leave period spans the 1-hour lunch break — exclude it from the total","Bu izin süresi 1 saatlik öğle molasını kapsıyor — toplamdan düş")}
+                                  style={{ display:"flex", alignItems:"center", gap:3, cursor:"pointer" }}>
+                                  <input type="checkbox" checked={!!ent.lunchBreak}
+                                    onChange={e=>setEntry(emp,dk,"lunchBreak",e.target.checked)}
+                                    style={{ accentColor:colors.primary, width:9, height:9, cursor:"pointer" }} />
+                                  <span style={{ fontSize:7, color:ent.lunchBreak?colors.primaryLight:colors.textDim, fontWeight:700, fontFamily:font }}>
+                                    {tr("incl. lunch (−1h)","mola dahil (−1s)")}
+                                  </span>
+                                </label>
                               </div>
                             )}
                             <div style={{ display:"flex", gap:3, marginTop:2, flexWrap:"wrap" }}>
