@@ -1061,6 +1061,27 @@ function attDayDiff(ent) {
 }
 function attFmt(m) { if (m==null) return "—"; const s=m>=0?"+":"-", a=Math.abs(m); return `${s}${Math.floor(a/60)}h ${String(a%60).padStart(2,"0")}m`; }
 function attAbsStr(mins) { const a=Math.abs(mins); return a<60?`${a}m`:`${Math.floor(a/60)}h${a%60>0?` ${a%60}m`:""}`; }
+// per-day category breakdown — leave is counted by the hour using its logged range (full expected day if no range was given)
+function attDayBreakdown(ent) {
+  const type = ent?.type || "", halfWith = ent?.halfWith || "";
+  const b = { lateMins: 0, earlyMins: 0, paidMins: 0, unpaidMins: 0 };
+  const rangeMins = attRangeMins(ent?.leaveStart, ent?.leaveEnd);
+  if (type === "paid_leave" || type === "unpaid_leave") {
+    const mins = rangeMins != null ? rangeMins : 600;
+    if (type === "paid_leave") b.paidMins = mins; else b.unpaidMins = mins;
+    return b;
+  }
+  if (type === "half_holiday" && halfWith) {
+    const mins = rangeMins != null ? rangeMins : 300;
+    if (halfWith === "paid_leave") b.paidMins = mins; else b.unpaidMins = mins;
+    return b;
+  }
+  if (type === "holiday") return b;
+  const isHalf = type === "half_holiday";
+  if (ent?.in)  { const m = attT2M(ent.in);  if (m != null && m > 510)  b.lateMins  = m - 510; }
+  if (!isHalf && ent?.out) { const m = attT2M(ent.out); if (m != null && m < 1110) b.earlyMins = 1110 - m; }
+  return b;
+}
 
 function AttendanceView({ colors, font, lang, onBack }) {
   const tr = (en, t) => lang === "tr" ? t : en;
@@ -1147,6 +1168,19 @@ function AttendanceView({ colors, font, lang, onBack }) {
     return total;
   }
 
+  // sums late/early/paid-leave/unpaid-leave minutes across a set of days for one employee
+  function empBreakdown(emp, days) {
+    return days.reduce((acc, d) => {
+      const b = attDayBreakdown(data[emp]?.[attDK(d)]);
+      acc.lateMins   += b.lateMins;
+      acc.earlyMins  += b.earlyMins;
+      acc.paidMins   += b.paidMins;
+      acc.unpaidMins += b.unpaidMins;
+      return acc;
+    }, { lateMins: 0, earlyMins: 0, paidMins: 0, unpaidMins: 0 });
+  }
+  const fmtMins = m => m > 0 ? attAbsStr(m) : "—";
+
   // true once any entry exists for the month — separate from empMonthTotal, which is null
   // for employees whose days are all leave/holiday (excluded from the diff, but still "data")
   const monthHasData = employees.some(emp => Object.values(data[emp] || {}).some(ent => ent && (ent.type || ent.in || ent.out)));
@@ -1169,8 +1203,7 @@ function AttendanceView({ colors, font, lang, onBack }) {
     // ── Per-employee detail sections ──
     const detailSections = employees.map(emp => {
       const workedCount = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; const t = e?.type || ""; return e?.in && e?.out && (!t || (t === "half_holiday" && !e?.halfWith)); }).length;
-      const lateCount   = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; const t = e?.type || ""; return e?.in && (!t || (t === "half_holiday" && !e?.halfWith)) && attT2M(e.in) > 510; }).length;
-      const earlyCount  = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; return e?.out && !e?.type && attT2M(e.out) < 1110; }).length;
+      const empB = empBreakdown(emp, allDays);
 
       const dayRows = allDays.map(d => {
         const dk  = attDK(d);
@@ -1199,8 +1232,10 @@ function AttendanceView({ colors, font, lang, onBack }) {
           <div class="emp-header">
             <span class="emp-name">👤 ${emp}</span>
             <span class="stat stat-w">${tr("Worked","Çalışma")}: <b>${workedCount}</b></span>
-            <span class="stat stat-l">${tr("Late arrivals","Geç giriş")}: <b>${lateCount}</b></span>
-            <span class="stat stat-e">${tr("Early departures","Erken çıkış")}: <b>${earlyCount}</b></span>
+            <span class="stat stat-l">${tr("Late arrival","Geç giriş")}: <b>${fmtMins(empB.lateMins)}</b></span>
+            <span class="stat stat-e">${tr("Early departure","Erken çıkış")}: <b>${fmtMins(empB.earlyMins)}</b></span>
+            <span class="stat stat-p">${tr("Paid leave","Ücretli izin")}: <b>${fmtMins(empB.paidMins)}</b></span>
+            <span class="stat stat-u">${tr("Unpaid leave","Ücretsiz izin")}: <b>${fmtMins(empB.unpaidMins)}</b></span>
           </div>
           <table><thead><tr>
             <th>${tr("Date","Tarih")}</th><th>${tr("Day","Gün")}</th>
@@ -1233,6 +1268,7 @@ tr.leave{background:#f0f9ff}
 .emp-name{font-size:13px;font-weight:700}
 .stat{font-size:10px;padding:2px 10px;border-radius:20px;font-weight:600}
 .stat-w{background:#e8f0fe;color:#1a56db}.stat-l{background:#fde8e8;color:#c81e1e}.stat-e{background:#fef3c7;color:#92400e}
+.stat-p{background:#dcfce7;color:#15803d}.stat-u{background:#fef3c7;color:#92400e}
 .footer{margin-top:24px;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:8px}
 small{font-weight:400;font-size:10px;color:#aaa}
 @media print{body{padding:16px}@page{margin:15mm}.emp-section{page-break-before:auto}}
@@ -1272,8 +1308,7 @@ ${detailSections}
     });
 
     const workedCount = rows.filter(r => !r.isOff && r.ent.in && r.ent.out).length;
-    const lateCount   = rows.filter(r => r.arrDelta != null && r.arrDelta > 0).length;
-    const earlyCount  = rows.filter(r => !r.isHalf && r.depDelta != null && r.depDelta < 0).length;
+    const empB = empBreakdown(emp, allDays);
 
     const bodyRows = rows.map(({ d, ent, type, isOff, isHalf, arrDelta, depDelta, dayDiff, arrLabel, depLabel }) => {
       const dayName = FULL_DAYS[d.getDay() - 1];
@@ -1297,9 +1332,10 @@ ${detailSections}
 body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1a1a1a;padding:32px}
 h1{font-size:20px;font-weight:700;margin-bottom:4px}
 .sub{font-size:11px;color:#666;margin-bottom:8px}
-.stats{display:flex;gap:16px;margin-bottom:20px;font-size:11px}
+.stats{display:flex;gap:16px;margin-bottom:20px;font-size:11px;flex-wrap:wrap}
 .stat{padding:4px 12px;border-radius:20px;font-weight:600}
 .stat-w{background:#e8f0fe;color:#1a56db}.stat-l{background:#fde8e8;color:#c81e1e}.stat-e{background:#fef3c7;color:#92400e}
+.stat-p{background:#dcfce7;color:#15803d}.stat-u{background:#fef3c7;color:#92400e}
 table{width:100%;border-collapse:collapse}
 th{background:#1a1a1a;color:#FFD700;padding:7px 10px;text-align:center;font-size:11px;font-weight:700}
 th:first-child,th:nth-child(2){text-align:left}
@@ -1315,8 +1351,10 @@ tr.leave{background:#f0f9ff}
 <div class="sub">${MONTHS[month]} ${year} &nbsp;·&nbsp; ${tr("Generated","Oluşturuldu")}: ${new Date().toLocaleDateString(lang==="tr"?"tr-TR":"en-GB")}</div>
 <div class="stats">
   <span class="stat stat-w">${tr("Days worked","Çalışma günü")}: ${workedCount}</span>
-  <span class="stat stat-l">${tr("Late arrivals","Geç giriş")}: ${lateCount}</span>
-  <span class="stat stat-e">${tr("Early departures","Erken çıkış")}: ${earlyCount}</span>
+  <span class="stat stat-l">${tr("Late arrival","Geç giriş")}: ${fmtMins(empB.lateMins)}</span>
+  <span class="stat stat-e">${tr("Early departure","Erken çıkış")}: ${fmtMins(empB.earlyMins)}</span>
+  <span class="stat stat-p">${tr("Paid leave","Ücretli izin")}: ${fmtMins(empB.paidMins)}</span>
+  <span class="stat stat-u">${tr("Unpaid leave","Ücretsiz izin")}: ${fmtMins(empB.unpaidMins)}</span>
 </div>
 <table><thead><tr>
   <th>${tr("Date","Tarih")}</th><th>${tr("Day","Gün")}</th>
@@ -1578,12 +1616,47 @@ tr.leave{background:#f0f9ff}
           )}
         </div>
 
+        {/* ── Category breakdown — late/early/paid/unpaid leave totals, by the hour ── */}
+        {monthHasData && (
+          <div style={{ marginTop:14, background:colors.surface, border:`1px solid ${colors.border}`, borderRadius:12, overflow:"hidden" }}>
+            <div style={{ padding:"12px 16px", borderBottom:`1px solid ${colors.border}` }}>
+              <span style={{ fontSize:13, fontWeight:700, color:colors.text, fontFamily:font }}>{MONTHS[month]} {year} — {tr("Breakdown by Category","Kategoriye Göre Döküm")}</span>
+            </div>
+            <div style={{ overflowX:"auto" }}>
+              <table style={{ borderCollapse:"collapse", width:"100%" }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...thSt, textAlign:"left", minWidth:160 }}>{tr("Employee","Çalışan")}</th>
+                    <th style={{ ...thSt, color:colors.danger }}>{tr("Late Arrival","Geç Giriş")}</th>
+                    <th style={{ ...thSt, color:colors.warning }}>{tr("Early Departure","Erken Çıkış")}</th>
+                    <th style={{ ...thSt, color:colors.success }}>{tr("Paid Leave","Ücretli İzin")}</th>
+                    <th style={{ ...thSt, color:colors.warning, borderRight:"none" }}>{tr("Unpaid Leave","Ücretsiz İzin")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.map((emp, ei) => {
+                    const b = empBreakdown(emp, weeks.flat());
+                    return (
+                      <tr key={ei} style={{ background: ei%2===0 ? "transparent" : `${colors.bg}99` }}>
+                        <td style={{ ...tdSt, fontFamily:font, fontSize:12, fontWeight:600, color:colors.text, padding:"10px 14px" }}>{emp}</td>
+                        <td style={{ ...tdSt, textAlign:"center" }}><span style={{ fontSize:12, fontWeight:600, color: b.lateMins>0?colors.danger:colors.textDim, fontFamily:font }}>{fmtMins(b.lateMins)}</span></td>
+                        <td style={{ ...tdSt, textAlign:"center" }}><span style={{ fontSize:12, fontWeight:600, color: b.earlyMins>0?colors.warning:colors.textDim, fontFamily:font }}>{fmtMins(b.earlyMins)}</span></td>
+                        <td style={{ ...tdSt, textAlign:"center" }}><span style={{ fontSize:12, fontWeight:600, color: b.paidMins>0?colors.success:colors.textDim, fontFamily:font }}>{fmtMins(b.paidMins)}</span></td>
+                        <td style={{ ...tdSt, textAlign:"center", borderRight:"none" }}><span style={{ fontSize:12, fontWeight:600, color: b.unpaidMins>0?colors.warning:colors.textDim, fontFamily:font }}>{fmtMins(b.unpaidMins)}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* ── Employee performance detail ── */}
         {selectedEmp && (() => {
           const allDays = weeks.flat();
           const workedDays = allDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; const t = e?.type || ""; return e?.in && e?.out && (!t || (t === "half_holiday" && !e?.halfWith)); });
-          const lateDays   = workedDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; return attT2M(e.in)  > 510;  });
-          const earlyOuts  = workedDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; return e.type !== "half_holiday" && attT2M(e.out) < 1110; });
+          const empB = empBreakdown(selectedEmp, allDays);
 
           const cellSt = { padding: 5, verticalAlign: "top" };
 
@@ -1594,9 +1667,11 @@ tr.leave{background:#f0f9ff}
                 <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
                   <span style={{ fontSize:14, fontWeight:700, color:colors.text, fontFamily:font }}>👤 {selectedEmp} — {MONTHS[month]} {year}</span>
                   {[
-                    { label: tr("Days worked","Çalışma günü"), val: workedDays.length, bg: `${colors.primary}18`, border: `${colors.primary}40`, color: colors.primaryLight },
-                    { label: tr("Late arrivals","Geç giriş"),     val: lateDays.length,   bg: `${colors.danger}12`,  border: `${colors.danger}40`,  color: colors.danger },
-                    { label: tr("Early departures","Erken çıkış"), val: earlyOuts.length,  bg: `${colors.warning}12`, border: `${colors.warning}40`, color: colors.warning },
+                    { label: tr("Days worked","Çalışma günü"),     val: workedDays.length,        bg: `${colors.primary}18`, border: `${colors.primary}40`, color: colors.primaryLight },
+                    { label: tr("Late arrival","Geç giriş"),       val: fmtMins(empB.lateMins),   bg: `${colors.danger}12`,  border: `${colors.danger}40`,  color: colors.danger },
+                    { label: tr("Early departure","Erken çıkış"),  val: fmtMins(empB.earlyMins),  bg: `${colors.warning}12`, border: `${colors.warning}40`, color: colors.warning },
+                    { label: tr("Paid leave","Ücretli izin"),      val: fmtMins(empB.paidMins),   bg: `${colors.success}12`, border: `${colors.success}40`, color: colors.success },
+                    { label: tr("Unpaid leave","Ücretsiz izin"),   val: fmtMins(empB.unpaidMins), bg: `${colors.warning}12`, border: `${colors.warning}40`, color: colors.warning },
                   ].map((s,i) => (
                     <span key={i} style={{ fontSize:11, background:s.bg, border:`1px solid ${s.border}`, borderRadius:20, padding:"3px 11px", color:s.color, fontFamily:font }}>
                       {s.label}: <b>{s.val}</b>
