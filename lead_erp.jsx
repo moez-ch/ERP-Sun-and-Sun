@@ -1088,7 +1088,9 @@ function attDayBreakdown(ent) {
   const lunchDed = ent?.lunchBreak ? 60 : 0;
 
   if (type === "paid_leave" || type === "unpaid_leave") {
-    const mins = Math.max(0, (rangeMins != null ? rangeMins : 600) - lunchDed);
+    // a full day off always spans the 1h lunch break, so it's excluded automatically (9h counted, not 10h);
+    // a specific leave range only gets the deduction when explicitly marked as spanning lunch
+    const mins = rangeMins != null ? Math.max(0, rangeMins - lunchDed) : 540;
     if (type === "paid_leave") b.paidMins = mins; else b.unpaidMins = mins;
     if (!partial) return b; // full day off — no clock-in/out to evaluate
   } else if (type === "half_holiday" && halfWith) {
@@ -1141,7 +1143,14 @@ function AttendanceView({ colors, font, lang, onBack }) {
   };
   const attRangeStr = ent => {
     const m = attRangeMins(ent?.leaveStart, ent?.leaveEnd);
-    if (!ent?.leaveStart || !ent?.leaveEnd || m == null) return null;
+    const type = ent?.type || "";
+    if (!ent?.leaveStart || !ent?.leaveEnd || m == null) {
+      // full day off — always counted as 9h, the 1h lunch break is excluded automatically
+      if (type === "paid_leave" || type === "unpaid_leave") {
+        return `${tr("Full day","Tam gün")} (${attAbsStr(600)} − ${tr("1h lunch","1s mola")} = ${attAbsStr(540)})`;
+      }
+      return null;
+    }
     if (ent?.lunchBreak) {
       const net = Math.max(0, m - 60);
       return `${ent.leaveStart}–${ent.leaveEnd} (${attAbsStr(m)} − ${tr("1h lunch","1s mola")} = ${attAbsStr(net)})`;
@@ -1525,6 +1534,7 @@ tr.leave{background:#f0f9ff}
                       const { type, halfWith, isOff } = attFlags(ent);
                       const dv   = attDayDiff(ent);
                       const showRange = type === "paid_leave" || type === "unpaid_leave" || (type === "half_holiday" && halfWith);
+                      const hasRange  = attRangeMins(ent?.leaveStart, ent?.leaveEnd) != null;
                       const leaveOpts = [
                         { key:"paid_leave",   label:tr("PL","Üİ"),   title:tr("Paid Leave","Ücretli İzin"),                       color:colors.success },
                         { key:"unpaid_leave", label:tr("UL","ÜSİ"),  title:tr("Unpaid Leave","Ücretsiz İzin"),                    color:colors.warning },
@@ -1573,15 +1583,19 @@ tr.leave{background:#f0f9ff}
                                     onChange={e=>setEntry(emp,dk,"leaveEnd",attFmtTime(e.target.value))}
                                     style={{ ...inpSt, width:42, textAlign:"center", fontSize:9, padding:"2px 3px" }} />
                                 </div>
-                                <label title={tr("This leave period spans the 1-hour lunch break — exclude it from the total","Bu izin süresi 1 saatlik öğle molasını kapsıyor — toplamdan düş")}
-                                  style={{ display:"flex", alignItems:"center", gap:3, cursor:"pointer" }}>
-                                  <input type="checkbox" checked={!!ent.lunchBreak}
-                                    onChange={e=>setEntry(emp,dk,"lunchBreak",e.target.checked)}
-                                    style={{ accentColor:colors.primary, width:9, height:9, cursor:"pointer" }} />
-                                  <span style={{ fontSize:7, color:ent.lunchBreak?colors.primaryLight:colors.textDim, fontWeight:700, fontFamily:font }}>
-                                    {tr("incl. lunch (−1h)","mola dahil (−1s)")}
-                                  </span>
-                                </label>
+                                {/* full days off always exclude the 1h lunch break automatically (9h counted);
+                                    a specific range needs this to know whether it overlaps lunch */}
+                                {hasRange && (
+                                  <label title={tr("This leave period spans the 1-hour lunch break — exclude it from the total","Bu izin süresi 1 saatlik öğle molasını kapsıyor — toplamdan düş")}
+                                    style={{ display:"flex", alignItems:"center", gap:3, cursor:"pointer" }}>
+                                    <input type="checkbox" checked={!!ent.lunchBreak}
+                                      onChange={e=>setEntry(emp,dk,"lunchBreak",e.target.checked)}
+                                      style={{ accentColor:colors.primary, width:9, height:9, cursor:"pointer" }} />
+                                    <span style={{ fontSize:7, color:ent.lunchBreak?colors.primaryLight:colors.textDim, fontWeight:700, fontFamily:font }}>
+                                      {tr("incl. lunch (−1h)","mola dahil (−1s)")}
+                                    </span>
+                                  </label>
+                                )}
                               </div>
                             )}
                             <div style={{ display:"flex", gap:3, marginTop:2, flexWrap:"wrap" }}>
