@@ -1077,7 +1077,7 @@ function attAbsStr(mins) { const a=Math.abs(mins); return a<60?`${a}m`:`${Math.f
 // per-day category breakdown — leave is counted by the hour using its logged range (full expected day if no range was given)
 function attDayBreakdown(ent) {
   const type = ent?.type || "", halfWith = ent?.halfWith || "";
-  const b = { lateMins: 0, earlyMins: 0, paidMins: 0, unpaidMins: 0 };
+  const b = { earlyArrMins: 0, lateArrMins: 0, earlyDepMins: 0, lateDepMins: 0, paidMins: 0, unpaidMins: 0 };
   const rangeMins = attRangeMins(ent?.leaveStart, ent?.leaveEnd);
   const partial = attIsPartialLeave(ent);
 
@@ -1095,8 +1095,14 @@ function attDayBreakdown(ent) {
 
   // partial-leave days and ordinary working days both have real clock times to evaluate
   const isHalf = type === "half_holiday";
-  if (ent?.in)  { const m = attT2M(ent.in);  if (m != null && m > 510)  b.lateMins  = m - 510; }
-  if (!isHalf && ent?.out) { const m = attT2M(ent.out); if (m != null && m < 1110) b.earlyMins = 1110 - m; }
+  if (ent?.in) {
+    const m = attT2M(ent.in);
+    if (m != null) { if (m > 510) b.lateArrMins = m - 510; else if (m < 510) b.earlyArrMins = 510 - m; }
+  }
+  if (!isHalf && ent?.out) {
+    const m = attT2M(ent.out);
+    if (m != null) { if (m < 1110) b.earlyDepMins = 1110 - m; else if (m > 1110) b.lateDepMins = m - 1110; }
+  }
   return b;
 }
 
@@ -1191,12 +1197,14 @@ function AttendanceView({ colors, font, lang, onBack }) {
   function empBreakdown(emp, days) {
     return days.reduce((acc, d) => {
       const b = attDayBreakdown(data[emp]?.[attDK(d)]);
-      acc.lateMins   += b.lateMins;
-      acc.earlyMins  += b.earlyMins;
-      acc.paidMins   += b.paidMins;
-      acc.unpaidMins += b.unpaidMins;
+      acc.earlyArrMins += b.earlyArrMins;
+      acc.lateArrMins  += b.lateArrMins;
+      acc.earlyDepMins += b.earlyDepMins;
+      acc.lateDepMins  += b.lateDepMins;
+      acc.paidMins     += b.paidMins;
+      acc.unpaidMins   += b.unpaidMins;
       return acc;
-    }, { lateMins: 0, earlyMins: 0, paidMins: 0, unpaidMins: 0 });
+    }, { earlyArrMins: 0, lateArrMins: 0, earlyDepMins: 0, lateDepMins: 0, paidMins: 0, unpaidMins: 0 });
   }
   const fmtMins = m => m > 0 ? attAbsStr(m) : "—";
 
@@ -1253,8 +1261,10 @@ function AttendanceView({ colors, font, lang, onBack }) {
           <div class="emp-header">
             <span class="emp-name">👤 ${emp}</span>
             <span class="stat stat-w">${tr("Worked","Çalışma")}: <b>${workedCount}</b></span>
-            <span class="stat stat-l">${tr("Late arrival","Geç giriş")}: <b>${fmtMins(empB.lateMins)}</b></span>
-            <span class="stat stat-e">${tr("Early departure","Erken çıkış")}: <b>${fmtMins(empB.earlyMins)}</b></span>
+            <span class="stat stat-ea">${tr("Early arrival","Erken giriş")}: <b>${fmtMins(empB.earlyArrMins)}</b></span>
+            <span class="stat stat-l">${tr("Late arrival","Geç giriş")}: <b>${fmtMins(empB.lateArrMins)}</b></span>
+            <span class="stat stat-e">${tr("Early departure","Erken çıkış")}: <b>${fmtMins(empB.earlyDepMins)}</b></span>
+            <span class="stat stat-ld">${tr("Late departure","Geç çıkış")}: <b>${fmtMins(empB.lateDepMins)}</b></span>
             <span class="stat stat-p">${tr("Paid leave","Ücretli izin")}: <b>${fmtMins(empB.paidMins)}</b></span>
             <span class="stat stat-u">${tr("Unpaid leave","Ücretsiz izin")}: <b>${fmtMins(empB.unpaidMins)}</b></span>
           </div>
@@ -1288,7 +1298,8 @@ tr.leave{background:#f0f9ff}
 .emp-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
 .emp-name{font-size:13px;font-weight:700}
 .stat{font-size:10px;padding:2px 10px;border-radius:20px;font-weight:600}
-.stat-w{background:#e8f0fe;color:#1a56db}.stat-l{background:#fde8e8;color:#c81e1e}.stat-e{background:#fef3c7;color:#92400e}
+.stat-w{background:#e8f0fe;color:#1a56db}.stat-ea{background:#e0f2fe;color:#0369a1}.stat-l{background:#fde8e8;color:#c81e1e}
+.stat-e{background:#fef3c7;color:#92400e}.stat-ld{background:#e0f2fe;color:#0369a1}
 .stat-p{background:#dcfce7;color:#15803d}.stat-u{background:#fef3c7;color:#92400e}
 .footer{margin-top:24px;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:8px}
 small{font-weight:400;font-size:10px;color:#aaa}
@@ -1357,7 +1368,8 @@ h1{font-size:20px;font-weight:700;margin-bottom:4px}
 .sub{font-size:11px;color:#666;margin-bottom:8px}
 .stats{display:flex;gap:16px;margin-bottom:20px;font-size:11px;flex-wrap:wrap}
 .stat{padding:4px 12px;border-radius:20px;font-weight:600}
-.stat-w{background:#e8f0fe;color:#1a56db}.stat-l{background:#fde8e8;color:#c81e1e}.stat-e{background:#fef3c7;color:#92400e}
+.stat-w{background:#e8f0fe;color:#1a56db}.stat-ea{background:#e0f2fe;color:#0369a1}.stat-l{background:#fde8e8;color:#c81e1e}
+.stat-e{background:#fef3c7;color:#92400e}.stat-ld{background:#e0f2fe;color:#0369a1}
 .stat-p{background:#dcfce7;color:#15803d}.stat-u{background:#fef3c7;color:#92400e}
 table{width:100%;border-collapse:collapse}
 th{background:#1a1a1a;color:#FFD700;padding:7px 10px;text-align:center;font-size:11px;font-weight:700}
@@ -1374,8 +1386,10 @@ tr.leave{background:#f0f9ff}
 <div class="sub">${MONTHS[month]} ${year} &nbsp;·&nbsp; ${tr("Generated","Oluşturuldu")}: ${new Date().toLocaleDateString(lang==="tr"?"tr-TR":"en-GB")}</div>
 <div class="stats">
   <span class="stat stat-w">${tr("Days worked","Çalışma günü")}: ${workedCount}</span>
-  <span class="stat stat-l">${tr("Late arrival","Geç giriş")}: ${fmtMins(empB.lateMins)}</span>
-  <span class="stat stat-e">${tr("Early departure","Erken çıkış")}: ${fmtMins(empB.earlyMins)}</span>
+  <span class="stat stat-ea">${tr("Early arrival","Erken giriş")}: ${fmtMins(empB.earlyArrMins)}</span>
+  <span class="stat stat-l">${tr("Late arrival","Geç giriş")}: ${fmtMins(empB.lateArrMins)}</span>
+  <span class="stat stat-e">${tr("Early departure","Erken çıkış")}: ${fmtMins(empB.earlyDepMins)}</span>
+  <span class="stat stat-ld">${tr("Late departure","Geç çıkış")}: ${fmtMins(empB.lateDepMins)}</span>
   <span class="stat stat-p">${tr("Paid leave","Ücretli izin")}: ${fmtMins(empB.paidMins)}</span>
   <span class="stat stat-u">${tr("Unpaid leave","Ücretsiz izin")}: ${fmtMins(empB.unpaidMins)}</span>
 </div>
@@ -1650,8 +1664,10 @@ tr.leave{background:#f0f9ff}
                 <thead>
                   <tr>
                     <th style={{ ...thSt, textAlign:"left", minWidth:160 }}>{tr("Employee","Çalışan")}</th>
+                    <th style={{ ...thSt, color:colors.primaryLight }}>{tr("Early Arrival","Erken Giriş")}</th>
                     <th style={{ ...thSt, color:colors.danger }}>{tr("Late Arrival","Geç Giriş")}</th>
                     <th style={{ ...thSt, color:colors.warning }}>{tr("Early Departure","Erken Çıkış")}</th>
+                    <th style={{ ...thSt, color:colors.primaryLight }}>{tr("Late Departure","Geç Çıkış")}</th>
                     <th style={{ ...thSt, color:colors.success }}>{tr("Paid Leave","Ücretli İzin")}</th>
                     <th style={{ ...thSt, color:colors.warning, borderRight:"none" }}>{tr("Unpaid Leave","Ücretsiz İzin")}</th>
                   </tr>
@@ -1662,8 +1678,10 @@ tr.leave{background:#f0f9ff}
                     return (
                       <tr key={ei} style={{ background: ei%2===0 ? "transparent" : `${colors.bg}99` }}>
                         <td style={{ ...tdSt, fontFamily:font, fontSize:12, fontWeight:600, color:colors.text, padding:"10px 14px" }}>{emp}</td>
-                        <td style={{ ...tdSt, textAlign:"center" }}><span style={{ fontSize:12, fontWeight:600, color: b.lateMins>0?colors.danger:colors.textDim, fontFamily:font }}>{fmtMins(b.lateMins)}</span></td>
-                        <td style={{ ...tdSt, textAlign:"center" }}><span style={{ fontSize:12, fontWeight:600, color: b.earlyMins>0?colors.warning:colors.textDim, fontFamily:font }}>{fmtMins(b.earlyMins)}</span></td>
+                        <td style={{ ...tdSt, textAlign:"center" }}><span style={{ fontSize:12, fontWeight:600, color: b.earlyArrMins>0?colors.primaryLight:colors.textDim, fontFamily:font }}>{fmtMins(b.earlyArrMins)}</span></td>
+                        <td style={{ ...tdSt, textAlign:"center" }}><span style={{ fontSize:12, fontWeight:600, color: b.lateArrMins>0?colors.danger:colors.textDim, fontFamily:font }}>{fmtMins(b.lateArrMins)}</span></td>
+                        <td style={{ ...tdSt, textAlign:"center" }}><span style={{ fontSize:12, fontWeight:600, color: b.earlyDepMins>0?colors.warning:colors.textDim, fontFamily:font }}>{fmtMins(b.earlyDepMins)}</span></td>
+                        <td style={{ ...tdSt, textAlign:"center" }}><span style={{ fontSize:12, fontWeight:600, color: b.lateDepMins>0?colors.primaryLight:colors.textDim, fontFamily:font }}>{fmtMins(b.lateDepMins)}</span></td>
                         <td style={{ ...tdSt, textAlign:"center" }}><span style={{ fontSize:12, fontWeight:600, color: b.paidMins>0?colors.success:colors.textDim, fontFamily:font }}>{fmtMins(b.paidMins)}</span></td>
                         <td style={{ ...tdSt, textAlign:"center", borderRight:"none" }}><span style={{ fontSize:12, fontWeight:600, color: b.unpaidMins>0?colors.warning:colors.textDim, fontFamily:font }}>{fmtMins(b.unpaidMins)}</span></td>
                       </tr>
@@ -1690,11 +1708,13 @@ tr.leave{background:#f0f9ff}
                 <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
                   <span style={{ fontSize:14, fontWeight:700, color:colors.text, fontFamily:font }}>👤 {selectedEmp} — {MONTHS[month]} {year}</span>
                   {[
-                    { label: tr("Days worked","Çalışma günü"),     val: workedDays.length,        bg: `${colors.primary}18`, border: `${colors.primary}40`, color: colors.primaryLight },
-                    { label: tr("Late arrival","Geç giriş"),       val: fmtMins(empB.lateMins),   bg: `${colors.danger}12`,  border: `${colors.danger}40`,  color: colors.danger },
-                    { label: tr("Early departure","Erken çıkış"),  val: fmtMins(empB.earlyMins),  bg: `${colors.warning}12`, border: `${colors.warning}40`, color: colors.warning },
-                    { label: tr("Paid leave","Ücretli izin"),      val: fmtMins(empB.paidMins),   bg: `${colors.success}12`, border: `${colors.success}40`, color: colors.success },
-                    { label: tr("Unpaid leave","Ücretsiz izin"),   val: fmtMins(empB.unpaidMins), bg: `${colors.warning}12`, border: `${colors.warning}40`, color: colors.warning },
+                    { label: tr("Days worked","Çalışma günü"),     val: workedDays.length,          bg: `${colors.primary}18`,      border: `${colors.primary}40`,      color: colors.primaryLight },
+                    { label: tr("Early arrival","Erken giriş"),    val: fmtMins(empB.earlyArrMins), bg: `${colors.primaryLight}12`, border: `${colors.primaryLight}40`, color: colors.primaryLight },
+                    { label: tr("Late arrival","Geç giriş"),       val: fmtMins(empB.lateArrMins),  bg: `${colors.danger}12`,       border: `${colors.danger}40`,       color: colors.danger },
+                    { label: tr("Early departure","Erken çıkış"),  val: fmtMins(empB.earlyDepMins), bg: `${colors.warning}12`,      border: `${colors.warning}40`,      color: colors.warning },
+                    { label: tr("Late departure","Geç çıkış"),     val: fmtMins(empB.lateDepMins),  bg: `${colors.primaryLight}12`, border: `${colors.primaryLight}40`, color: colors.primaryLight },
+                    { label: tr("Paid leave","Ücretli izin"),      val: fmtMins(empB.paidMins),     bg: `${colors.success}12`,      border: `${colors.success}40`,      color: colors.success },
+                    { label: tr("Unpaid leave","Ücretsiz izin"),   val: fmtMins(empB.unpaidMins),   bg: `${colors.warning}12`,      border: `${colors.warning}40`,      color: colors.warning },
                   ].map((s,i) => (
                     <span key={i} style={{ fontSize:11, background:s.bg, border:`1px solid ${s.border}`, borderRadius:20, padding:"3px 11px", color:s.color, fontFamily:font }}>
                       {s.label}: <b>{s.val}</b>
