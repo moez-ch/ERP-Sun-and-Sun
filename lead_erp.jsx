@@ -1039,6 +1039,14 @@ function attWeeks(year, month) {
 function attDK(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function attFD(d) { return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}`; }
 function attT2M(s) { if (!s) return null; const m = s.match(/^(\d{1,2}):(\d{2})/); return m ? parseInt(m[1])*60+parseInt(m[2]) : null; }
+function attFmtTime(raw) {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  const h = String(Math.min(parseInt(digits.slice(0, 2), 10), 23)).padStart(2, "0");
+  const mDigits = digits.slice(2);
+  if (mDigits.length < 2) return `${h}:${mDigits}`;
+  return `${h}:${String(Math.min(parseInt(mDigits, 10), 59)).padStart(2, "0")}`;
+}
 function attRangeMins(s, e) { const a = attT2M(s), b = attT2M(e); if (a == null || b == null) return null; let d = b - a; if (d < 0) d += 1440; return d; }
 function attDayDiff(ent) {
   const type = ent?.type || "";
@@ -1439,13 +1447,13 @@ tr.leave{background:#f0f9ff}
                             <div style={{ display:"flex", alignItems:"center", gap:3 }}>
                               <span style={{ fontSize:9, color:colors.success, width:8, flexShrink:0 }}>↑</span>
                               <input type="text" value={ent.in||""} disabled={isOff} placeholder="HH:MM" maxLength={5}
-                                onChange={e=>setEntry(emp,dk,"in",e.target.value)}
+                                onChange={e=>setEntry(emp,dk,"in",attFmtTime(e.target.value))}
                                 style={{ ...inpSt, opacity: isOff ? 0.3 : 1 }} />
                             </div>
                             <div style={{ display:"flex", alignItems:"center", gap:3 }}>
                               <span style={{ fontSize:9, color:colors.danger, width:8, flexShrink:0 }}>↓</span>
                               <input type="text" value={ent.out||""} disabled={isOff} placeholder="HH:MM" maxLength={5}
-                                onChange={e=>setEntry(emp,dk,"out",e.target.value)}
+                                onChange={e=>setEntry(emp,dk,"out",attFmtTime(e.target.value))}
                                 style={{ ...inpSt, opacity: isOff ? 0.3 : 1 }} />
                             </div>
                             {dv!=null && (
@@ -1467,11 +1475,11 @@ tr.leave{background:#f0f9ff}
                             {showRange && (
                               <div style={{ display:"flex", alignItems:"center", gap:2, justifyContent:"center" }}>
                                 <input type="text" value={ent.leaveStart||""} placeholder="HH:MM" maxLength={5}
-                                  onChange={e=>setEntry(emp,dk,"leaveStart",e.target.value)}
+                                  onChange={e=>setEntry(emp,dk,"leaveStart",attFmtTime(e.target.value))}
                                   style={{ ...inpSt, width:42, textAlign:"center", fontSize:9, padding:"2px 3px" }} />
                                 <span style={{ fontSize:8, color:colors.textDim }}>–</span>
                                 <input type="text" value={ent.leaveEnd||""} placeholder="HH:MM" maxLength={5}
-                                  onChange={e=>setEntry(emp,dk,"leaveEnd",e.target.value)}
+                                  onChange={e=>setEntry(emp,dk,"leaveEnd",attFmtTime(e.target.value))}
                                   style={{ ...inpSt, width:42, textAlign:"center", fontSize:9, padding:"2px 3px" }} />
                               </div>
                             )}
