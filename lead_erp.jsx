@@ -1048,15 +1048,28 @@ function attFmtTime(raw) {
   return `${h}:${String(Math.min(parseInt(mDigits, 10), 59)).padStart(2, "0")}`;
 }
 function attRangeMins(s, e) { const a = attT2M(s), b = attT2M(e); if (a == null || b == null) return null; let d = b - a; if (d < 0) d += 1440; return d; }
+// a leave/unpaid-leave day counts as "partial" (worked alongside the leave) once the employee also logged
+// actual in/out clock times and a specific leave range — otherwise it's treated as a full day off
+function attIsPartialLeave(ent) {
+  const type = ent?.type || "";
+  return (type === "paid_leave" || type === "unpaid_leave")
+    && attRangeMins(ent?.leaveStart, ent?.leaveEnd) != null
+    && !!ent?.in && !!ent?.out;
+}
 function attDayDiff(ent) {
   const type = ent?.type || "";
-  if (type === "holiday" || type === "paid_leave" || type === "unpaid_leave") return null; // excluded from diff — leave hours are tracked as a record only
-  if (type === "half_holiday" && ent?.halfWith) return null; // other half is leave too — fully excluded from diff
+  const partial = attIsPartialLeave(ent);
+  if (!partial) {
+    if (type === "holiday" || type === "paid_leave" || type === "unpaid_leave") return null; // excluded — full day off, leave hours are tracked as a record only
+    if (type === "half_holiday" && ent?.halfWith) return null; // other half is leave too — fully excluded from diff
+  }
   if (!ent?.in || !ent?.out) return null;
   const i = attT2M(ent.in), o = attT2M(ent.out);
   if (i == null || o == null) return null;
   let w = o - i;
   if (w < 0) w += 1440;
+  // unpaid leave taken during a working day isn't compensated — it doesn't count as time worked
+  if (partial && type === "unpaid_leave") w -= attRangeMins(ent.leaveStart, ent.leaveEnd);
   return w - (type === "half_holiday" ? 300 : 600); // half-day public holiday expects 5h instead of 10h
 }
 function attFmt(m) { if (m==null) return "—"; const s=m>=0?"+":"-", a=Math.abs(m); return `${s}${Math.floor(a/60)}h ${String(a%60).padStart(2,"0")}m`; }
@@ -1066,17 +1079,21 @@ function attDayBreakdown(ent) {
   const type = ent?.type || "", halfWith = ent?.halfWith || "";
   const b = { lateMins: 0, earlyMins: 0, paidMins: 0, unpaidMins: 0 };
   const rangeMins = attRangeMins(ent?.leaveStart, ent?.leaveEnd);
+  const partial = attIsPartialLeave(ent);
+
   if (type === "paid_leave" || type === "unpaid_leave") {
     const mins = rangeMins != null ? rangeMins : 600;
     if (type === "paid_leave") b.paidMins = mins; else b.unpaidMins = mins;
-    return b;
-  }
-  if (type === "half_holiday" && halfWith) {
+    if (!partial) return b; // full day off — no clock-in/out to evaluate
+  } else if (type === "half_holiday" && halfWith) {
     const mins = rangeMins != null ? rangeMins : 300;
     if (halfWith === "paid_leave") b.paidMins = mins; else b.unpaidMins = mins;
     return b;
+  } else if (type === "holiday") {
+    return b;
   }
-  if (type === "holiday") return b;
+
+  // partial-leave days and ordinary working days both have real clock times to evaluate
   const isHalf = type === "half_holiday";
   if (ent?.in)  { const m = attT2M(ent.in);  if (m != null && m > 510)  b.lateMins  = m - 510; }
   if (!isHalf && ent?.out) { const m = attT2M(ent.out); if (m != null && m < 1110) b.earlyMins = 1110 - m; }
@@ -1096,11 +1113,13 @@ function AttendanceView({ colors, font, lang, onBack }) {
     half_holiday: tr("Half-day Holiday","Yarım Gün Resmi Tatil"),
   };
   const LEAVE_COLORS = { paid_leave: colors.success, unpaid_leave: colors.warning, holiday: colors.primary, half_holiday: colors.accent };
-  // a day is fully off (isOff) when it's a full leave/holiday, or a half-holiday combined with leave for the other half
+  // a day is fully off (isOff) when it's a full leave/holiday, or a half-holiday combined with leave for the other half —
+  // but a leave day where the employee also logged real clock times + a leave range ("partial leave") still counts as worked
   const attFlags = ent => {
     const type = ent?.type || "", halfWith = ent?.halfWith || "";
-    return { type, halfWith,
-      isOff:  type === "holiday" || type === "paid_leave" || type === "unpaid_leave" || (type === "half_holiday" && !!halfWith),
+    const partial = attIsPartialLeave(ent);
+    return { type, halfWith, partial,
+      isOff:  type === "holiday" || (type === "half_holiday" && !!halfWith) || ((type === "paid_leave" || type === "unpaid_leave") && !partial),
       isHalf: type === "half_holiday" && !halfWith };
   };
   const attLeaveLabel = ent => {
@@ -1202,13 +1221,13 @@ function AttendanceView({ colors, font, lang, onBack }) {
 
     // ── Per-employee detail sections ──
     const detailSections = employees.map(emp => {
-      const workedCount = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; const t = e?.type || ""; return e?.in && e?.out && (!t || (t === "half_holiday" && !e?.halfWith)); }).length;
+      const workedCount = allDays.filter(d => { const e = data[emp]?.[attDK(d)]; return e?.in && e?.out && !attFlags(e).isOff; }).length;
       const empB = empBreakdown(emp, allDays);
 
       const dayRows = allDays.map(d => {
         const dk  = attDK(d);
         const ent = data[emp]?.[dk] || { in:"", out:"", type:"", leaveStart:"", leaveEnd:"", halfWith:"" };
-        const { type, isOff, isHalf } = attFlags(ent);
+        const { type, isOff, isHalf, partial } = attFlags(ent);
         const dayName = FULL_DAYS[d.getDay()-1];
         if (isOff) {
           return `<tr class="leave"><td>${attFD(d)}</td><td>${dayName}</td><td colspan="4" style="text-align:center;font-style:italic;color:#555">${attLeaveNote(ent)}</td><td>—</td></tr>`;
@@ -1218,7 +1237,9 @@ function AttendanceView({ colors, font, lang, onBack }) {
         const dayDiff  = attDayDiff(ent);
         const arrLabel = arrDelta==null?"—":arrDelta===0?tr("On time","Tam"):arrDelta>0?`+${attAbsStr(arrDelta)} ${tr("late","geç")}`:`-${attAbsStr(arrDelta)} ${tr("early","erken")}`;
         const depLabel = isHalf ? "—" : (depDelta==null?"—":depDelta===0?tr("On time","Tam"):depDelta>0?`+${attAbsStr(depDelta)}`:`-${attAbsStr(depDelta)} ${tr("early","erken")}`);
-        const dayLabel = isHalf ? `${dayName}<br><small style="font-style:italic;color:#888">${LEAVE_LABELS.half_holiday}</small>` : dayName;
+        const dayLabel = isHalf ? `${dayName}<br><small style="font-style:italic;color:#888">${LEAVE_LABELS.half_holiday}</small>`
+          : partial ? `${dayName}<br><small style="font-style:italic;color:#888">${attLeaveNote(ent)}</small>`
+          : dayName;
         return `<tr>
           <td>${attFD(d)}</td><td>${dayLabel}</td>
           <td>${ent.in||"—"}</td><td class="${arrDelta==null?"neutral":arrDelta>0?"neg":"pos"}">${arrLabel}</td>
@@ -1298,22 +1319,24 @@ ${detailSections}
     const rows = allDays.map(d => {
       const dk  = attDK(d);
       const ent = data[emp]?.[dk] || { in:"", out:"", type:"", leaveStart:"", leaveEnd:"", halfWith:"" };
-      const { type, isOff, isHalf } = attFlags(ent);
+      const { type, isOff, isHalf, partial } = attFlags(ent);
       const arrDelta = !isOff && ent.in  ? attT2M(ent.in)  - 510  : null;
       const depDelta = !isOff && !isHalf && ent.out ? attT2M(ent.out) - 1110 : null;
       const dayDiff  = attDayDiff(ent);
       const arrLabel = arrDelta == null ? "—" : arrDelta === 0 ? tr("On time","Tam") : arrDelta > 0 ? `+${attAbsStr(arrDelta)} ${tr("late","geç")}` : `-${attAbsStr(arrDelta)} ${tr("early","erken")}`;
       const depLabel = isHalf ? "—" : (depDelta == null ? "—" : depDelta === 0 ? tr("On time","Tam") : depDelta > 0 ? `+${attAbsStr(depDelta)}` : `-${attAbsStr(depDelta)} ${tr("early","erken")}`);
-      return { d, dk, ent, type, isOff, isHalf, arrDelta, depDelta, dayDiff, arrLabel, depLabel };
+      return { d, dk, ent, type, isOff, isHalf, partial, arrDelta, depDelta, dayDiff, arrLabel, depLabel };
     });
 
     const workedCount = rows.filter(r => !r.isOff && r.ent.in && r.ent.out).length;
     const empB = empBreakdown(emp, allDays);
 
-    const bodyRows = rows.map(({ d, ent, type, isOff, isHalf, arrDelta, depDelta, dayDiff, arrLabel, depLabel }) => {
+    const bodyRows = rows.map(({ d, ent, type, isOff, isHalf, partial, arrDelta, depDelta, dayDiff, arrLabel, depLabel }) => {
       const dayName = FULL_DAYS[d.getDay() - 1];
       if (isOff) return `<tr class="leave"><td>${attFD(d)}</td><td>${dayName}</td><td colspan="4" style="text-align:center;font-style:italic">${attLeaveNote(ent)}</td><td>—</td></tr>`;
-      const dayLabel = isHalf ? `${dayName} <small style="font-style:italic;color:#888">(${LEAVE_LABELS.half_holiday})</small>` : dayName;
+      const dayLabel = isHalf ? `${dayName} <small style="font-style:italic;color:#888">(${LEAVE_LABELS.half_holiday})</small>`
+        : partial ? `${dayName} <small style="font-style:italic;color:#888">(${attLeaveNote(ent)})</small>`
+        : dayName;
       if (!ent.in && !ent.out) return `<tr><td>${attFD(d)}</td><td>${dayLabel}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
       return `<tr>
         <td>${attFD(d)}</td><td>${dayLabel}</td>
@@ -1655,7 +1678,7 @@ tr.leave{background:#f0f9ff}
         {/* ── Employee performance detail ── */}
         {selectedEmp && (() => {
           const allDays = weeks.flat();
-          const workedDays = allDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; const t = e?.type || ""; return e?.in && e?.out && (!t || (t === "half_holiday" && !e?.halfWith)); });
+          const workedDays = allDays.filter(d => { const e = data[selectedEmp]?.[attDK(d)]; return e?.in && e?.out && !attFlags(e).isOff; });
           const empB = empBreakdown(selectedEmp, allDays);
 
           const cellSt = { padding: 5, verticalAlign: "top" };
@@ -1719,7 +1742,7 @@ tr.leave{background:#f0f9ff}
 
                           const dk   = attDK(d);
                           const ent  = data[selectedEmp]?.[dk] || { in:"", out:"", type:"", leaveStart:"", leaveEnd:"", halfWith:"" };
-                          const { type, isOff, isHalf } = attFlags(ent);
+                          const { type, isOff, isHalf, partial } = attFlags(ent);
 
                           if (isOff) {
                             const color = LEAVE_COLORS[type] || colors.textMuted;
@@ -1761,11 +1784,17 @@ tr.leave{background:#f0f9ff}
                                   {!noData && arrLabel && <div style={{ fontSize:9, color:arrColor, fontFamily:font, marginTop:1 }}>{arrLabel}</div>}
                                 </div>
                                 {/* Evening / Departure */}
-                                <div style={{ padding:"6px 8px", background: noData || isHalf ? "transparent" : depDelta != null && depDelta < 0 ? `${colors.danger}08` : `${colors.success}06` }}>
+                                <div style={{ padding:"6px 8px", borderBottom: partial ? `1px solid ${colors.border}50` : "none", background: noData || isHalf ? "transparent" : depDelta != null && depDelta < 0 ? `${colors.danger}08` : `${colors.success}06` }}>
                                   <div style={{ fontSize:9, color:colors.textDim, fontFamily:font, marginBottom:2 }}>↓ {tr("Departure","Çıkış")}</div>
                                   <div style={{ fontSize:12, fontWeight:700, color: noData ? colors.textDim : (isHalf ? colors.text : depColor), fontFamily:font }}>{ent.out || "—"}</div>
                                   {!noData && !isHalf && depLabel && <div style={{ fontSize:9, color:depColor, fontFamily:font, marginTop:1 }}>{depLabel}</div>}
                                 </div>
+                                {/* Partial leave note */}
+                                {partial && (
+                                  <div style={{ padding:"5px 8px", background:`${LEAVE_COLORS[type]}10` }}>
+                                    <div style={{ fontSize:9, fontWeight:700, color:LEAVE_COLORS[type], fontFamily:font, textAlign:"center" }}>{attLeaveNote(ent)}</div>
+                                  </div>
+                                )}
                               </div>
                             </td>
                           );
