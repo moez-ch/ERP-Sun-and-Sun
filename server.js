@@ -460,6 +460,36 @@ if (companyCount === 0) {
   ins.run("Sun ve Sun Danışmanlık Bilişim San. ve Tic. A.Ş.","Sun ve Sun A.Ş.","","","","",3);
 }
 
+// ── ATTENDANCE TRACKER ──────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS attendance_employees (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT UNIQUE NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 99
+  );
+  CREATE TABLE IF NOT EXISTS attendance_records (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee    TEXT NOT NULL,
+    date        TEXT NOT NULL,
+    check_in    TEXT DEFAULT '',
+    check_out   TEXT DEFAULT '',
+    type        TEXT DEFAULT '',
+    leave_start TEXT DEFAULT '',
+    leave_end   TEXT DEFAULT '',
+    half_with   TEXT DEFAULT '',
+    lunch_break INTEGER DEFAULT 0,
+    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(employee, date)
+  );
+`);
+if (db.prepare("SELECT COUNT(*) as c FROM attendance_employees").get().c === 0) {
+  const ins = db.prepare("INSERT INTO attendance_employees (name, sort_order) VALUES (?, ?)");
+  [
+    "Esra Serin", "Merve Çöloğlu", "Sude Solakoğlu", "Şura Kurtoğlu",
+    "Anis Nakib", "Moez Cherni", "Mohamed Ali Naguez", "Gökçe Kurnaz",
+  ].forEach((name, i) => ins.run(name, i + 1));
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS canva_config (
     key   TEXT PRIMARY KEY,
@@ -1292,6 +1322,66 @@ app.put("/contracts/companies/ibans/:ibanId/set-default", authenticate, (req, re
   db.prepare("UPDATE company_ibans SET is_default=0 WHERE company_id=?").run(row.company_id);
   db.prepare("UPDATE company_ibans SET is_default=1 WHERE id=?").run(req.params.ibanId);
   db.prepare("UPDATE contract_companies SET iban=? WHERE id=?").run(row.iban, row.company_id);
+  res.json({ ok: true });
+});
+
+// ── ATTENDANCE TRACKER ──────────────────────────────────────────────
+
+// GET /attendance/employees
+app.get("/attendance/employees", authenticate, (_req, res) => {
+  res.json(db.prepare("SELECT name FROM attendance_employees ORDER BY sort_order, id").all().map(r => r.name));
+});
+
+// PUT /attendance/employees — replace the whole employee list (names, in order)
+app.put("/attendance/employees", authenticate, (req, res) => {
+  const { names } = req.body || {};
+  if (!Array.isArray(names)) return res.status(400).json({ error: "names array required" });
+  const tx = db.transaction(list => {
+    db.prepare("DELETE FROM attendance_employees").run();
+    const ins = db.prepare("INSERT INTO attendance_employees (name, sort_order) VALUES (?, ?)");
+    list.forEach((name, i) => { if (name?.trim()) ins.run(name.trim(), i + 1); });
+  });
+  tx(names);
+  res.json({ ok: true });
+});
+
+// GET /attendance/records?year=&month=  (month is 1-12) — shaped as { [employee]: { [date]: entry } }
+app.get("/attendance/records", authenticate, (req, res) => {
+  const { year, month } = req.query;
+  const prefix = `${year}-${String(month).padStart(2, "0")}`;
+  const rows = db.prepare("SELECT * FROM attendance_records WHERE date LIKE ?").all(`${prefix}%`);
+  const out = {};
+  rows.forEach(r => {
+    out[r.employee] = out[r.employee] || {};
+    out[r.employee][r.date] = {
+      in: r.check_in, out: r.check_out, type: r.type,
+      leaveStart: r.leave_start, leaveEnd: r.leave_end, halfWith: r.half_with,
+      lunchBreak: !!r.lunch_break,
+    };
+  });
+  res.json(out);
+});
+
+// PUT /attendance/records/:employee/:date — upsert a single day entry
+app.put("/attendance/records/:employee/:date", authenticate, (req, res) => {
+  const { in: checkIn, out: checkOut, type, leaveStart, leaveEnd, halfWith, lunchBreak } = req.body || {};
+  db.prepare(`
+    INSERT INTO attendance_records (employee, date, check_in, check_out, type, leave_start, leave_end, half_with, lunch_break, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(employee, date) DO UPDATE SET
+      check_in    = excluded.check_in,
+      check_out   = excluded.check_out,
+      type        = excluded.type,
+      leave_start = excluded.leave_start,
+      leave_end   = excluded.leave_end,
+      half_with   = excluded.half_with,
+      lunch_break = excluded.lunch_break,
+      updated_at  = excluded.updated_at
+  `).run(
+    req.params.employee, req.params.date,
+    checkIn ?? "", checkOut ?? "", type ?? "",
+    leaveStart ?? "", leaveEnd ?? "", halfWith ?? "", lunchBreak ? 1 : 0
+  );
   res.json({ ok: true });
 });
 

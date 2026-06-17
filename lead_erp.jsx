@@ -1167,29 +1167,36 @@ function AttendanceView({ colors, font, lang, onBack }) {
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [newEmp,  setNewEmp]  = useState("");
 
-  const [employees, setEmployees] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("sns_att_employees")) || DEFAULT_ATT_EMPLOYEES; }
-    catch { return DEFAULT_ATT_EMPLOYEES; }
-  });
+  const [employees, setEmployees] = useState(DEFAULT_ATT_EMPLOYEES);
+  const [data, setData] = useState({});
+  const attAuthHeaders = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sns_token")}` });
 
-  const dataKey = `sns_att_${year}_${month}`;
-  const [data, setData] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`sns_att_${now.getFullYear()}_${now.getMonth()}`)) || {}; }
-    catch { return {}; }
-  });
+  // employees and monthly records now live server-side (attendance_employees / attendance_records
+  // tables) — this used to be localStorage-only, which meant data only existed in whichever browser
+  // entered it and vanished as soon as anyone checked from a different machine
+  useEffect(() => {
+    fetch("/attendance/employees", { headers: attAuthHeaders() })
+      .then(r => r.json()).then(list => { if (Array.isArray(list) && list.length) setEmployees(list); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
-    try { setData(JSON.parse(localStorage.getItem(dataKey)) || {}); }
-    catch { setData({}); }
+    fetch(`/attendance/records?year=${year}&month=${month + 1}`, { headers: attAuthHeaders() })
+      .then(r => r.json()).then(d => setData(d || {}))
+      .catch(() => setData({}));
   }, [year, month]);
 
-  function saveData(d) { setData(d); localStorage.setItem(dataKey, JSON.stringify(d)); }
-  function saveEmployees(list) { setEmployees(list); localStorage.setItem("sns_att_employees", JSON.stringify(list)); }
+  function saveEmployees(list) {
+    setEmployees(list);
+    fetch("/attendance/employees", { method: "PUT", headers: attAuthHeaders(), body: JSON.stringify({ names: list }) }).catch(() => {});
+  }
 
   function setEntry(emp, dk, field, val) {
     const empData = { ...(data[emp] || {}) };
-    empData[dk] = { in: "", out: "", type: "", leaveStart: "", leaveEnd: "", halfWith: "", ...(empData[dk] || {}), [field]: val };
-    saveData({ ...data, [emp]: empData });
+    const entry = { in: "", out: "", type: "", leaveStart: "", leaveEnd: "", halfWith: "", lunchBreak: false, ...(empData[dk] || {}), [field]: val };
+    empData[dk] = entry;
+    setData({ ...data, [emp]: empData });
+    fetch(`/attendance/records/${encodeURIComponent(emp)}/${dk}`, { method: "PUT", headers: attAuthHeaders(), body: JSON.stringify(entry) }).catch(() => {});
   }
 
   const weeks = attWeeks(year, month);
