@@ -2299,6 +2299,58 @@ async function mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex) 
   return Buffer.from(await canvaDoc.save());
 }
 
+// ── COVER COMPANY-NAME OVERLAY ───────────────────────────────────
+// All 3 cover themes place the customer's company name in the same lower-left
+// area (under the subtitle, above the website pill, over a white background),
+// so a single position/color works for all of them. Tweak COVER_NAME_STYLE to
+// nudge placement — values are fractions of the slide (top-left origin).
+const COVER_NAME_STYLE = {
+  left:     "8.7%",    // distance from the left edge (aligns with the titles)
+  top:      "73%",     // distance from the top edge
+  width:    "48%",     // wrap width for long names
+  color:    "#1B2E5E", // dark navy — reads on all three white areas
+  fontFrac: 0.042,     // font size as a fraction of slide height
+};
+
+async function renderCompanyNameOverlay(name, pageW, pageH) {
+  const scale = 2; // render at 2x for crisp text
+  const pxW = Math.round(pageW * scale);
+  const pxH = Math.round(pageH * scale);
+  const esc = s => String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const s = COVER_NAME_STYLE;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+    html,body{margin:0;padding:0;width:${pxW}px;height:${pxH}px;background:transparent;overflow:hidden;}
+    .name{position:absolute;left:${s.left};top:${s.top};width:${s.width};
+      font-family:'Poppins','Segoe UI',Arial,sans-serif;font-weight:700;
+      font-size:${Math.round(pxH * s.fontFrac)}px;line-height:1.15;color:${s.color};}
+  </style></head><body><div class="name">${esc(name)}</div></body></html>`;
+  const htmlPath = path.join(TMP_DIR, `cover_name_${Date.now()}.html`);
+  fs.writeFileSync(htmlPath, html, "utf-8");
+  const browser = await puppeteer.launch({ executablePath: EDGE_PATH, headless: true, args: ["--no-sandbox","--disable-setuid-sandbox"] });
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: pxW, height: pxH, deviceScaleFactor: 1 });
+    await page.goto("file:///" + htmlPath.replaceAll("\\", "/"), { waitUntil: "networkidle0" });
+    const png = await page.screenshot({ omitBackground: true, type: "png" });
+    return Buffer.from(png);
+  } finally {
+    await browser.close();
+    fs.unlinkSync(htmlPath);
+  }
+}
+
+// Stamp the company name onto page 0 (the cover) of a merged deck PDF.
+async function stampCompanyNameOnCover(pdfBytes, name) {
+  if (!name || !name.trim()) return pdfBytes;
+  const doc = await PDFDocument.load(pdfBytes);
+  const page = doc.getPage(0);
+  const { width, height } = page.getSize();
+  const pngBytes = await renderCompanyNameOverlay(name.trim(), width, height);
+  const png = await doc.embedPng(pngBytes);
+  page.drawImage(png, { x: 0, y: 0, width, height });
+  return Buffer.from(await doc.save());
+}
+
 // ── CANVA ROUTES ─────────────────────────────────────────────────
 
 // GET /canva/config
@@ -2954,6 +3006,8 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
       const canvaDoc = await PDFDocument.load(canvaPdfBytes);
       const slideIndex = canvaDoc.getPageCount() - 1; // 1-indexed: second to last
       finalPdfBytes = await mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex);
+      // Stamp the customer's company name onto the cover (only when we have the deck)
+      finalPdfBytes = await stampCompanyNameOnCover(finalPdfBytes, client_name);
     } catch (canvaErr) {
       console.warn("[pricing/generate] Canva unavailable — returning slide only:", canvaErr.message);
       finalPdfBytes = slidePdfBytes;
