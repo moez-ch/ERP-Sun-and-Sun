@@ -22,6 +22,15 @@ import { randomBytes, createHash } from "node:crypto";
 function resolveBrowserPath() {
   const candidates = [
     process.env.BROWSER_PATH,
+    // Linux (the 192.168.1.135 server runs Ubuntu)
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/usr/bin/microsoft-edge-stable",
+    "/usr/bin/microsoft-edge",
+    "/snap/bin/chromium",
+    // Windows (dev box)
     "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
     "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
     "C:/Program Files/Google/Chrome/Application/chrome.exe",
