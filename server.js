@@ -16,7 +16,29 @@ import puppeteer from "puppeteer-core";
 import { PDFDocument } from "pdf-lib";
 import { randomBytes, createHash } from "node:crypto";
 
-const EDGE_PATH = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+// Locate a Chromium-based browser for Puppeteer. Paths vary by machine
+// (dev box vs. the 192.168.1.135 server), so probe common locations and
+// allow an override via the BROWSER_PATH env var.
+function resolveBrowserPath() {
+  const candidates = [
+    process.env.BROWSER_PATH,
+    "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
+    "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+    "C:/Program Files/Google/Chrome/Application/chrome.exe",
+    "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+  ].filter(Boolean);
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) return p; } catch {}
+  }
+  return null;
+}
+
+const EDGE_PATH = resolveBrowserPath();
+if (!EDGE_PATH) {
+  console.warn("[pdf] No Chromium browser found. HTML→PDF generation will fail. Set BROWSER_PATH to msedge.exe or chrome.exe.");
+} else {
+  console.log(`[pdf] Using browser: ${EDGE_PATH}`);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || "sns-erp-2025-secret-key";
