@@ -2306,7 +2306,7 @@ async function mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex) 
 // nudge placement — values are fractions of the slide (top-left origin).
 const COVER_NAME_STYLE = {
   left:     "8.7%",    // distance from the left edge (aligns with the titles)
-  top:      "73%",     // distance from the top edge
+  top:      "61%",     // distance from the top edge
   width:    "48%",     // wrap width for long names
   color:    "#1B2E5E", // dark navy — reads on all three white areas
   fontFrac: 0.042,     // font size as a fraction of slide height
@@ -2910,21 +2910,35 @@ app.get("/presentations", authenticate, (req, res) => {
   res.json(db.prepare("SELECT * FROM program_presentations ORDER BY category, name").all());
 });
 
+// Resolve a Canva design ID from a pasted value: a direct canva.com/design/…
+// URL, a raw design ID, or a short link (canva.link/…) that redirects to one.
+async function resolveCanvaDesignId(link) {
+  const s = (link || "").trim();
+  if (!s) return "";
+  let m = s.match(/canva\.com\/design\/([A-Za-z0-9_-]+)/);
+  if (m) return m[1];
+  if (!s.includes("/") && /^[A-Za-z0-9_-]{8,}$/.test(s)) return s; // raw design id
+  try {
+    const r = await fetch(s, { redirect: "follow", signal: AbortSignal.timeout(10000) });
+    m = r.url.match(/canva\.com\/design\/([A-Za-z0-9_-]+)/);
+    if (m) return m[1];
+  } catch (e) { /* unresolved */ }
+  return "";
+}
+
 app.post("/presentations", authenticate, requireAdmin, async (req, res) => {
   const { category, name, canva_link, theme } = req.body || {};
   if (!name || !canva_link) return res.status(400).json({ error: "name and canva_link required" });
-  let design_id = "";
-  try {
-    const r = await fetch(canva_link.trim(), { redirect: "follow", signal: AbortSignal.timeout(10000) });
-    const match = r.url.match(/canva\.com\/design\/([A-Za-z0-9_-]+)/);
-    if (match) design_id = match[1];
-  } catch (e) { /* leave empty, user can fix manually */ }
+  const design_id = await resolveCanvaDesignId(canva_link);
+  if (!design_id) return res.status(400).json({ error: "Could not read a Canva design ID from that link. Open the design in Canva and paste its canva.com/design/… URL (or the design ID itself)." });
   const row = db.prepare("INSERT INTO program_presentations (category, name, canva_link, design_id, theme) VALUES (?,?,?,?,?)").run(category || "", name.trim(), canva_link.trim(), design_id, theme === "green" ? "green" : "blue");
   res.json(db.prepare("SELECT * FROM program_presentations WHERE id=?").get(row.lastInsertRowid));
 });
 
-app.put("/presentations/:id", authenticate, requireAdmin, (req, res) => {
-  const { category, name, canva_link, design_id } = req.body || {};
+app.put("/presentations/:id", authenticate, requireAdmin, async (req, res) => {
+  let { category, name, canva_link, design_id } = req.body || {};
+  // If no explicit design_id given, try to (re)resolve it from the link
+  if (!design_id && canva_link) design_id = await resolveCanvaDesignId(canva_link);
   db.prepare("UPDATE program_presentations SET category=?, name=?, canva_link=?, design_id=? WHERE id=?").run(category || "", name || "", canva_link || "", design_id || "", req.params.id);
   res.json(db.prepare("SELECT * FROM program_presentations WHERE id=?").get(req.params.id));
 });

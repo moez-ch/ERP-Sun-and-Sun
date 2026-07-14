@@ -7294,10 +7294,14 @@ Kurallar:
                             <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 260, overflowY: "auto" }}>
                               {grouped[selectedPresCategory].map(p => {
                                 const selected = pricingData.design_id && pricingData.design_id === p.design_id;
+                                const noId = !p.design_id;
                                 return (
                                   <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                    <div onClick={() => { if (selected) { pd("design_id", ""); } else { pd("design_id", p.design_id); pd("theme", p.theme || "blue"); } }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderRadius: 7, cursor: "pointer", border: `2px solid ${selected ? colors.primary : colors.border}`, background: selected ? `${colors.primary}14` : "transparent", transition: "all .15s" }}>
-                                      <span style={{ fontSize: 12, fontWeight: selected ? 700 : 500, color: selected ? colors.primaryLight : colors.text }}>{p.name}</span>
+                                    <div onClick={() => {
+                                        if (noId) { alert(lang === "tr" ? "Bu sunumun Canva tasarım kimliği eksik. Yönetici olarak silip geçerli bir Canva bağlantısıyla yeniden ekleyin." : "This presentation has no Canva design ID. Delete it and re-add with a valid Canva link."); return; }
+                                        if (selected) { pd("design_id", ""); } else { pd("design_id", p.design_id); pd("theme", p.theme || "blue"); }
+                                      }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderRadius: 7, cursor: noId ? "not-allowed" : "pointer", border: `2px solid ${selected ? colors.primary : colors.border}`, background: selected ? `${colors.primary}14` : "transparent", opacity: noId ? 0.5 : 1, transition: "all .15s" }}>
+                                      <span style={{ fontSize: 12, fontWeight: selected ? 700 : 500, color: selected ? colors.primaryLight : colors.text }}>{p.name}{noId && " ⚠"}</span>
                                       {selected && <span style={{ fontSize: 11, fontWeight: 700, color: colors.primaryLight }}>✓</span>}
                                     </div>
                                     {isAdmin && <button onClick={() => handleDeletePres(p.id)} style={{ padding: "4px 7px", background: "rgba(229,115,115,0.1)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>✕</button>}
