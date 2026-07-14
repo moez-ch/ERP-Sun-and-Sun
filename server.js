@@ -548,6 +548,8 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   )
 `);
+// Older DBs were created before the theme column existed; add it if missing.
+try { db.exec(`ALTER TABLE program_presentations ADD COLUMN theme TEXT NOT NULL DEFAULT 'blue'`); } catch {}
 
 // Seed program presentations on first run
 if (db.prepare("SELECT COUNT(*) as c FROM program_presentations").get().c === 0) {
