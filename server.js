@@ -2147,7 +2147,39 @@ function escapeXml(s) {
   return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
+// Word can split a typed tag across runs (e.g. a spell-check region wraps the
+// inner word), so "@@payment_schedule@@" may live in three separate <w:t>
+// elements. Reassemble it into one contiguous marker before matching.
+function consolidatePaymentScheduleTag(xml) {
+  if (xml.includes("@@payment_schedule@@")) return xml;
+  const clean = xml.replace(/<w:proofErr[^>]*\/>/g, "");
+  const regions = [];
+  const tRe = /<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g;
+  let m;
+  while ((m = tRe.exec(clean)) !== null) {
+    const openEnd = clean.indexOf(">", m.index) + 1;
+    regions.push({ start: openEnd, text: m[1] });
+  }
+  const plain = regions.map(r => r.text).join("");
+  const TAG = "@@payment_schedule@@";
+  const idx = plain.indexOf(TAG);
+  if (idx < 0) return xml; // genuinely absent
+  const patEnd = idx + TAG.length;
+  let cum = 0, sR = -1, eR = -1, sOff = 0, eOff = 0;
+  for (let i = 0; i < regions.length; i++) {
+    const next = cum + regions[i].text.length;
+    if (sR < 0 && idx < next) { sR = i; sOff = idx - cum; }
+    if (eR < 0 && patEnd <= next) { eR = i; eOff = patEnd - cum; break; }
+    cum = next;
+  }
+  if (sR < 0 || eR < 0) return xml;
+  const xmlStart = regions[sR].start + sOff;
+  const xmlEnd   = regions[eR].start + eOff;
+  return clean.slice(0, xmlStart) + TAG + clean.slice(xmlEnd);
+}
+
 function replacePaymentSchedule(xml, scheduleXml) {
+  xml = consolidatePaymentScheduleTag(xml);
   if (!xml.includes("@@payment_schedule@@")) return xml;
   const paraRe = /<w:p\b[^>]*>(?:(?!<\/w:p>)[\s\S])*?@@payment_schedule@@(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/;
   if (paraRe.test(xml)) return xml.replace(paraRe, scheduleXml || "");
