@@ -2023,7 +2023,13 @@ function parseVergiLevhasi(items) {
     .map(([k, t]) => ({ k, y: anchorY(t) })).filter(l => l.y != null);
   const rb = {};
   if (R.length) for (const it of items.filter(i => i.x >= 538)) (rb[near(R, it.y)] ||= []).push(it);
-  const office = join(rb.dai);
+  // GİB prints just the office name (e.g. "AKSU"); contracts want it title-cased
+  // with the "Vergi Dairesi" suffix, e.g. "Aksu Vergi Dairesi".
+  let office = join(rb.dai);
+  if (office) {
+    const titleTr = s => s.toLocaleLowerCase("tr-TR").replace(/(^|[\s\/])([a-zçğıiöşü])/g, (m, p, c) => p + c.toLocaleUpperCase("tr-TR"));
+    office = /verg[iı]\s*da[iı]res/i.test(office) ? titleTr(office) : titleTr(office) + " Vergi Dairesi";
+  }
 
   return { name, office, address };
 }
