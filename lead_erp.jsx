@@ -7417,7 +7417,7 @@ Kurallar:
                   style={{ width: "100%", padding: "13px", background: pricingGenerating ? colors.border : colors.primary, border: "none", borderRadius: 9, color: "#fff", fontSize: 14, fontWeight: 700, cursor: pricingGenerating ? "not-allowed" : "pointer" }}>
                   {pricingGenerating ? t("pricing_building") : t("pricing_download")}
                 </button>
-              </>}
+              </>
               </div>
             </div>
           );
