@@ -1,15 +1,19 @@
-// Prints the slide-1 thumbnail URL of every Price Quote presentation.
-// Used to inventory cover art styles / titles. Read-only except for the
-// Canva token refresh (same behaviour as the app).
+// Downloads the slide-1 thumbnail of every Price Quote presentation into
+// tools/cover_shots/ so the cover art style / title / subtitle can be
+// catalogued. Read-only except for the Canva token refresh.
 //
 //   cd ~/ERP-Sun-and-Sun && node tools/dump_covers.mjs
+//   git add tools/cover_shots && git commit -m "cover shots" && git push
 //
 import Database from "better-sqlite3";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const db = new Database(path.join(root, "erp_auth.db"));
+const SHOTS = path.join(root, "tools", "cover_shots");
+fs.mkdirSync(SHOTS, { recursive: true });
 
 const cfg = Object.fromEntries(db.prepare("SELECT key, value FROM canva_config").all().map(r => [r.key, r.value]));
 if (!cfg.access_token) {
@@ -43,22 +47,37 @@ if (Date.now() > parseInt(cfg.token_expires_at || "0") - 60000) {
 }
 
 const rows = db.prepare("SELECT id, name, theme, design_id FROM program_presentations WHERE design_id <> ? ORDER BY id").all("");
-console.error(`fetching ${rows.length} covers...\n`);
+console.log(`fetching ${rows.length} covers -> ${SHOTS}\n`);
 
+const index = [];
 for (const r of rows) {
-  let thumb = "NO-THUMB";
+  let status = "ok";
   try {
     const resp = await fetch(`https://api.canva.com/rest/v1/designs/${r.design_id}/pages?limit=1`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (resp.ok) {
-      const data = await resp.json();
-      thumb = data.items?.[0]?.thumbnail?.url || "NO-THUMB";
+    if (!resp.ok) {
+      status = `HTTP-${resp.status}`;
     } else {
-      thumb = `HTTP-${resp.status}`;
+      const data = await resp.json();
+      const url = data.items?.[0]?.thumbnail?.url;
+      if (!url) {
+        status = "NO-THUMB";
+      } else {
+        const img = await fetch(url);
+        if (!img.ok) {
+          status = `IMG-HTTP-${img.status}`;
+        } else {
+          const buf = Buffer.from(await img.arrayBuffer());
+          fs.writeFileSync(path.join(SHOTS, `${String(r.id).padStart(2, "0")}.png`), buf);
+        }
+      }
     }
   } catch (e) {
-    thumb = "ERROR " + e.message;
+    status = "ERROR " + e.message;
   }
-  console.log([r.id, r.theme || "blue", r.name, thumb].join("\t"));
+  index.push({ id: r.id, name: r.name, design_id: r.design_id, status });
+  console.log(`${String(r.id).padStart(2, " ")}  ${status === "ok" ? "saved " : status.padEnd(6)}  ${r.name}`);
 }
+fs.writeFileSync(path.join(SHOTS, "index.json"), JSON.stringify(index, null, 2), "utf-8");
+console.log(`\ndone -> ${SHOTS}`);
