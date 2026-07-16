@@ -14,6 +14,9 @@ import Docxtemplater from "docxtemplater";
 import mammoth from "mammoth";
 import puppeteer from "puppeteer-core";
 import { PDFDocument } from "pdf-lib";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import { createCanvas } from "@napi-rs/canvas";
+import { readBarcodes } from "zxing-wasm/reader";
 import { randomBytes, createHash } from "node:crypto";
 
 // Locate a Chromium-based browser for Puppeteer. Paths vary by machine
@@ -1986,6 +1989,83 @@ app.post("/contracts/generate", authenticate, async (req, res) => {
   } catch (e) {
     console.error("[contracts/generate]", e);
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Tax certificate (vergi levhası) PDF extraction ────────────────
+// These GİB PDFs are text-based: name / tax office / address are real text,
+// while the tax number is drawn only as a Code128 barcode. So we read the
+// three text fields from the layout and decode the barcode for the number —
+// no OCR, no ML service needed.
+const pdfCanvasFactory = {
+  create: (w, h) => { const c = createCanvas(Math.max(1, Math.ceil(w)), Math.max(1, Math.ceil(h))); return { canvas: c, context: c.getContext("2d") }; },
+  reset:  (o, w, h) => { o.canvas.width = Math.max(1, Math.ceil(w)); o.canvas.height = Math.max(1, Math.ceil(h)); },
+  destroy: (o) => { o.canvas.width = 0; o.canvas.height = 0; },
+};
+
+function parseVergiLevhasi(items) {
+  const U = s => (s || "").toLocaleUpperCase("tr-TR").replace(/\s+/g, " ").trim();
+  const anchorY = (...txts) => { const it = items.find(i => txts.some(t => U(i.str).includes(t))); return it ? it.y : null; };
+  const join = arr => (arr || []).sort((a, b) => (b.y - a.y) || (a.x - b.x)).map(i => i.str.trim()).filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  const near = (labels, y) => labels.reduce((best, l) => Math.abs(l.y - y) < Math.abs(best.y - y) ? l : best, labels[0]).k;
+
+  // Left column: each value line is assigned to its nearest label (value boxes
+  // are centred on the label, so wrapped values straddle it — fixed bands leak).
+  const L = [["adi", "ADI SOYADI"], ["tic", "ÜNVAN"], ["adr", "YERİ ADRES"], ["tur", "TÜRÜ"], ["ana", "ANA FAAL"]]
+    .map(([k, t]) => ({ k, y: anchorY(t) })).filter(l => l.y != null);
+  const lb = {};
+  if (L.length) for (const it of items.filter(i => i.x >= 185 && i.x < 485)) (lb[near(L, it.y)] ||= []).push(it);
+  const name = join(lb.tic) || join(lb.adi);
+  const address = join(lb.adr);
+
+  // Right column: vergi dairesi value
+  const R = [["dai", "DAİRES"], ["kim", "VERGİ KİMLİK"], ["tck", "TC KİMLİK"], ["ise", "BAŞLAMA"]]
+    .map(([k, t]) => ({ k, y: anchorY(t) })).filter(l => l.y != null);
+  const rb = {};
+  if (R.length) for (const it of items.filter(i => i.x >= 538)) (rb[near(R, it.y)] ||= []).push(it);
+  const office = join(rb.dai);
+
+  return { name, office, address };
+}
+
+async function extractVergiLevhasi(pdfBuffer) {
+  const data = new Uint8Array(pdfBuffer);
+  const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true, verbosity: 0, canvasFactory: pdfCanvasFactory }).promise;
+  try {
+    const page = await doc.getPage(1);
+
+    const tc = await page.getTextContent();
+    const items = tc.items.map(i => ({ str: i.str, x: Math.round(i.transform[4]), y: Math.round(i.transform[5]) })).filter(i => i.str.trim());
+    const { name, office, address } = parseVergiLevhasi(items);
+
+    // Tax number: decode the Code128 barcode from a rendered image
+    let taxNo = "";
+    try {
+      const vp = page.getViewport({ scale: 3.5 });
+      const { canvas, context } = pdfCanvasFactory.create(vp.width, vp.height);
+      await page.render({ canvasContext: context, viewport: vp, canvasFactory: pdfCanvasFactory }).promise;
+      const png = canvas.toBuffer("image/png");
+      const results = await readBarcodes(new Blob([png]), { tryHarder: true, formats: ["Code128"] });
+      taxNo = results.map(r => r.text).find(t => /^\d{10}$/.test(t)) || "";
+    } catch (e) { console.warn("[pdf-tax] barcode decode failed:", e.message); }
+    // Fallback: a plain 10-digit number in the text, if the barcode didn't decode
+    if (!taxNo) { const m = items.map(i => i.str).join(" ").match(/\b\d{10}\b/); if (m) taxNo = m[0]; }
+
+    return { party2_name: name, party2_tax_office: office, party2_tax_no: taxNo, party2_address: address };
+  } finally {
+    await doc.destroy();
+  }
+}
+
+// POST /contracts/pdf-tax — extract Party fields from a vergi levhası PDF
+app.post("/contracts/pdf-tax", authenticate, upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No PDF provided" });
+  try {
+    const fields = await extractVergiLevhasi(req.file.buffer);
+    res.json({ ok: true, fields });
+  } catch (e) {
+    console.error("[pdf-tax]", e);
+    res.status(500).json({ error: "Could not read the PDF. Make sure it is a GİB vergi levhası PDF." });
   }
 });
 

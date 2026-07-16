@@ -2370,8 +2370,8 @@ Kurallar:
     try {
       const token = localStorage.getItem("sns_token");
       const fd = new FormData();
-      fd.append("image", file);
-      const r = await fetch("/contracts/ocr", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      fd.append("file", file);
+      const r = await fetch("/contracts/pdf-tax", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
       const d = await r.json();
       if (d.ok && d.fields) {
         setDraft(prev => ({ ...prev, name: d.fields.party2_name || prev.name, tax_office: d.fields.party2_tax_office || prev.tax_office, tax_no: d.fields.party2_tax_no || prev.tax_no, address: d.fields.party2_address || prev.address }));
@@ -5874,8 +5874,8 @@ Kurallar:
             try {
               const token = localStorage.getItem("sns_token");
               const fd = new FormData();
-              fd.append("image", file);
-              const r = await fetch("/contracts/ocr", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+              fd.append("file", file);
+              const r = await fetch("/contracts/pdf-tax", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
               const d = await r.json();
               if (d.ok && d.fields) {
                 // Remap party2_ fields to party3_ if target is party3
@@ -6972,7 +6972,7 @@ Kurallar:
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionParty2")}</div>
                         <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6 }}>
-                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleOcr(e.target.files[0]); }} />
+                          <input type="file" accept="application/pdf,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleOcr(e.target.files[0]); }} />
                           <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{contractOcrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
                         </label>
                       </div>
@@ -7010,7 +7010,7 @@ Kurallar:
                           <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Party 3</div>
                           <div style={{ display: "flex", gap: 8 }}>
                             <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6 }}>
-                              <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleOcr(e.target.files[0], "party3"); }} />
+                              <input type="file" accept="application/pdf,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleOcr(e.target.files[0], "party3"); }} />
                               <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{contractOcrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
                             </label>
                             <button onClick={() => { setShowParty3(false); setContractData(p => ({ ...p, party3_name: "", party3_tax_office: "", party3_tax_no: "", party3_address: "" })); }}
@@ -7599,7 +7599,7 @@ Kurallar:
                   {showAdd && (
                     <div style={{ background: colors.bg, borderRadius: 8, padding: 14, marginBottom: 14, border: `1px solid ${colors.border}` }}>
                       <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, marginBottom: 12 }}>
-                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setSettingsAddDraft); }} />
+                        <input type="file" accept="application/pdf,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setSettingsAddDraft); }} />
                         <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{ocrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
                       </label>
                       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 10 }}>
@@ -7620,7 +7620,7 @@ Kurallar:
                       {editingId === c.id ? (
                         <div>
                           <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, marginBottom: 10 }}>
-                            <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setSettingsEditDraft); }} />
+                            <input type="file" accept="application/pdf,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) runOcr(e.target.files[0], setSettingsEditDraft); }} />
                             <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{ocrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
                           </label>
                           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 10 }}>
