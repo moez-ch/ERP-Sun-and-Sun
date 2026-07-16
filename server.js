@@ -2280,8 +2280,20 @@ function getCanvaConfig() {
   };
 }
 
+// Canva's API is intermittently unreachable from this server (transient
+// "fetch failed" at the network layer). Retry network-level failures a few
+// times; HTTP responses (even errors) return immediately.
+async function fetchRetry(url, opts, tries = 3) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try { return await fetch(url, opts); }
+    catch (e) { lastErr = e; if (i < tries - 1) await new Promise(r => setTimeout(r, 800 * (i + 1))); }
+  }
+  throw lastErr;
+}
+
 async function refreshCanvaToken(cfg) {
-  const resp = await fetch("https://api.canva.com/rest/v1/oauth/token", {
+  const resp = await fetchRetry("https://api.canva.com/rest/v1/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -2309,7 +2321,7 @@ async function getValidCanvaToken() {
 }
 
 async function exportCanvaDesignAsPdf(canvaDesignId, token) {
-  const createResp = await fetch("https://api.canva.com/rest/v1/exports", {
+  const createResp = await fetchRetry("https://api.canva.com/rest/v1/exports", {
     method: "POST",
     headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ design_id: canvaDesignId, format: { type: "pdf", export_quality: "regular" } })
@@ -2321,7 +2333,7 @@ async function exportCanvaDesignAsPdf(canvaDesignId, token) {
 
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 2000));
-    const pollResp = await fetch(`https://api.canva.com/rest/v1/exports/${exportId}`, {
+    const pollResp = await fetchRetry(`https://api.canva.com/rest/v1/exports/${exportId}`, {
       headers: { "Authorization": `Bearer ${token}` }
     });
     const pollData = await pollResp.json();
@@ -2329,7 +2341,7 @@ async function exportCanvaDesignAsPdf(canvaDesignId, token) {
     if (job?.status === "success") {
       const url = job.urls?.[0];
       if (!url) throw new Error("No download URL in Canva export result");
-      const fileResp = await fetch(url);
+      const fileResp = await fetchRetry(url);
       return Buffer.from(await fileResp.arrayBuffer());
     }
     if (job?.status === "failed") throw new Error("Canva export job failed");
