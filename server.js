@@ -2008,6 +2008,8 @@ function parseVergiLevhasi(items) {
   const anchorY = (...txts) => { const it = items.find(i => txts.some(t => U(i.str).includes(t))); return it ? it.y : null; };
   const join = arr => (arr || []).sort((a, b) => (b.y - a.y) || (a.x - b.x)).map(i => i.str.trim()).filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
   const near = (labels, y) => labels.reduce((best, l) => Math.abs(l.y - y) < Math.abs(best.y - y) ? l : best, labels[0]).k;
+  // GİB prints values in ALL CAPS; contracts want Title Case (Turkish locale).
+  const titleTr = s => s.toLocaleLowerCase("tr-TR").replace(/(^|[\s\/])([a-zçğıiöşü])/g, (m, p, c) => p + c.toLocaleUpperCase("tr-TR"));
 
   // Left column: each value line is assigned to its nearest label (value boxes
   // are centred on the label, so wrapped values straddle it — fixed bands leak).
@@ -2015,8 +2017,8 @@ function parseVergiLevhasi(items) {
     .map(([k, t]) => ({ k, y: anchorY(t) })).filter(l => l.y != null);
   const lb = {};
   if (L.length) for (const it of items.filter(i => i.x >= 185 && i.x < 485)) (lb[near(L, it.y)] ||= []).push(it);
-  const name = join(lb.tic) || join(lb.adi);
-  const address = join(lb.adr);
+  const name = titleTr(join(lb.tic) || join(lb.adi));
+  const address = titleTr(join(lb.adr));
 
   // Right column: vergi dairesi value
   const R = [["dai", "DAİRES"], ["kim", "VERGİ KİMLİK"], ["tck", "TC KİMLİK"], ["ise", "BAŞLAMA"]]
@@ -2026,10 +2028,7 @@ function parseVergiLevhasi(items) {
   // GİB prints just the office name (e.g. "AKSU"); contracts want it title-cased
   // with the "Vergi Dairesi" suffix, e.g. "Aksu Vergi Dairesi".
   let office = join(rb.dai);
-  if (office) {
-    const titleTr = s => s.toLocaleLowerCase("tr-TR").replace(/(^|[\s\/])([a-zçğıiöşü])/g, (m, p, c) => p + c.toLocaleUpperCase("tr-TR"));
-    office = /verg[iı]\s*da[iı]res/i.test(office) ? titleTr(office) : titleTr(office) + " Vergi Dairesi";
-  }
+  if (office) office = /verg[iı]\s*da[iı]res/i.test(office) ? titleTr(office) : titleTr(office) + " Vergi Dairesi";
 
   return { name, office, address };
 }
