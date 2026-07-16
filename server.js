@@ -550,6 +550,11 @@ db.exec(`
 `);
 // Older DBs were created before the theme column existed; add it if missing.
 try { db.exec(`ALTER TABLE program_presentations ADD COLUMN theme TEXT NOT NULL DEFAULT 'blue'`); } catch {}
+// Generated-cover fields. A presentation with cover_title set gets its cover
+// slide generated (replacing the Canva one); otherwise the Canva cover is kept.
+try { db.exec(`ALTER TABLE program_presentations ADD COLUMN cover_color TEXT NOT NULL DEFAULT 'red'`); } catch {}
+try { db.exec(`ALTER TABLE program_presentations ADD COLUMN cover_title TEXT NOT NULL DEFAULT ''`); } catch {}
+try { db.exec(`ALTER TABLE program_presentations ADD COLUMN cover_subtitle TEXT NOT NULL DEFAULT ''`); } catch {}
 
 // Seed program presentations on first run
 if (db.prepare("SELECT COUNT(*) as c FROM program_presentations").get().c === 0) {
@@ -2301,6 +2306,111 @@ async function mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex) 
   return Buffer.from(await canvaDoc.save());
 }
 
+// ── GENERATED COVER SLIDE ────────────────────────────────────────
+// One artwork (blob + waves) in three colorways, sampled from the Canva
+// covers. A presentation opts in by having cover_title set; otherwise its
+// original Canva cover is kept and only the company name is stamped on.
+const COVER_LOGO = (() => {
+  try { return "data:image/png;base64," + fs.readFileSync(path.join(__dirname, "sns_logo.png")).toString("base64"); }
+  catch { return ""; }
+})();
+
+const COVER_COLORS = {
+  red: {
+    blobFrom: "#3B3A6B", blobMid: "#8E3230", blobTo: "#A5342A",
+    wave: "#B0392B", title: "#1B3A5C", sub: "#B0392B",
+    tagBorder: "#1B3A5C", tagBg: "rgba(27,58,92,0.06)", tagText: "#1B3A5C",
+    dotA: "#2B3A7A", dotB: "#B0392B", pill: "#1B1B44", brand: "#B0392B",
+  },
+  green: {
+    blobFrom: "#0B3E64", blobMid: "#125E5E", blobTo: "#5C9B2E",
+    wave: "#6FA83C", title: "#17A24A", sub: "#22409B",
+    tagBorder: "#22409B", tagBg: "rgba(34,64,155,0.06)", tagText: "#1B2E5E",
+    dotA: "#2B4CA8", dotB: "#2F4FA8", pill: "#1B2E5E", brand: "#1B2E5E",
+  },
+  blue: {
+    blobFrom: "#1B3A7A", blobMid: "#2B6ECF", blobTo: "#35C2EF",
+    wave: "#4A9BE0", title: "#1B3A7A", sub: "#29ABE2",
+    tagBorder: "#1B3A7A", tagBg: "rgba(27,58,122,0.06)", tagText: "#1B3A7A",
+    dotA: "#2B4CA8", dotB: "#35C2EF", pill: "#1B2E5E", brand: "#1B3A7A",
+  },
+};
+
+function coverArtSvg(c) {
+  const waves = [];
+  for (let i = 0; i < 26; i++) {
+    const o = i * 13;
+    waves.push(`<path d="M ${1430 + o * 0.35},1080 C ${1400 + o * 0.5},${780 - o * 0.6} ${1560 + o * 0.5},${560 - o * 0.7} ${1900 + o * 0.2},${330 - o * 0.9}" fill="none" stroke="${c.wave}" stroke-width="1.6" opacity="${0.75 - i * 0.012}"/>`);
+  }
+  return `<defs><linearGradient id="blob" x1="0" y1="0" x2="1" y2="0.6">
+    <stop offset="0%" stop-color="${c.blobFrom}"/><stop offset="45%" stop-color="${c.blobMid}"/><stop offset="100%" stop-color="${c.blobTo}"/>
+  </linearGradient></defs>
+  <path d="M 800,0 C 980,150 1120,190 1330,150 C 1560,105 1760,40 1920,0 L 1920,470 C 1700,470 1470,380 1270,250 C 1080,130 900,70 800,0 Z" fill="url(#blob)"/>
+  <g>${waves.join("")}</g>
+  <circle cx="585" cy="185" r="9" fill="${c.dotA}"/>
+  <circle cx="865" cy="275" r="13" fill="${c.dotA}"/>
+  <circle cx="960" cy="570" r="17" fill="${c.dotB}"/>
+  <circle cx="770" cy="775" r="42" fill="${c.dotB}"/>`;
+}
+
+function buildCoverSlideHtml({ color, title, subtitle, company }) {
+  const c = COVER_COLORS[color] || COVER_COLORS.red;
+  const esc = s => String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const br = s => esc(s).replace(/\n/g, "<br/>");
+  // Longer copy steps down a size so the column always fits above the footer.
+  const tLen = String(title || "").length, sLen = String(subtitle || "").length;
+  const titleSize = tLen > 90 ? 50 : tLen > 55 ? 60 : 78;
+  const subSize   = sLen > 90 ? 30 : sLen > 45 ? 34 : 44;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{width:1920px;height:1080px;background:#fff;overflow:hidden;
+    font-family:'Poppins','Montserrat','DejaVu Sans','Segoe UI',Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+  .slide{position:relative;width:1920px;height:1080px;background:#fff;overflow:hidden;}
+  svg.art{position:absolute;inset:0;width:1920px;height:1080px;}
+  .logo{position:absolute;left:100px;top:70px;width:160px;height:160px;border-radius:50%;
+    background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.18);object-fit:contain;padding:10px;}
+  /* Text flows as one left column so long titles push the rest down
+     instead of overlapping it. */
+  .stack{position:absolute;left:58px;top:30%;width:54%;display:flex;
+    flex-direction:column;align-items:flex-start;}
+  .title{color:${c.title};font-weight:800;font-size:${titleSize}px;
+    line-height:1.14;letter-spacing:.2px;}
+  .subtitle{color:${c.sub};font-weight:700;font-size:${subSize}px;line-height:1.2;margin-top:34px;}
+  .tag{margin-top:30px;max-width:100%;padding:16px 34px;border-radius:14px;
+    background:${c.tagBg};border:2.5px solid ${c.tagBorder};color:${c.tagText};
+    font-weight:700;font-size:38px;line-height:1.25;overflow-wrap:break-word;}
+  .web{position:absolute;left:112px;bottom:52px;height:58px;display:flex;align-items:center;
+    padding:0 34px;border-radius:29px;background:${c.pill};color:#fff;font-weight:700;font-size:25px;}
+  .brand{position:absolute;right:70px;bottom:60px;color:${c.brand};font-weight:700;font-size:28px;}
+  </style></head><body><div class="slide">
+    <svg class="art" viewBox="0 0 1920 1080">${coverArtSvg(c)}</svg>
+    ${COVER_LOGO ? `<img class="logo" src="${COVER_LOGO}"/>` : ""}
+    <div class="stack">
+      <div class="title">${br(title)}</div>
+      ${subtitle ? `<div class="subtitle">${br(subtitle)}</div>` : ""}
+      ${company ? `<div class="tag">${esc(company)}</div>` : ""}
+    </div>
+    <div class="web">www.sunandsun.com.tr</div>
+    <div class="brand">Sun &amp; Sun Şirketler Grubu</div>
+  </div></body></html>`;
+}
+
+async function generateCoverSlide(data) {
+  const html = buildCoverSlideHtml(data);
+  const htmlPath = path.join(TMP_DIR, `cover_slide_${Date.now()}.html`);
+  fs.writeFileSync(htmlPath, html, "utf-8");
+  const browser = await puppeteer.launch({ executablePath: EDGE_PATH, headless: true, args: ["--no-sandbox","--disable-setuid-sandbox"] });
+  try {
+    const page = await browser.newPage();
+    await page.goto("file:///" + htmlPath.replaceAll("\\", "/"), { waitUntil: "networkidle0" });
+    const pdfBytes = await page.pdf({ width: "338.67mm", height: "190.5mm", printBackground: true, margin: { top:"0mm", bottom:"0mm", left:"0mm", right:"0mm" } });
+    return Buffer.from(pdfBytes);
+  } finally {
+    await browser.close();
+    fs.unlinkSync(htmlPath);
+  }
+}
+
 // ── COVER COMPANY-NAME OVERLAY ───────────────────────────────────
 // All 3 cover themes place the customer's company name in the same lower-left
 // area (under the subtitle, above the website pill, over a white background),
@@ -3022,8 +3132,21 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
       const canvaDoc = await PDFDocument.load(canvaPdfBytes);
       const slideIndex = canvaDoc.getPageCount() - 1; // 1-indexed: second to last
       finalPdfBytes = await mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex);
-      // Stamp the customer's company name onto the cover (only when we have the deck)
-      finalPdfBytes = await stampCompanyNameOnCover(finalPdfBytes, client_name);
+
+      // Cover: either generate it (when the presentation is configured for it)
+      // or keep Canva's and just stamp the company name on.
+      const pres = db.prepare("SELECT cover_color, cover_title, cover_subtitle FROM program_presentations WHERE design_id=?").get(targetDesignId);
+      if (pres?.cover_title) {
+        const coverPdfBytes = await generateCoverSlide({
+          color: pres.cover_color || "red",
+          title: pres.cover_title,
+          subtitle: pres.cover_subtitle || "",
+          company: (client_name || "").trim(),
+        });
+        finalPdfBytes = await mergeCanvaPdfWithSlide(finalPdfBytes, coverPdfBytes, 1);
+      } else {
+        finalPdfBytes = await stampCompanyNameOnCover(finalPdfBytes, client_name);
+      }
     } catch (canvaErr) {
       console.warn("[pricing/generate] Canva unavailable — returning slide only:", canvaErr.message);
       finalPdfBytes = slidePdfBytes;

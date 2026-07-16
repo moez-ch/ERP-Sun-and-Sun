@@ -1,61 +1,54 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
 
-# Build output
-dist/
-dist-ssr/
-build/
-
-# Environment & secrets
-.env
-.env.local
-.env.*.local
-*.local
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Editor directories and files
-.vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-Thumbs.db
-
+# Build output
 # Claude Code internal
-.claude/
-
-# Database files (contain sensitive user/auth data)
-*.db
-*.sqlite
-*.sqlite3
-
 # Data files that may contain sensitive lead data
-*.xlsx
-*.xls
-*.csv
-
+# Database files (contain sensitive user/auth data)
+# Dependencies
+# Editor directories and files
+# Environment & secrets
+# Log files
+# Logs
 # OS files
-Desktop.ini
-
 # Python cache
-__pycache__/
+# Temporary generated files
+*.csv
+*.db
+*.local
+*.log
+*.njsproj
+*.ntvs*
 *.pyc
 *.pyo
-
-# Log files
-*.log
-
-# Temporary generated files
-tmp_contracts/
+*.sln
+*.sqlite
+*.sqlite3
+*.suo
+*.sw?
+*.xls
+*.xlsx
+.claude/
+.DS_Store
+.env
+.env.*.local
+.env.local
+.idea
+.pnp
+.pnp.js
+.vscode/*
+__pycache__/
+_cover_preview.mjs
+_covers/
+_sheet.mjs
+build/
+Desktop.ini
+dist/
+dist-ssr/
+lerna-debug.log*
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+Thumbs.db
+tmp_contracts/_cover_preview/
+yarn-debug.log*
+yarn-error.log*
