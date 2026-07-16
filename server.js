@@ -2315,6 +2315,21 @@ const COVER_LOGO = (() => {
   catch { return ""; }
 })();
 
+// Montserrat is bundled (assets/fonts) and embedded into the render, so covers
+// look identical regardless of what fonts the host machine has installed.
+// Without this the Linux server silently falls back to DejaVu Sans.
+const COVER_FONT_CSS = (() => {
+  const face = (file, weight) => {
+    try {
+      const b64 = fs.readFileSync(path.join(__dirname, "assets", "fonts", file)).toString("base64");
+      return `@font-face{font-family:'CoverSans';font-style:normal;font-weight:${weight};src:url(data:font/ttf;base64,${b64}) format('truetype');}`;
+    } catch { return ""; }
+  };
+  const css = face("Montserrat-Bold.ttf", 700) + face("Montserrat-ExtraBold.ttf", 800);
+  if (!css) console.warn("[cover] Montserrat not found in assets/fonts — covers will use a fallback font.");
+  return css;
+})();
+
 const COVER_COLORS = {
   // navy -> plum -> burgundy, matching the transition on the real covers
   red: {
@@ -2364,9 +2379,10 @@ function buildCoverSlideHtml({ color, title, subtitle, company }) {
   const titleSize = tLen > 90 ? 50 : tLen > 55 ? 60 : 78;
   const subSize   = sLen > 90 ? 30 : sLen > 45 ? 34 : 44;
   return `<!doctype html><html><head><meta charset="utf-8"><style>
+  ${COVER_FONT_CSS}
   *{margin:0;padding:0;box-sizing:border-box;}
   body{width:1920px;height:1080px;background:#fff;overflow:hidden;
-    font-family:'Poppins','Montserrat','DejaVu Sans','Segoe UI',Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+    font-family:'CoverSans','Montserrat','DejaVu Sans','Segoe UI',Arial,sans-serif;-webkit-font-smoothing:antialiased;}
   .slide{position:relative;width:1920px;height:1080px;background:#fff;overflow:hidden;}
   svg.art{position:absolute;inset:0;width:1920px;height:1080px;}
   .logo{position:absolute;left:100px;top:70px;width:160px;height:160px;border-radius:50%;
