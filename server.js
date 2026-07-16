@@ -2316,8 +2316,9 @@ const COVER_LOGO = (() => {
 })();
 
 const COVER_COLORS = {
+  // navy -> plum -> burgundy, matching the transition on the real covers
   red: {
-    blobFrom: "#3B3A6B", blobMid: "#8E3230", blobTo: "#A5342A",
+    blobFrom: "#232B5E", blobMid: "#5E2B4E", blobTo: "#8E2536",
     wave: "#B0392B", title: "#1B3A5C", sub: "#B0392B",
     tagBorder: "#1B3A5C", tagBg: "rgba(27,58,92,0.06)", tagText: "#1B3A5C",
     dotA: "#2B3A7A", dotB: "#B0392B", pill: "#1B1B44", brand: "#B0392B",
@@ -2328,11 +2329,12 @@ const COVER_COLORS = {
     tagBorder: "#22409B", tagBg: "rgba(34,64,155,0.06)", tagText: "#1B2E5E",
     dotA: "#2B4CA8", dotB: "#2F4FA8", pill: "#1B2E5E", brand: "#1B2E5E",
   },
+  // light + airy: periwinkle -> turquoise, pale waves (as on the real cover)
   blue: {
-    blobFrom: "#1B3A7A", blobMid: "#2B6ECF", blobTo: "#35C2EF",
-    wave: "#4A9BE0", title: "#1B3A7A", sub: "#29ABE2",
+    blobFrom: "#7A8AE0", blobMid: "#4FB4E6", blobTo: "#5ADCD8",
+    wave: "#8CC8F0", title: "#1B3A7A", sub: "#29ABE2",
     tagBorder: "#1B3A7A", tagBg: "rgba(27,58,122,0.06)", tagText: "#1B3A7A",
-    dotA: "#2B4CA8", dotB: "#35C2EF", pill: "#1B2E5E", brand: "#1B3A7A",
+    dotA: "#2B4CA8", dotB: "#4FD0E0", pill: "#1B2E5E", brand: "#1B3A7A",
   },
 };
 
