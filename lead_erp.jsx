@@ -7174,7 +7174,12 @@ Kurallar:
               const blob = await r.blob();
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
-              a.href = url; a.download = `pricing_${Date.now()}.pdf`; a.click();
+              // Filename: "Company Name_Program Name" (program from the selected presentation)
+              const company = (pricingData.client_name || "").trim();
+              const selPres = progPresEntations.find(p => p.design_id && p.design_id === pricingData.design_id);
+              const program = selPres ? selPres.name.replace(/^Fiyat Teklifi[^_]*_/i, "") : "";
+              const fname = [company, program].filter(Boolean).join("_").replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "_") || `pricing_${Date.now()}`;
+              a.href = url; a.download = `${fname}.pdf`; a.click();
               URL.revokeObjectURL(url);
             } catch (e) { alert("Error: " + e.message); }
             finally { setPricingGenerating(false); }
@@ -7198,7 +7203,12 @@ Kurallar:
               if (!r.ok) { const e = await r.json(); alert("Error: " + e.error); return; }
               const blob = await r.blob();
               const url = URL.createObjectURL(blob);
-              const a = document.createElement("a"); a.href = url; a.download = `pricing_${Date.now()}.pdf`; a.click();
+              const a = document.createElement("a");
+              const company = (programData.party2_name || "").trim();
+              const selPres = progPresEntations.find(p => p.design_id && p.design_id === pricingData.design_id);
+              const program = selPres ? selPres.name.replace(/^Fiyat Teklifi[^_]*_/i, "") : "";
+              const fname = [company, program].filter(Boolean).join("_").replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "_") || `pricing_${Date.now()}`;
+              a.href = url; a.download = `${fname}.pdf`; a.click();
               URL.revokeObjectURL(url);
             } catch (e) { alert("Error: " + e.message); }
             finally { setProgramGenerating(false); }
