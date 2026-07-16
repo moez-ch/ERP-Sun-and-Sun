@@ -2430,6 +2430,24 @@ async function mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex) 
   return Buffer.from(await canvaDoc.save());
 }
 
+// Find the deck's built-in pricing page (its heading contains "ÜCRETLENDİRME")
+// so the generated slide replaces it, instead of assuming second-to-last —
+// decks with trailing closing/back-cover pages break that assumption.
+// Returns a 1-indexed page number, or the fallback if none is found.
+async function findPricingPageIndex(pdfBytes, fallbackIndex) {
+  try {
+    const doc = await pdfjsLib.getDocument({ data: new Uint8Array(pdfBytes), useSystemFonts: true, verbosity: 0 }).promise;
+    let found = -1;
+    for (let i = 1; i <= doc.numPages; i++) {
+      const tc = await (await doc.getPage(i)).getTextContent();
+      const text = tc.items.map(it => it.str).join(" ").toLocaleUpperCase("tr-TR");
+      if (text.includes("ÜCRETLENDİRME")) found = i; // last match wins
+    }
+    await doc.destroy();
+    return found > 0 ? found : fallbackIndex;
+  } catch { return fallbackIndex; }
+}
+
 // ── GENERATED COVER SLIDE ────────────────────────────────────────
 // One artwork (blob + waves) in three colorways, sampled from the Canva
 // covers. A presentation opts in by having cover_title set; otherwise its
@@ -3121,12 +3139,33 @@ function buildGreenDiscountPricingSlideHtml(d) {
     .replaceAll("#dde4f0", "#E0EAF4");
 }
 
+// Turquoise / navy variant — matches the "Mavi Belge" (Su Verimliliği) decks.
+function buildTurquoisePricingSlideHtml(d) {
+  return buildPricingSlideHtml(d)
+    .replaceAll("#ad3125", "#0E9BC4")
+    .replaceAll("#0b3e64", "#123A63")
+    .replace("background: #081828", "background: linear-gradient(135deg, #0A2A44 0%, #12557A 100%)")
+    .replaceAll("#dde4f0", "#D6EAF2");
+}
+function buildTurquoiseDiscountPricingSlideHtml(d) {
+  return buildDiscountPricingSlideHtml(d)
+    .replaceAll("#ad3125", "#0E9BC4")
+    .replaceAll("#0b3e64", "#123A63")
+    .replace("background: #081828", "background: linear-gradient(135deg, #0A2A44 0%, #12557A 100%)")
+    .replaceAll("#dde4f0", "#D6EAF2");
+}
+
 async function generatePricingSlide(data) {
+  const isTurq = data.theme === "turquoise";
   let html;
   if (data.discount) {
-    html = data.theme === "green" ? buildGreenDiscountPricingSlideHtml(data) : buildDiscountPricingSlideHtml(data);
+    html = data.theme === "green" ? buildGreenDiscountPricingSlideHtml(data)
+         : isTurq ? buildTurquoiseDiscountPricingSlideHtml(data)
+         : buildDiscountPricingSlideHtml(data);
   } else {
-    html = data.theme === "green" ? buildGreenPricingSlideHtml(data) : buildPricingSlideHtml(data);
+    html = data.theme === "green" ? buildGreenPricingSlideHtml(data)
+         : isTurq ? buildTurquoisePricingSlideHtml(data)
+         : buildPricingSlideHtml(data);
   }
   const htmlPath = path.join(TMP_DIR, `pricing_slide_${Date.now()}.html`);
   fs.writeFileSync(htmlPath, html, "utf-8");
@@ -3235,14 +3274,14 @@ app.post("/pricing/generate-program", authenticate, async (req, res) => {
     await browser.close();
     fs.unlinkSync(htmlPath);
 
-    // Try to merge into Canva presentation (second to last slide)
+    // Merge into the Canva presentation, replacing its built-in pricing page
     let finalPdfBytes;
     const targetDesignId = (design_id || "").trim() || PRICING_DESIGN_ID;
     try {
       const token = await getValidCanvaToken();
       const canvaPdfBytes = await exportCanvaDesignAsPdf(targetDesignId, token);
       const canvaDoc = await PDFDocument.load(canvaPdfBytes);
-      const slideIndex = canvaDoc.getPageCount() - 1;
+      const slideIndex = await findPricingPageIndex(canvaPdfBytes, canvaDoc.getPageCount() - 1);
       finalPdfBytes = await mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex);
     } catch (canvaErr) {
       console.warn("[pricing/generate-program] Canva unavailable — returning slide only:", canvaErr.message);
@@ -3270,9 +3309,10 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
     try {
       const token = await getValidCanvaToken();
       const canvaPdfBytes = await exportCanvaDesignAsPdf(targetDesignId, token);
-      // Pricing page is always second to last — compute dynamically
+      // Replace the deck's built-in pricing page (found by its "ÜCRETLENDİRME"
+      // heading); fall back to second-to-last if it can't be located.
       const canvaDoc = await PDFDocument.load(canvaPdfBytes);
-      const slideIndex = canvaDoc.getPageCount() - 1; // 1-indexed: second to last
+      const slideIndex = await findPricingPageIndex(canvaPdfBytes, canvaDoc.getPageCount() - 1);
       finalPdfBytes = await mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex);
 
       // Cover: either generate it (when the presentation is configured for it)

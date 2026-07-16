@@ -56,8 +56,9 @@ let n = 0;
 for (const [id, [color, title, subtitle]] of Object.entries(COVERS)) {
   const row = db.prepare("SELECT id, name FROM program_presentations WHERE id=?").get(id);
   if (!row) { console.log(`SKIP ${id} — no such presentation`); continue; }
-  // pricing slide only has blue/green variants; blue covers use the blue slide
-  const theme = color === "green" ? "green" : "blue";
+  // Pricing-slide theme: green covers -> green slide, the turquoise "Mavi Belge"
+  // cover -> turquoise slide, everything else -> default (red/navy) slide.
+  const theme = color === "green" ? "green" : color === "blue" ? "turquoise" : "blue";
   if (!dry) upd.run(color, title, subtitle, theme, id);
   console.log(`${String(id).padStart(2)}  ${color.padEnd(5)} ${theme.padEnd(5)}  ${title.split("\n")[0]}  |  ${row.name}`);
   n++;
