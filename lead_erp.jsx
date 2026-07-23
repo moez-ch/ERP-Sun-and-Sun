@@ -1886,8 +1886,39 @@ tr.leave{background:#f0f9ff}
 export default function App() {
   const [authUser, setAuthUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  // Odoo hand-off: ?app=contracts => open straight on Contracts with the ERP
+  // chrome hidden (kiosk); ?sso_token=... => log the user in automatically.
+  const kiosk = new URLSearchParams(window.location.search).get("app") === "contracts";
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ssoToken = params.get("sso_token");
+    const stripSso = () => {
+      params.delete("sso_token");
+      const qs = params.toString();
+      window.history.replaceState({}, "", window.location.pathname + (qs ? "?" + qs : ""));
+    };
+
+    if (ssoToken) {
+      // Exchange the short-lived Odoo token for a normal ERP session.
+      fetch("/auth/sso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: ssoToken }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.token) {
+            localStorage.setItem("sns_token", data.token);
+            localStorage.setItem("sns_user", JSON.stringify(data.user));
+            setAuthUser(data.user);
+          }
+        })
+        .catch(() => {})
+        .finally(() => { stripSso(); setAuthLoading(false); });
+      return;
+    }
+
     const token = localStorage.getItem("sns_token");
     if (!token) { setAuthLoading(false); return; }
     fetch("/auth/me", { headers: { Authorization: `Bearer ${token}` } })
@@ -1913,7 +1944,7 @@ export default function App() {
     </div>
   );
   if (!authUser) return <LoginPage onLogin={handleLogin} />;
-  return <Dashboard authUser={authUser} onLogout={handleLogout} />;
+  return <Dashboard authUser={authUser} onLogout={handleLogout} kiosk={kiosk} />;
 }
 
 function EmailHistory({ colors, token, lang }) {
@@ -2104,7 +2135,7 @@ function handleRichPaste(e) {
   e.currentTarget.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-function Dashboard({ authUser, onLogout: handleLogout }) {
+function Dashboard({ authUser, onLogout: handleLogout, kiosk = false }) {
   // ── LEADS STATE ─────────────────────────────────────────────────
   const [leads, setLeads] = useState(() => {
     try {
@@ -2112,7 +2143,7 @@ function Dashboard({ authUser, onLogout: handleLogout }) {
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
-  const [view, setView] = useState("dashboard"); // dashboard | leads | agent | pipeline | detail
+  const [view, setView] = useState(kiosk ? "contracts" : "dashboard"); // dashboard | leads | agent | pipeline | detail
   const [toolsSubView, setToolsSubView] = useState(null); // null | "keyword_hunter" | "excel_cleaner"
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768);
@@ -3298,6 +3329,7 @@ Kurallar:
   // ─── RENDER ──────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: font, background: colors.bg, color: colors.text, overflow: "hidden" }}>
+      {!kiosk && (<>
       {/* MOBILE SIDEBAR OVERLAY */}
       {isMobile && sidebarMobileOpen && (
         <div onClick={() => setSidebarMobileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99 }} />
@@ -3414,11 +3446,31 @@ Kurallar:
           )}
         </div>
       </div>
+      </>)}
 
       {/* MAIN CONTENT */}
       <div style={{ flex: 1, overflow: "auto", padding: isMobile ? 12 : 24, minWidth: 0 }}>
+        {/* Kiosk (Odoo hand-off) top bar — sidebar is hidden, so surface user + logout */}
+        {kiosk && (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, paddingBottom: 12, borderBottom: `1px solid ${colors.border}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
+                <img src={snsLogo} alt="Sun&Sun" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>Sözleşmeler</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 12, color: colors.textDim }}>{authUser.name}</span>
+              <button onClick={handleLogout}
+                style={{ padding: "6px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textDim, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: font }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = colors.danger; e.currentTarget.style.color = colors.danger; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.color = colors.textDim; }}
+              >↩ {t("nav_logout")}</button>
+            </div>
+          </div>
+        )}
         {/* Mobile hamburger */}
-        {isMobile && (
+        {isMobile && !kiosk && (
           <button onClick={() => setSidebarMobileOpen(true)} style={{ position: "fixed", top: 10, left: 10, zIndex: 98, background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, padding: "6px 10px", cursor: "pointer", color: colors.text, fontSize: 18, lineHeight: 1, boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>☰</button>
         )}
         <style>{`

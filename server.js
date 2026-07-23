@@ -54,6 +54,9 @@ if (!EDGE_PATH) {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || "sns-erp-2025-secret-key";
+// Shared secret for Odoo->ERP single sign-on. Must match sunandsun_ui.sso_secret
+// on the Odoo side. Set it in .env (never commit). If empty, /auth/sso is off.
+const SSO_SECRET = process.env.SSO_SECRET || "";
 const PORT = 3001;
 
 const app = express();
@@ -691,6 +694,49 @@ app.post("/auth/login", (req, res) => {
 
   res.json({
     token,
+    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+  });
+});
+
+// POST /auth/sso — exchange an Odoo-signed hand-off token for an ERP session.
+// The token is a short-lived HS256 JWT signed with SSO_SECRET (shared with the
+// Odoo sunandsun_ui module). We match its email to a local account and issue a
+// normal ERP token. Unknown emails are auto-provisioned as standard users.
+app.post("/auth/sso", (req, res) => {
+  if (!SSO_SECRET)
+    return res.status(503).json({ error: "SSO not configured" });
+  const { token } = req.body || {};
+  if (!token) return res.status(400).json({ error: "Missing token" });
+
+  let payload;
+  try {
+    payload = jwt.verify(token, SSO_SECRET, { algorithms: ["HS256"] });
+  } catch {
+    return res.status(401).json({ error: "Invalid or expired SSO token" });
+  }
+
+  const email = (payload.email || "").trim().toLowerCase();
+  if (!email) return res.status(400).json({ error: "Token has no email" });
+
+  let user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+  if (!user) {
+    // First-time SSO for a known Odoo user we haven't provisioned yet.
+    const hash = bcrypt.hashSync(randomBytes(24).toString("hex"), 10);
+    const result = db
+      .prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)")
+      .run((payload.name || email).trim(), email, hash, "user");
+    user = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
+  }
+
+  db.prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").run(user.id);
+
+  const appToken = jwt.sign(
+    { id: user.id, name: user.name, email: user.email, role: user.role },
+    JWT_SECRET,
+    { expiresIn: "8h" }
+  );
+  res.json({
+    token: appToken,
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
   });
 });
