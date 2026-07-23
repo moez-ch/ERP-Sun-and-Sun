@@ -1469,7 +1469,7 @@ app.delete("/dropdown-options/:id", authenticate, (req, res) => {
 
 // GET /contracts/templates
 app.get("/contracts/templates", authenticate, (req, res) => {
-  const rows = db.prepare("SELECT id, name, filename, variables, template_type, visible_fields, default_party1_id, default_iban, created_at FROM contract_templates ORDER BY created_at DESC").all();
+  const rows = db.prepare("SELECT id, name, filename, variables, template_type, visible_fields, default_party1_id, default_iban, created_at FROM contract_templates ORDER BY name COLLATE NOCASE ASC").all();
   res.json(rows.map(r => ({ ...r, variables: JSON.parse(r.variables), visible_fields: r.visible_fields ? JSON.parse(r.visible_fields) : null })));
 });
 

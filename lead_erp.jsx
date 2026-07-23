@@ -6380,7 +6380,7 @@ Kurallar:
                                       if (e.key === "Enter") {
                                         const token = localStorage.getItem("sns_token");
                                         await fetch(`/contracts/templates/${tpl.id}/name`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: renamingValue }) });
-                                        setContractTemplates(p => p.map(t => t.id === tpl.id ? { ...t, name: renamingValue } : t));
+                                        setContractTemplates(p => p.map(t => t.id === tpl.id ? { ...t, name: renamingValue } : t).sort((a, b) => a.name.localeCompare(b.name)));
                                         if (contractPreviewTpl?.id === tpl.id) setContractPreviewTpl(p => ({ ...p, name: renamingValue }));
                                         setRenamingTplId(null);
                                       } else if (e.key === "Escape") { setRenamingTplId(null); }
@@ -6389,7 +6389,7 @@ Kurallar:
                                       if (renamingValue.trim() && renamingValue.trim() !== tpl.name) {
                                         const token = localStorage.getItem("sns_token");
                                         await fetch(`/contracts/templates/${tpl.id}/name`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: renamingValue }) });
-                                        setContractTemplates(p => p.map(t => t.id === tpl.id ? { ...t, name: renamingValue } : t));
+                                        setContractTemplates(p => p.map(t => t.id === tpl.id ? { ...t, name: renamingValue } : t).sort((a, b) => a.name.localeCompare(b.name)));
                                         if (contractPreviewTpl?.id === tpl.id) setContractPreviewTpl(p => ({ ...p, name: renamingValue }));
                                       }
                                       setRenamingTplId(null);
