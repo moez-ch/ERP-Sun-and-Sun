@@ -1886,9 +1886,13 @@ tr.leave{background:#f0f9ff}
 export default function App() {
   const [authUser, setAuthUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  // Odoo hand-off: ?app=contracts => open straight on Contracts with the ERP
+  // Odoo hand-off: ?app=<slug> => open straight on that screen with the ERP
   // chrome hidden (kiosk); ?sso_token=... => log the user in automatically.
-  const kiosk = new URLSearchParams(window.location.search).get("app") === "contracts";
+  // Each Odoo app tile passes a slug that maps to the ERP view it should land on.
+  const KIOSK_VIEWS = { contracts: "contracts", teklif: "pricing" };
+  const appParam = new URLSearchParams(window.location.search).get("app");
+  const kioskView = KIOSK_VIEWS[appParam] || null;
+  const kiosk = !!kioskView;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1944,7 +1948,7 @@ export default function App() {
     </div>
   );
   if (!authUser) return <LoginPage onLogin={handleLogin} />;
-  return <Dashboard authUser={authUser} onLogout={handleLogout} kiosk={kiosk} />;
+  return <Dashboard authUser={authUser} onLogout={handleLogout} kiosk={kiosk} kioskView={kioskView} />;
 }
 
 function EmailHistory({ colors, token, lang }) {
@@ -2135,7 +2139,7 @@ function handleRichPaste(e) {
   e.currentTarget.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-function Dashboard({ authUser, onLogout: handleLogout, kiosk = false }) {
+function Dashboard({ authUser, onLogout: handleLogout, kiosk = false, kioskView = null }) {
   // ── LEADS STATE ─────────────────────────────────────────────────
   const [leads, setLeads] = useState(() => {
     try {
@@ -2143,7 +2147,7 @@ function Dashboard({ authUser, onLogout: handleLogout, kiosk = false }) {
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
-  const [view, setView] = useState(kiosk ? "contracts" : "dashboard"); // dashboard | leads | agent | pipeline | detail
+  const [view, setView] = useState(kioskView || "dashboard"); // dashboard | leads | agent | pipeline | detail
   const [toolsSubView, setToolsSubView] = useState(null); // null | "keyword_hunter" | "excel_cleaner"
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768);
@@ -3457,7 +3461,7 @@ Kurallar:
               <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
                 <img src={snsLogo} alt="Sun&Sun" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
-              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>Sözleşmeler</div>
+              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>{view === "pricing" ? "Fiyat Teklifi" : "Sözleşmeler"}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ fontSize: 12, color: colors.textDim }}>{authUser.name}</span>
