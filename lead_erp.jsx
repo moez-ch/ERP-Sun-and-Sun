@@ -1882,6 +1882,67 @@ tr.leave{background:#f0f9ff}
   );
 }
 
+// ─── ODOO COMPANY SEARCH ─────────────────────────────────────────
+// Reusable lookup: type a company name, hit Search, pick a match to auto-fill
+// tax office / tax number / address and remember the Odoo partner id (used to
+// post the chatter note to the exact right company). Renders nothing when Odoo
+// isn't configured on the server, so the forms stay clean.
+function OdooCompanySearch({ colors, lang, onPick }) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState(null); // null = idle, [] = searched & empty
+  const [loading, setLoading] = useState(false);
+  const [disabled, setDisabled] = useState(false);
+  const L = (tr, en) => (lang === "tr" ? tr : en);
+
+  const run = async () => {
+    const term = q.trim();
+    if (!term) return;
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("sns_token");
+      const r = await fetch(`/odoo/company-search?q=${encodeURIComponent(term)}`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (d.disabled) { setDisabled(true); setResults([]); }
+      else setResults(Array.isArray(d.results) ? d.results : []);
+    } catch (e) { setResults([]); }
+    finally { setLoading(false); }
+  };
+
+  if (disabled) return null; // Odoo not configured → feature silently off
+
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", gap: 6 }}>
+        <input value={q} onChange={e => setQ(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); run(); } }}
+          placeholder={L("Odoo'da firma ara…", "Search company in Odoo…")}
+          style={{ flex: 1, padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+        <button type="button" onClick={run} disabled={loading || !q.trim()}
+          style={{ padding: "8px 12px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: loading || !q.trim() ? "default" : "pointer", whiteSpace: "nowrap", opacity: loading || !q.trim() ? 0.6 : 1 }}>
+          {loading ? "…" : `🔍 ${L("Ara", "Search")}`}
+        </button>
+      </div>
+      {results !== null && (
+        <div style={{ marginTop: 6, border: `1px solid ${colors.border}`, borderRadius: 6, background: colors.surface, maxHeight: 220, overflowY: "auto" }}>
+          {results.length === 0 ? (
+            <div style={{ padding: "8px 10px", fontSize: 12, color: colors.textMuted }}>{L("Eşleşme yok.", "No matches.")}</div>
+          ) : results.map(c => (
+            <div key={c.id} onClick={() => { onPick(c); setResults(null); setQ(c.name || q); }}
+              style={{ padding: "8px 10px", cursor: "pointer", borderBottom: `1px solid ${colors.border}` }}
+              onMouseEnter={e => (e.currentTarget.style.background = colors.bg)}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: colors.text }}>{c.name}</div>
+              <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                {[c.tax_no && `VKN ${c.tax_no}`, c.tax_office, c.city].filter(Boolean).join(" · ") || L("(detay yok)", "(no details)")}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── MAIN APP ────────────────────────────────────────────────────
 export default function App() {
   const [authUser, setAuthUser] = useState(null);
@@ -2309,7 +2370,7 @@ Kurallar:
     { key: "payment_schedule",         label: "Payment Schedule (Annex-1)", group: "Other" },
   ];
   const EMPTY_CONTRACT_DATA = () => ({
-    party1_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
+    party1_id: "", odoo_partner_id: "", party2_name: "", party2_tax_office: "", party2_tax_no: "",
     party2_address: "", party3_name: "", party3_tax_office: "", party3_tax_no: "", party3_address: "",
     financier: "", program_name: "", down_payment: "", down_payment_2: "", success_bonus: "", success_bonus_2: "",
     success_bonus_type: "onaylanan destek", success_bonus_type_2: "onaylanan destek",
@@ -2366,7 +2427,7 @@ Kurallar:
   const [canvaSavingCreds, setCanvaSavingCreds] = useState(false);
   // ── Pricing state ─────────────────────────────────────────────
   const EMPTY_OPT = () => ({ title: "", dp: "", dp_original: "", succ_fee_1: "", note1: "", succ_fee_2: "", note2: "" });
-  const [pricingData, setPricingData] = useState({ num_options: 1, gen_note: "", design_id: "", theme: "blue", discount: false, client_name: "", opt: [EMPTY_OPT(), EMPTY_OPT(), EMPTY_OPT()] });
+  const [pricingData, setPricingData] = useState({ num_options: 1, gen_note: "", design_id: "", theme: "blue", discount: false, client_name: "", odoo_partner_id: "", opt: [EMPTY_OPT(), EMPTY_OPT(), EMPTY_OPT()] });
   const [pricingMode, setPricingMode] = useState("quote"); // "quote" | "program"
   const [pricingReportView, setPricingReportView] = useState(false); // false=form, true=history
   const [pricingReport, setPricingReport] = useState(null);
@@ -6255,7 +6316,7 @@ Kurallar:
                   rows={2} placeholder={opts.placeholder || ""}
                   style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
               ) : (
-                <input value={contractData[key] || ""} onChange={e => setContractData(p => ({ ...p, [key]: e.target.value }))}
+                <input value={contractData[key] || ""} onChange={e => setContractData(p => ({ ...p, [key]: e.target.value, ...(key === "party2_name" ? { odoo_partner_id: "" } : {}) }))}
                   placeholder={opts.placeholder || ""}
                   style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
               )}
@@ -7065,6 +7126,14 @@ Kurallar:
                           <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{contractOcrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
                         </label>
                       </div>
+                      <OdooCompanySearch colors={colors} lang={lang} onPick={c => setContractData(p => ({
+                        ...p,
+                        party2_name: c.name || p.party2_name,
+                        party2_tax_office: c.tax_office || p.party2_tax_office,
+                        party2_tax_no: c.tax_no || p.party2_tax_no,
+                        party2_address: c.address || p.party2_address,
+                        odoo_partner_id: c.id,
+                      }))} />
                       {fieldVisible('party2_name') && field(t("contract_party2Name"), "party2_name", { placeholder: t("contract_party2NamePh") })}
                       {(fieldVisible('party2_tax_office') || fieldVisible('party2_tax_no')) && (
                       <div style={{ display: "grid", gridTemplateColumns: fieldVisible('party2_tax_office') && fieldVisible('party2_tax_no') ? "1fr 1fr" : "1fr", gap: 10 }}>
@@ -7585,7 +7654,8 @@ Kurallar:
                 {/* Client name */}
                 <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
                   <div style={{ ...labelStyle, marginBottom: 8 }}>{lang === "tr" ? "Müşteri Adı" : "Client Name"} <span style={{ fontWeight: 400, textTransform: "none" }}>{lang === "tr" ? "(PDF dosya adı)" : "(PDF file name)"}</span></div>
-                  <input value={pricingData.client_name} onChange={e => pd("client_name", e.target.value)}
+                  <OdooCompanySearch colors={colors} lang={lang} onPick={c => { pd("client_name", c.name || pricingData.client_name); pd("odoo_partner_id", c.id); }} />
+                  <input value={pricingData.client_name} onChange={e => { pd("client_name", e.target.value); pd("odoo_partner_id", ""); }}
                     placeholder={lang === "tr" ? "ör. ABC Tekstil A.Ş." : "e.g. ABC Tekstil A.Ş."} style={inputStyle} />
                 </div>
 

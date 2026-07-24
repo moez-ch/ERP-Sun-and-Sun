@@ -674,7 +674,7 @@ function finalizeContractDoc(rowId, ext, bytes, data, user) {
     const fname = persistGenerated("contract", rowId, ext, Buffer.from(bytes));
     if (fname) db.prepare("UPDATE contracts SET stored_file=? WHERE id=?").run(fname, rowId);
   } catch (e) { console.warn("[contract persist]", e.message); }
-  notifyOdooChatter(data?.party2_name, user?.name || user?.email, "Sözleşme");
+  notifyOdooChatter(data?.party2_name, user?.name || user?.email, "Sözleşme", data?.odoo_partner_id);
 }
 
 // ── Odoo JSON-RPC (outbound) ──────────────────────────────────────
@@ -702,18 +702,23 @@ async function odooExec(model, method, args = [], kwargs = {}) {
 
 // Best-effort: find the company by name and post a chatter note. Non-blocking;
 // swallows every error so document generation is never affected.
-async function notifyOdooChatter(companyName, userName, kindLabel) {
+async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = null) {
   try {
+    let targetId = Number(partnerId) || null; // exact match from the ERP Search picker, if any
     const name = (companyName || "").trim();
-    if (!name) return;
-    let ids = await odooExec("res.partner", "search", [[["is_company", "=", true], ["name", "ilike", name]]], { limit: 2 });
-    if (ids === null) return; // creds not configured
-    if (!ids.length) ids = await odooExec("res.partner", "search", [[["name", "ilike", name]]], { limit: 2 });
-    if (!ids || !ids.length) { console.log(`[odoo chatter] no partner match for "${name}"`); return; }
+    if (!targetId) {
+      if (!name) return;
+      let ids = await odooExec("res.partner", "search", [[["is_company", "=", true], ["name", "ilike", name]]], { limit: 2 });
+      if (ids === null) return; // creds not configured
+      if (!ids.length) ids = await odooExec("res.partner", "search", [[["name", "ilike", name]]], { limit: 2 });
+      if (!ids || !ids.length) { console.log(`[odoo chatter] no partner match for "${name}"`); return; }
+      targetId = ids[0];
+    }
     const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const body = `<p>📄 <b>${esc(userName || "Bir kullanıcı")}</b> bir ${esc(kindLabel)} oluşturdu.</p>`;
-    await odooExec("res.partner", "message_post", [[ids[0]]], { body, message_type: "comment", subtype_xmlid: "mail.mt_note" });
-    console.log(`[odoo chatter] posted "${kindLabel}" note to partner #${ids[0]} (${name})`);
+    const posted = await odooExec("res.partner", "message_post", [[targetId]], { body, message_type: "comment", subtype_xmlid: "mail.mt_note" });
+    if (posted === null) return; // creds not configured
+    console.log(`[odoo chatter] posted "${kindLabel}" note to partner #${targetId} (${name || "id " + targetId})`);
   } catch (e) { console.warn("[odoo chatter]", e.message); }
 }
 
@@ -1420,6 +1425,41 @@ app.get("/contracts/companies", authenticate, (req, res) => {
   const companies = db.prepare("SELECT * FROM contract_companies ORDER BY sort_order, id").all();
   const allIbans = db.prepare("SELECT * FROM company_ibans ORDER BY is_default DESC, id").all();
   res.json(companies.map(c => ({ ...c, ibans: allIbans.filter(i => i.company_id === c.id) })));
+});
+
+// GET /odoo/company-search?q=  — look up companies in Odoo by name so a quote/
+// contract can auto-fill tax office, tax number and address (Esra's "Match"
+// request). Returns { disabled:true } when Odoo creds aren't configured so the
+// UI can hide the button gracefully.
+app.get("/odoo/company-search", authenticate, async (req, res) => {
+  const q = (req.query.q || "").toString().trim();
+  if (!q) return res.json({ ok: true, results: [] });
+  try {
+    const ids = await odooExec("res.partner", "search",
+      [[["is_company", "=", true], ["name", "ilike", q]]],
+      { limit: 8, order: "name" });
+    if (ids === null) return res.json({ ok: false, disabled: true, results: [] });
+    if (!ids.length) return res.json({ ok: true, results: [] });
+    const recs = await odooExec("res.partner", "read",
+      [ids, ["id", "name", "vat", "x_tax_office", "street", "street2", "city", "phone", "email"]]);
+    const results = (recs || []).map(r => {
+      const address = ["street", "street2", "city"].map(k => r[k]).filter(v => v && v !== false).join(" ").trim();
+      return {
+        id: r.id,
+        name: r.name || "",
+        tax_no: r.vat && r.vat !== false ? r.vat : "",
+        tax_office: r.x_tax_office && r.x_tax_office !== false ? r.x_tax_office : "",
+        address,
+        city: r.city && r.city !== false ? r.city : "",
+        phone: r.phone && r.phone !== false ? r.phone : "",
+        email: r.email && r.email !== false ? r.email : "",
+      };
+    });
+    res.json({ ok: true, results });
+  } catch (e) {
+    console.warn("[odoo company-search]", e.message);
+    res.status(502).json({ ok: false, error: "Odoo lookup failed" });
+  }
 });
 
 // POST /contracts/companies
@@ -3497,7 +3537,7 @@ app.delete("/presentations/:id", authenticate, requireAdmin, (req, res) => {
 
 // POST /pricing/generate-program — renders pricing_Xprogram.html and merges into Canva presentation
 app.post("/pricing/generate-program", authenticate, async (req, res) => {
-  const { num_programs, party2_name, contract_date, notes, programs, design_id } = req.body || {};
+  const { num_programs, party2_name, contract_date, notes, programs, design_id, odoo_partner_id } = req.body || {};
   const n = Math.min(Math.max(parseInt(num_programs) || 1, 1), 3);
   const file = n === 1 ? "pricing_1program.html" : n === 2 ? "pricing_2programs.html" : "pricing_3programs.html";
   const p = programs || [];
@@ -3552,7 +3592,7 @@ app.post("/pricing/generate-program", authenticate, async (req, res) => {
              req.user?.id, req.user?.name || req.user?.email);
       const fname = persistGenerated("pricequote", info.lastInsertRowid, "pdf", Buffer.from(finalPdfBytes));
       if (fname) db.prepare("UPDATE price_quotes SET stored_file=? WHERE id=?").run(fname, info.lastInsertRowid);
-      notifyOdooChatter(party2_name, req.user?.name || req.user?.email, "Fiyat Teklifi");
+      notifyOdooChatter(party2_name, req.user?.name || req.user?.email, "Fiyat Teklifi", odoo_partner_id);
     } catch (logErr) { console.error("[pricing/generate-program log]", logErr); }
 
     res.setHeader("Content-Type", "application/pdf");
@@ -3566,7 +3606,7 @@ app.post("/pricing/generate-program", authenticate, async (req, res) => {
 
 // POST /pricing/generate
 app.post("/pricing/generate", authenticate, async (req, res) => {
-  const { num_options, opt, gen_note, design_id, theme, discount, client_name } = req.body || {};
+  const { num_options, opt, gen_note, design_id, theme, discount, client_name, odoo_partner_id } = req.body || {};
   const data = { num_options: num_options || 1, opt: opt || [], gen_note: gen_note || "", theme: theme || "blue", discount: !!discount };
   const targetDesignId = (design_id || "").trim() || PRICING_DESIGN_ID;
   try {
@@ -3611,7 +3651,7 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
              req.user?.id, req.user?.name || req.user?.email);
       const fname = persistGenerated("pricequote", info.lastInsertRowid, "pdf", Buffer.from(finalPdfBytes));
       if (fname) db.prepare("UPDATE price_quotes SET stored_file=? WHERE id=?").run(fname, info.lastInsertRowid);
-      notifyOdooChatter(client_name, req.user?.name || req.user?.email, "Fiyat Teklifi");
+      notifyOdooChatter(client_name, req.user?.name || req.user?.email, "Fiyat Teklifi", odoo_partner_id);
     } catch (logErr) { console.error("[pricing/generate log]", logErr); }
 
     const safeName = (client_name || "").trim().replace(/[\/\\:*?"<>|]/g, "").replace(/\s+/g, "_") || `pricing_${Date.now()}`;
