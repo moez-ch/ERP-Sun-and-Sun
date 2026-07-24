@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import snsLogo from "./sns_logo.png";
 import * as XLSX from "xlsx";
 import LoginPage from "./LoginPage.jsx";
@@ -2274,6 +2274,7 @@ Kurallar:
   const [contractReport, setContractReport] = useState(null);
   const [contractReportLoading, setContractReportLoading] = useState(false);
   const [contractReportFilters, setContractReportFilters] = useState({ date_from: "", date_to: "", prepared_by: "" });
+  const [expandedContractGroup, setExpandedContractGroup] = useState(null);
   const [contractTemplate, setContractTemplate] = useState(null);
   const [editingFieldConfig, setEditingFieldConfig] = useState(null); // { tplId, fields: {key: bool} }
   const [renamingTplId, setRenamingTplId] = useState(null);
@@ -6350,14 +6351,51 @@ Kurallar:
                             <tbody>
                               {contractReport.groups.length === 0 ? (
                                 <tr><td colSpan={4} style={{ padding: "24px 16px", textAlign: "center", color: colors.textMuted }}>No contracts found for this period.</td></tr>
-                              ) : contractReport.groups.map((g, i) => (
-                                <tr key={i} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                                  <td style={{ padding: "12px 16px", fontWeight: 600 }}>{g.template_name}</td>
-                                  <td style={{ padding: "12px 16px", color: colors.textMuted }}>{g.prepared_by || "—"}</td>
-                                  <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 600 }}>{g.count}</td>
-                                  <td style={{ padding: "12px 16px", textAlign: "right", color: colors.primary, fontWeight: 700 }}>{fmt(g.total_value)} TL + KDV</td>
-                                </tr>
-                              ))}
+                              ) : contractReport.groups.map((g, i) => {
+                                const open = expandedContractGroup === i;
+                                const rows = [...(g.contracts || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                                return (
+                                <Fragment key={i}>
+                                  <tr onClick={() => setExpandedContractGroup(open ? null : i)}
+                                    style={{ borderBottom: `1px solid ${colors.border}`, cursor: "pointer", background: open ? `${colors.primary}0d` : "transparent" }}>
+                                    <td style={{ padding: "12px 16px", fontWeight: 600 }}>
+                                      <span style={{ display: "inline-block", width: 14, color: colors.primary, transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
+                                      {g.template_name}
+                                    </td>
+                                    <td style={{ padding: "12px 16px", color: colors.textMuted }}>{g.prepared_by || "—"}</td>
+                                    <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 600 }}>{g.count}</td>
+                                    <td style={{ padding: "12px 16px", textAlign: "right", color: colors.primary, fontWeight: 700 }}>{fmt(g.total_value)} TL + KDV</td>
+                                  </tr>
+                                  {open && (
+                                    <tr>
+                                      <td colSpan={4} style={{ padding: 0, background: colors.bg }}>
+                                        {rows.map((c, j) => (
+                                          <div key={j} style={{ borderBottom: j < rows.length - 1 ? `1px solid ${colors.border}` : "none", padding: "14px 18px 14px 32px" }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                                              <div style={{ fontWeight: 700, fontSize: 12, color: colors.textMuted }}>#{rows.length - j} · {c.prepared_for || c.template_name}</div>
+                                              <div style={{ fontSize: 12, color: colors.textMuted }}>
+                                                {new Date(c.created_at).toLocaleDateString("tr-TR")} · {c.prepared_by || "—"}
+                                                <span style={{ color: colors.primary, fontWeight: 700, marginLeft: 10 }}>{fmt(c.value)} TL</span>
+                                              </div>
+                                            </div>
+                                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "8px 20px" }}>
+                                              {(c.fields || []).length === 0 ? (
+                                                <div style={{ fontSize: 12, color: colors.textMuted }}>—</div>
+                                              ) : c.fields.map(f => (
+                                                <div key={f.key}>
+                                                  <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>{f.label}</div>
+                                                  <div style={{ fontSize: 13, color: f.value ? colors.text : colors.textMuted, wordBreak: "break-word" }}>{f.value || "—"}</div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </td>
+                                    </tr>
+                                  )}
+                                </Fragment>
+                                );
+                              })}
                             </tbody>
                             <tfoot>
                               <tr style={{ background: `${colors.primary}10`, borderTop: `2px solid ${colors.primary}44` }}>
@@ -6368,34 +6406,6 @@ Kurallar:
                             </tfoot>
                           </table>
                         </div>
-
-                        {/* Individual contracts detail — every filled-in field, "—" when blank */}
-                        {contractReport.groups.flatMap(g => g.contracts).length > 0 && (
-                          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
-                            <div style={{ padding: "12px 18px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>Details</div>
-                            {contractReport.groups.flatMap(g => g.contracts).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((c, i) => (
-                              <div key={i} style={{ borderBottom: `1px solid ${colors.border}`, padding: "14px 18px" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-                                  <div style={{ fontWeight: 700, fontSize: 13 }}>{c.template_name}</div>
-                                  <div style={{ fontSize: 12, color: colors.textMuted }}>
-                                    {new Date(c.created_at).toLocaleDateString("tr-TR")} · {c.prepared_by || "—"}
-                                    <span style={{ color: colors.primary, fontWeight: 700, marginLeft: 10 }}>{fmt(c.value)} TL</span>
-                                  </div>
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "8px 20px" }}>
-                                  {(c.fields || []).length === 0 ? (
-                                    <div style={{ fontSize: 12, color: colors.textMuted }}>—</div>
-                                  ) : c.fields.map(f => (
-                                    <div key={f.key}>
-                                      <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>{f.label}</div>
-                                      <div style={{ fontSize: 13, color: f.value ? colors.text : colors.textMuted, wordBreak: "break-word" }}>{f.value || "—"}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
