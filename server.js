@@ -2284,12 +2284,68 @@ app.post("/contracts/pdf-tax", authenticate, upload.single("file"), async (req, 
   }
 });
 
+// Shared core for the "Fill Odoo" feature: resolve the matching res.partner and
+// write ONLY the Odoo fields that are currently EMPTY (never overwrites). Used
+// by both the PDF path (vergi levhası) and the manual path (form values).
+// Returns a plain result object: {disabled|notFound|ambiguous} on failure to
+// resolve, or {ok, partner, matchedBy, filled, skipped} on success.
+async function fillOdooCompany({ partnerId, name, taxNo, office, address, phone, email, who, source }) {
+  name = (name || "").trim(); taxNo = (taxNo || "").trim();
+  office = (office || "").trim(); address = (address || "").trim();
+  phone = (phone || "").trim(); email = (email || "").trim();
+
+  let matchedBy = "";
+  if (partnerId) {
+    // explicit partner (came from 🔍 Search) — trust it, no name/tax lookup
+    matchedBy = "id";
+  } else {
+    let ids = null;
+    if (taxNo) { ids = await odooExec("res.partner", "search", [[["vat", "=", taxNo]]], { limit: 2 }); if (ids) matchedBy = "vat"; }
+    if (ids === null) return { disabled: true };     // odooExec null => creds missing
+    if (!ids.length && name) {
+      ids = await odooExec("res.partner", "search", [[["is_company", "=", true], ["name", "ilike", name]]], { limit: 5 });
+      matchedBy = "name";
+    }
+    if (!ids || !ids.length) return { notFound: true };
+    if (matchedBy === "name" && ids.length > 1) {
+      const cands = await odooExec("res.partner", "read", [ids, ["id", "name", "vat", "city"]]);
+      return { ambiguous: true, candidates: cands };
+    }
+    partnerId = ids[0];
+  }
+
+  const curArr = await odooExec("res.partner", "read", [[partnerId], ["name", "vat", "x_tax_office", "street", "phone", "email", "city"]]);
+  if (curArr === null) return { disabled: true };
+  if (!curArr.length) return { notFound: true };
+  const cur = curArr[0];
+
+  const empty = v => v === false || v === undefined || v === null || String(v).trim() === "";
+  const plan = [
+    { key: "vat",          label: "Vergi No",      value: taxNo },
+    { key: "x_tax_office", label: "Vergi Dairesi", value: office },
+    { key: "street",       label: "Adres",         value: address },
+    { key: "phone",        label: "Telefon",       value: phone },
+    { key: "email",        label: "E-posta",       value: email },
+  ];
+  const write = {}, filled = [], skipped = [];
+  for (const f of plan) {
+    if (!f.value) continue;                          // nothing supplied for this field
+    if (empty(cur[f.key])) { write[f.key] = f.value; filled.push(f.label); }
+    else skipped.push(f.label);                      // Odoo already has a value → leave it
+  }
+  if (Object.keys(write).length) {
+    await odooExec("res.partner", "write", [[partnerId], write]);
+    const w = String(who || "Bir kullanıcı").replace(/</g, "&lt;");
+    const body = `<p>✍️ <b>${w}</b> ${source || "formdan"} eksik firma bilgilerini güncelledi: ${filled.join(", ")}.</p>`;
+    try { await odooExec("res.partner", "message_post", [[partnerId]], { body, message_type: "comment", subtype_xmlid: "mail.mt_note" }); } catch {}
+  }
+  return { ok: true, partner: { id: partnerId, name: cur.name }, matchedBy, filled, skipped };
+}
+
 // POST /odoo/fill-company — read a vergi levhası PDF, find the matching company
 // in Odoo (by tax number first, then name), and fill ONLY the fields that are
-// currently empty in Odoo (tax number → vat, tax office → x_tax_office, address
-// → street). Never overwrites existing Odoo data. Also returns the extracted
-// fields so the form can be filled in the same click. Reports exactly what was
-// written and what was skipped.
+// currently empty in Odoo. Never overwrites existing Odoo data. Also returns the
+// extracted fields so the form can be filled in the same click.
 app.post("/odoo/fill-company", authenticate, upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No PDF provided" });
   let fields;
@@ -2299,50 +2355,38 @@ app.post("/odoo/fill-company", authenticate, upload.single("file"), async (req, 
     console.error("[odoo/fill-company] extract", e);
     return res.status(500).json({ error: "Could not read the PDF. Make sure it is a GİB vergi levhası PDF." });
   }
-  const name    = (fields.party2_name || "").trim();
-  const taxNo   = (fields.party2_tax_no || "").trim();
-  const office  = (fields.party2_tax_office || "").trim();
-  const address = (fields.party2_address || "").trim();
   try {
-    // 1) resolve the Odoo partner — tax number is the reliable key
-    let ids = null, matchedBy = "";
-    if (taxNo) { ids = await odooExec("res.partner", "search", [[["vat", "=", taxNo]]], { limit: 2 }); if (ids) matchedBy = "vat"; }
-    if (ids === null) return res.json({ ok: false, disabled: true, fields });
-    if (!ids.length && name) {
-      ids = await odooExec("res.partner", "search", [[["is_company", "=", true], ["name", "ilike", name]]], { limit: 5 });
-      matchedBy = "name";
-    }
-    if (!ids || !ids.length) return res.json({ ok: false, notFound: true, fields });
-    if (matchedBy === "name" && ids.length > 1) {
-      const cands = await odooExec("res.partner", "read", [ids, ["id", "name", "vat", "city"]]);
-      return res.json({ ok: false, ambiguous: true, fields, candidates: cands });
-    }
-    const partnerId = ids[0];
-
-    // 2) read current values and fill only the empty ones
-    const cur = (await odooExec("res.partner", "read", [[partnerId], ["name", "vat", "x_tax_office", "street", "city"]]))[0];
-    const empty = v => v === false || v === undefined || v === null || String(v).trim() === "";
-    const plan = [
-      { key: "vat",          label: "Vergi No",      value: taxNo },
-      { key: "x_tax_office", label: "Vergi Dairesi", value: office },
-      { key: "street",       label: "Adres",         value: address },
-    ];
-    const write = {}, filled = [], skipped = [];
-    for (const f of plan) {
-      if (!f.value) continue;                       // nothing extracted for this field
-      if (empty(cur[f.key])) { write[f.key] = f.value; filled.push(f.label); }
-      else skipped.push(f.label);                   // Odoo already has a value → leave it
-    }
-    if (Object.keys(write).length) {
-      await odooExec("res.partner", "write", [[partnerId], write]);
-      const who = req.user?.name || req.user?.email || "Bir kullanıcı";
-      const body = `<p>📄 <b>${String(who).replace(/</g, "&lt;")}</b> vergi levhasından eksik bilgileri güncelledi: ${filled.join(", ")}.</p>`;
-      try { await odooExec("res.partner", "message_post", [[partnerId]], { body, message_type: "comment", subtype_xmlid: "mail.mt_note" }); } catch {}
-    }
-    res.json({ ok: true, fields, partner: { id: partnerId, name: cur.name }, matchedBy, filled, skipped });
+    const r = await fillOdooCompany({
+      name: fields.party2_name, taxNo: fields.party2_tax_no,
+      office: fields.party2_tax_office, address: fields.party2_address,
+      who: req.user?.name || req.user?.email, source: "vergi levhasından",
+    });
+    res.json({ ...r, ok: !!r.ok, fields });          // always echo fields so the form fills
   } catch (e) {
     console.error("[odoo/fill-company]", e);
     res.status(502).json({ ok: false, error: "Odoo update failed", fields });
+  }
+});
+
+// POST /odoo/fill-company-manual — same fill-empty-only behaviour, but the values
+// come from the form (typed by hand after a 🔍 Search) instead of a PDF. Body is
+// JSON: { odoo_partner_id?, name, tax_no, tax_office, address, phone, email }.
+app.post("/odoo/fill-company-manual", authenticate, async (req, res) => {
+  const b = req.body || {};
+  const partnerId = Number(b.odoo_partner_id) || null;
+  const name = (b.name || "").trim();
+  if (!partnerId && !name && !(b.tax_no || "").trim())
+    return res.status(400).json({ ok: false, error: "No company selected" });
+  try {
+    const r = await fillOdooCompany({
+      partnerId, name, taxNo: b.tax_no, office: b.tax_office,
+      address: b.address, phone: b.phone, email: b.email,
+      who: req.user?.name || req.user?.email, source: "formdan",
+    });
+    res.json({ ...r, ok: !!r.ok });
+  } catch (e) {
+    console.error("[odoo/fill-company-manual]", e);
+    res.status(502).json({ ok: false, error: "Odoo update failed" });
   }
 });
 

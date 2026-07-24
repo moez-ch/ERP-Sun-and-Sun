@@ -6057,6 +6057,50 @@ Kurallar:
             finally { setOdooFillLoading(false); }
           };
 
+          // Manual variant: push the values currently TYPED in the form into the
+          // matching Odoo company (fill-empty-only) — no PDF needed.
+          const handleFillOdooManual = async () => {
+            const L = (tr, en) => (lang === "tr" ? tr : en);
+            if (!contractData.odoo_partner_id && !(contractData.party2_name || "").trim()) {
+              alert(L("Önce firmayı 🔍 Ara ile seçin veya adını yazın.", "First pick the company with 🔍 Search or type its name."));
+              return;
+            }
+            setOdooFillLoading(true);
+            try {
+              const token = localStorage.getItem("sns_token");
+              const r = await fetch("/odoo/fill-company-manual", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                  odoo_partner_id: contractData.odoo_partner_id || "",
+                  name: contractData.party2_name || "",
+                  tax_no: contractData.party2_tax_no || "",
+                  tax_office: contractData.party2_tax_office || "",
+                  address: contractData.party2_address || "",
+                }),
+              });
+              const d = await r.json();
+              if (d.ok) {
+                const parts = [`${L("Firma", "Company")}: ${d.partner?.name || "?"}`];
+                parts.push(d.filled?.length
+                  ? `${L("Odoo'da güncellendi", "Updated in Odoo")}: ${d.filled.join(", ")}`
+                  : L("Odoo'da eksik bilgi yoktu — hiçbir şey değişmedi.", "Nothing was missing in Odoo — no changes."));
+                if (d.skipped?.length) parts.push(`${L("Zaten doluydu (dokunulmadı)", "Already filled (left as-is)")}: ${d.skipped.join(", ")}`);
+                alert(parts.join("\n"));
+              } else if (d.disabled) {
+                alert(L("Odoo bağlantısı yapılandırılmamış.", "Odoo connection is not configured."));
+              } else if (d.notFound) {
+                alert(L("Bu firma Odoo'da bulunamadı. Lütfen 🔍 Ara ile doğru firmayı seçin.", "Company not found in Odoo. Please pick it with 🔍 Search."));
+              } else if (d.ambiguous) {
+                const names = (d.candidates || []).map(c => c.name).join(", ");
+                alert(L(`Odoo'da birden fazla eşleşme: ${names}. Lütfen 🔍 Ara ile seçin.`, `Multiple Odoo matches: ${names}. Please pick with 🔍 Search.`));
+              } else {
+                alert(L("Odoo güncellemesi başarısız: ", "Odoo update failed: ") + (d.error || "?"));
+              }
+            } catch (e) { alert(e.message); }
+            finally { setOdooFillLoading(false); }
+          };
+
           const fv = contractTemplate?.visible_fields || {};
           const fieldVisible = k => fv[k] !== false;
 
@@ -7173,8 +7217,13 @@ Kurallar:
                           <label title={lang === "tr" ? "PDF'ten Odoo'daki eksik bilgileri doldur" : "Fill missing Odoo info from the PDF"}
                             style={{ display: "flex", alignItems: "center", gap: 6, cursor: odooFillLoading ? "default" : "pointer", padding: "5px 10px", background: "#8b5cf622", border: "1px solid #8b5cf644", borderRadius: 6, opacity: odooFillLoading ? 0.6 : 1 }}>
                             <input type="file" accept="application/pdf,.pdf" disabled={odooFillLoading} style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFillOdoo(e.target.files[0]); e.target.value = ""; }} />
-                            <span style={{ fontSize: 11, fontWeight: 600, color: "#a78bfa" }}>{odooFillLoading ? (lang === "tr" ? "Odoo…" : "Odoo…") : (lang === "tr" ? "⇪ Odoo'yu Doldur" : "⇪ Fill Odoo")}</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: "#a78bfa" }}>{odooFillLoading ? (lang === "tr" ? "Odoo…" : "Odoo…") : (lang === "tr" ? "⇪ PDF'ten Doldur" : "⇪ From PDF")}</span>
                           </label>
+                          <button type="button" onClick={handleFillOdooManual} disabled={odooFillLoading}
+                            title={lang === "tr" ? "Formdaki bilgileri Odoo'daki eksik alanlara yaz" : "Write the form values into the empty Odoo fields"}
+                            style={{ display: "flex", alignItems: "center", gap: 6, cursor: odooFillLoading ? "default" : "pointer", padding: "5px 10px", background: "#8b5cf622", border: "1px solid #8b5cf644", borderRadius: 6, opacity: odooFillLoading ? 0.6 : 1, color: "#a78bfa", fontSize: 11, fontWeight: 600 }}>
+                            {odooFillLoading ? (lang === "tr" ? "Odoo…" : "Odoo…") : (lang === "tr" ? "⇪ Formdan Doldur" : "⇪ From Form")}
+                          </button>
                         </div>
                       </div>
                       <OdooCompanySearch colors={colors} lang={lang} onPick={c => setContractData(p => ({
