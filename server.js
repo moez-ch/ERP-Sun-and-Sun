@@ -2195,9 +2195,16 @@ app.get("/contracts/report", authenticate, (req, res) => {
     // Ordered union: template's declared vars first, then any extra data keys.
     const order = [...(tplVars[r.template_id] || [])];
     for (const k of Object.keys(d)) if (!order.includes(k)) order.push(k);
+    // Hide internal plumbing (record ids, iban, the installment array) — keep
+    // every human-entered field, blanks included (rendered as "-" on the client).
+    const HIDE = new Set(["payment_schedule", "iban"]);
     const fields = order
-      .filter(k => k !== "payment_schedule")
-      .map(k => ({ key: k, label: humanize(k), value: (d[k] ?? "").toString().trim() }));
+      .filter(k => !HIDE.has(k) && !/_id$/.test(k))
+      .map(k => {
+        let v = d[k];
+        if (Array.isArray(v)) v = v.length ? `${v.length} row(s)` : "";
+        return { key: k, label: humanize(k), value: (v ?? "").toString().trim() };
+      });
     return { id: r.id, template_name: r.template_name, prepared_by: r.created_by_name, prepared_for: d.party2_name || "", value, created_at: r.created_at, fields };
   });
 
