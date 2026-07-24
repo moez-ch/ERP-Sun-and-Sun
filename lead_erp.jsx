@@ -7394,6 +7394,42 @@ Kurallar:
             finally { setPricingGenerating(false); }
           };
 
+          // Quote form: read a vergi levhası PDF → set client name + link the
+          // Odoo company, and fill whatever info is missing on it in Odoo.
+          const handleFillOdooQuote = async (file) => {
+            setOdooFillLoading(true);
+            try {
+              const token = localStorage.getItem("sns_token");
+              const fd = new FormData();
+              fd.append("file", file);
+              const r = await fetch("/odoo/fill-company", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+              const d = await r.json();
+              const L = (tr, en) => (lang === "tr" ? tr : en);
+              if (d.fields?.party2_name) pd("client_name", d.fields.party2_name);
+              if (d.ok) {
+                pd("odoo_partner_id", d.partner?.id || "");
+                const parts = [`${L("Firma", "Company")}: ${d.partner?.name || "?"}`];
+                parts.push(d.filled?.length
+                  ? `${L("Odoo'da güncellendi", "Updated in Odoo")}: ${d.filled.join(", ")}`
+                  : L("Odoo'da eksik bilgi yoktu — hiçbir şey değişmedi.", "Nothing was missing in Odoo — no changes."));
+                if (d.skipped?.length) parts.push(`${L("Zaten doluydu (dokunulmadı)", "Already filled (left as-is)")}: ${d.skipped.join(", ")}`);
+                alert(parts.join("\n"));
+              } else if (d.disabled) {
+                alert(L("Odoo bağlantısı yapılandırılmamış.", "Odoo connection is not configured."));
+              } else if (d.notFound) {
+                alert(L("Bu firma Odoo'da bulunamadı (vergi no / isim eşleşmedi). İsim forma yine de dolduruldu.",
+                        "Company not found in Odoo (no tax-no / name match). The name was still filled."));
+              } else if (d.ambiguous) {
+                const names = (d.candidates || []).map(c => c.name).join(", ");
+                alert(L(`Odoo'da birden fazla eşleşme var: ${names}. Lütfen 🔍 Ara ile doğru firmayı seçin.`,
+                        `Multiple Odoo matches: ${names}. Please pick the right company with 🔍 Search.`));
+              } else {
+                alert(L("Odoo güncellemesi başarısız: ", "Odoo update failed: ") + (d.error || "?"));
+              }
+            } catch (e) { alert(e.message); }
+            finally { setOdooFillLoading(false); }
+          };
+
           const ppd = (k, v) => setProgramData(p => ({ ...p, [k]: v }));
           const ppdProg = (i, k, v) => setProgramData(p => {
             const programs = p.programs.map((pr, idx) => idx === i ? { ...pr, [k]: v } : pr);
@@ -7702,7 +7738,14 @@ Kurallar:
 
                 {/* Client name */}
                 <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
-                  <div style={{ ...labelStyle, marginBottom: 8 }}>{lang === "tr" ? "Müşteri Adı" : "Client Name"} <span style={{ fontWeight: 400, textTransform: "none" }}>{lang === "tr" ? "(PDF dosya adı)" : "(PDF file name)"}</span></div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <div style={labelStyle}>{lang === "tr" ? "Müşteri Adı" : "Client Name"} <span style={{ fontWeight: 400, textTransform: "none" }}>{lang === "tr" ? "(PDF dosya adı)" : "(PDF file name)"}</span></div>
+                    <label title={lang === "tr" ? "PDF'ten Odoo'daki eksik bilgileri doldur" : "Fill missing Odoo info from the PDF"}
+                      style={{ display: "flex", alignItems: "center", gap: 6, cursor: odooFillLoading ? "default" : "pointer", padding: "5px 10px", background: "#8b5cf622", border: "1px solid #8b5cf644", borderRadius: 6, opacity: odooFillLoading ? 0.6 : 1 }}>
+                      <input type="file" accept="application/pdf,.pdf" disabled={odooFillLoading} style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFillOdooQuote(e.target.files[0]); e.target.value = ""; }} />
+                      <span style={{ fontSize: 11, fontWeight: 600, color: "#a78bfa" }}>{odooFillLoading ? "Odoo…" : (lang === "tr" ? "⇪ Odoo'yu Doldur" : "⇪ Fill Odoo")}</span>
+                    </label>
+                  </div>
                   <OdooCompanySearch colors={colors} lang={lang} onPick={c => { pd("client_name", c.name || pricingData.client_name); pd("odoo_partner_id", c.id); }} />
                   <input value={pricingData.client_name} onChange={e => { pd("client_name", e.target.value); pd("odoo_partner_id", ""); }}
                     placeholder={lang === "tr" ? "ör. ABC Tekstil A.Ş." : "e.g. ABC Tekstil A.Ş."} style={inputStyle} />
