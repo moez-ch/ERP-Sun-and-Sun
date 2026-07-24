@@ -3386,8 +3386,16 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
     }
 
     const safeName = (client_name || "").trim().replace(/[\/\\:*?"<>|]/g, "").replace(/\s+/g, "_") || `pricing_${Date.now()}`;
+    // HTTP headers are Latin-1 only: an ASCII fallback for `filename=` (Turkish
+    // ç/ş/ğ/ı/ö/ü stripped via NFKD), plus RFC 5987 `filename*` so modern
+    // browsers still get the real UTF-8 name. Otherwise Node throws
+    // "Invalid character in header content" on any non-Latin1 client name.
+    const asciiName = safeName.normalize("NFKD").replace(/[^\x20-\x7E]/g, "") || `pricing_${Date.now()}`;
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${safeName}.pdf"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${asciiName}.pdf"; filename*=UTF-8''${encodeURIComponent(safeName)}.pdf`
+    );
     res.send(finalPdfBytes);
   } catch (e) {
     console.error("[pricing/generate]", e);
