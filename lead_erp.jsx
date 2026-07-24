@@ -6263,7 +6263,7 @@ Kurallar:
 
           return (
             <div style={{ animation: "slideIn .3s ease", display: "flex", gap: 24, alignItems: "flex-start" }}>
-            <div style={{ flex: isMobile ? "1" : "0 0 780px", minWidth: 0 }}>
+            <div style={{ flex: isMobile ? "1" : (contractView === "report" ? "1 1 auto" : "0 0 780px"), minWidth: 0 }}>
               {/* Header */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{t("contract_title")}</h2>
@@ -6369,30 +6369,31 @@ Kurallar:
                           </table>
                         </div>
 
-                        {/* Individual contracts detail */}
+                        {/* Individual contracts detail — every filled-in field, "—" when blank */}
                         {contractReport.groups.flatMap(g => g.contracts).length > 0 && (
                           <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
                             <div style={{ padding: "12px 18px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>Details</div>
-                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                              <thead>
-                                <tr style={{ background: colors.bg }}>
-                                  {["Date", "Type", "Prepared By", "Prepared For", "Value"].map(h => (
-                                    <th key={h} style={{ padding: "8px 14px", textAlign: h === "Value" ? "right" : "left", color: colors.textMuted, fontWeight: 600, fontSize: 11, borderBottom: `1px solid ${colors.border}` }}>{h}</th>
+                            {contractReport.groups.flatMap(g => g.contracts).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((c, i) => (
+                              <div key={i} style={{ borderBottom: `1px solid ${colors.border}`, padding: "14px 18px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                                  <div style={{ fontWeight: 700, fontSize: 13 }}>{c.template_name}</div>
+                                  <div style={{ fontSize: 12, color: colors.textMuted }}>
+                                    {new Date(c.created_at).toLocaleDateString("tr-TR")} · {c.prepared_by || "—"}
+                                    <span style={{ color: colors.primary, fontWeight: 700, marginLeft: 10 }}>{fmt(c.value)} TL</span>
+                                  </div>
+                                </div>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "8px 20px" }}>
+                                  {(c.fields || []).length === 0 ? (
+                                    <div style={{ fontSize: 12, color: colors.textMuted }}>—</div>
+                                  ) : c.fields.map(f => (
+                                    <div key={f.key}>
+                                      <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>{f.label}</div>
+                                      <div style={{ fontSize: 13, color: f.value ? colors.text : colors.textMuted, wordBreak: "break-word" }}>{f.value || "—"}</div>
+                                    </div>
                                   ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {contractReport.groups.flatMap(g => g.contracts).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((c, i) => (
-                                  <tr key={i} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                                    <td style={{ padding: "9px 14px", color: colors.textMuted }}>{new Date(c.created_at).toLocaleDateString("tr-TR")}</td>
-                                    <td style={{ padding: "9px 14px", fontWeight: 600 }}>{c.template_name}</td>
-                                    <td style={{ padding: "9px 14px" }}>{c.prepared_by || "—"}</td>
-                                    <td style={{ padding: "9px 14px" }}>{c.prepared_for || "—"}</td>
-                                    <td style={{ padding: "9px 14px", textAlign: "right", color: colors.primary, fontWeight: 600 }}>{fmt(c.value)} TL</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -7276,7 +7277,7 @@ Kurallar:
 
           return (
             <div style={{ flex: 1, overflowY: "auto", padding: 32 }}>
-              <div style={{ maxWidth: 580, margin: "0 auto" }}>
+              <div style={{ maxWidth: pricingReportView ? 1140 : 580, margin: "0 auto" }}>
                 <div style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ fontSize: 22, fontWeight: 800 }}>{t("pricing_title")}</div>
                   <button onClick={() => setPricingReportView(v => !v)}
@@ -7301,6 +7302,21 @@ Kurallar:
                   };
                   const fmt = v => v ? Number(v).toLocaleString("tr-TR") : "—";
                   const L = (tr, en) => (lang === "tr" ? tr : en);
+                  const dash = v => (v !== undefined && v !== null && String(v).trim() !== "") ? String(v) : "—";
+                  const noteLabel = v => { const n = NOTE_OPTIONS.find(o => o.value === v); return n ? (lang === "tr" ? n.tr : n.value) : dash(v); };
+                  const feeLabel = v => (v !== undefined && v !== null && String(v).trim() !== "") ? `${v}% + KDV` : "—";
+                  const th = { padding: "7px 12px", textAlign: "left", color: colors.textMuted, fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.4, borderBottom: `1px solid ${colors.border}`, whiteSpace: "nowrap", background: colors.bg };
+                  const td = { padding: "7px 12px", fontSize: 12, borderBottom: `1px solid ${colors.border}`, verticalAlign: "top" };
+                  const Meta = ({ items }) => (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "8px 20px", padding: "12px 16px" }}>
+                      {items.map(it => (
+                        <div key={it.label}>
+                          <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>{it.label}</div>
+                          <div style={{ fontSize: 13, color: (it.value && it.value !== "—") ? colors.text : colors.textMuted, wordBreak: "break-word" }}>{it.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  );
                   return (
                     <div>
                       {/* Filters */}
@@ -7339,32 +7355,77 @@ Kurallar:
                             <span>{L("Sonuçlar", "Results")} — {pricingReport.total_count} {L("teklif", "quote(s)")}</span>
                             <span style={{ color: colors.primary }}>{fmt(pricingReport.total_value)} TL</span>
                           </div>
-                          <div style={{ overflowX: "auto" }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                              <thead>
-                                <tr style={{ background: colors.bg }}>
-                                  {[L("Tarih", "Date"), L("Hazırlayan", "Prepared By"), L("Müşteri", "Client"), L("Program", "Program"), L("Seçenekler", "Options"), L("Not", "Note"), L("Tutar", "Value")].map(h => (
-                                    <th key={h} style={{ padding: "9px 14px", textAlign: h === L("Tutar", "Value") ? "right" : "left", color: colors.textMuted, fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, borderBottom: `1px solid ${colors.border}`, whiteSpace: "nowrap" }}>{h}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {pricingReport.quotes.length === 0 ? (
-                                  <tr><td colSpan={7} style={{ padding: "24px 16px", textAlign: "center", color: colors.textMuted }}>{L("Bu dönem için teklif bulunamadı.", "No quotes found for this period.")}</td></tr>
-                                ) : pricingReport.quotes.map(q => (
-                                  <tr key={q.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                                    <td style={{ padding: "9px 14px", color: colors.textMuted, whiteSpace: "nowrap" }}>{new Date(String(q.created_at).replace(" ", "T") + "Z").toLocaleString("tr-TR")}</td>
-                                    <td style={{ padding: "9px 14px" }}>{q.prepared_by || "—"}</td>
-                                    <td style={{ padding: "9px 14px", fontWeight: 600 }}>{q.client_name || "—"}</td>
-                                    <td style={{ padding: "9px 14px" }}>{q.program_name || "—"}</td>
-                                    <td style={{ padding: "9px 14px", color: colors.textMuted, maxWidth: 320 }}>{q.summary || `${q.options_count} ${L("seçenek", "option(s)")}`}</td>
-                                    <td style={{ padding: "9px 14px", color: colors.textMuted, maxWidth: 200 }}>{q.note || "—"}</td>
-                                    <td style={{ padding: "9px 14px", textAlign: "right", color: colors.primary, fontWeight: 600, whiteSpace: "nowrap" }}>{q.value ? fmt(q.value) + " TL" : "—"}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                          {pricingReport.quotes.length === 0 ? (
+                            <div style={{ padding: "28px 16px", textAlign: "center", color: colors.textMuted, fontSize: 13 }}>{L("Bu dönem için teklif bulunamadı.", "No quotes found for this period.")}</div>
+                          ) : pricingReport.quotes.map(q => {
+                            const d = q.data || {};
+                            const isProgram = q.mode === "program";
+                            const opts = Array.isArray(d.opt) ? d.opt.slice(0, d.num_options || d.opt.length) : [];
+                            const progs = Array.isArray(d.programs) ? d.programs : [];
+                            return (
+                              <div key={q.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                                {/* Header line */}
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, padding: "12px 16px 0" }}>
+                                  <div style={{ fontSize: 13, fontWeight: 700 }}>
+                                    {q.client_name || "—"}
+                                    <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.4 }}>{isProgram ? L("Program Teklifi", "Program Quote") : L("Fiyat Teklifi", "Price Quote")}</span>
+                                  </div>
+                                  <div style={{ fontSize: 12, color: colors.textMuted }}>
+                                    {new Date(String(q.created_at).replace(" ", "T") + "Z").toLocaleString("tr-TR")} · {q.prepared_by || "—"}
+                                    <span style={{ color: colors.primary, fontWeight: 700, marginLeft: 10 }}>{q.value ? fmt(q.value) + " TL" : "—"}</span>
+                                  </div>
+                                </div>
+                                {/* Top-level fields */}
+                                <Meta items={isProgram ? [
+                                  { label: L("Müşteri", "Client"), value: dash(d.party2_name || q.client_name) },
+                                  { label: L("Program", "Program"), value: dash(q.program_name) },
+                                  { label: L("Sözleşme Tarihi", "Contract Date"), value: dash(d.contract_date) },
+                                  { label: L("Notlar", "Notes"), value: dash(d.notes) },
+                                ] : [
+                                  { label: L("Program", "Program"), value: dash(q.program_name) },
+                                  { label: L("Slayt Tipi", "Slide Type"), value: d.discount ? L("İndirimli", "With Discount") : L("Standart", "Standard") },
+                                  { label: L("Tema", "Theme"), value: dash(d.theme) },
+                                  { label: L("Genel Not", "General Note"), value: dash(d.gen_note) },
+                                ]} />
+                                {/* Per-option / per-program detail table */}
+                                <div style={{ overflowX: "auto", padding: "0 16px 14px" }}>
+                                  {isProgram ? (
+                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                      <thead><tr>{[L("Program", "Program"), L("Ücret", "Fee"), L("Başarı Primi", "Success Fee"), L("İkramiye/Not", "Bonus/Note")].map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+                                      <tbody>
+                                        {progs.length === 0 ? <tr><td style={td} colSpan={4}>—</td></tr> : progs.map((p, i) => (
+                                          <tr key={i}>
+                                            <td style={td}>{dash(p.name)}</td>
+                                            <td style={td}>{dash(p.fee)}</td>
+                                            <td style={td}>{dash(p.succ_fee || p.success_fee)}</td>
+                                            <td style={td}>{dash(p.bonus || p.note)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                      <thead><tr>{["#", L("Başlık", "Title"), d.discount ? L("İlk Fiyat", "Orig. Price") : null, L("Peşinat", "Down Payment"), L("Başarı Primi 1", "Success Fee 1"), L("Not 1", "Note 1"), L("Başarı Primi 2", "Success Fee 2"), L("Not 2", "Note 2")].filter(Boolean).map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+                                      <tbody>
+                                        {opts.length === 0 ? <tr><td style={td} colSpan={8}>—</td></tr> : opts.map((o, i) => (
+                                          <tr key={i}>
+                                            <td style={td}>{i + 1}</td>
+                                            <td style={td}>{dash(o.title)}</td>
+                                            {d.discount ? <td style={td}>{dash(o.dp_original)}</td> : null}
+                                            <td style={td}>{dash(o.dp)}</td>
+                                            <td style={td}>{feeLabel(o.succ_fee_1)}</td>
+                                            <td style={td}>{o.note1 ? noteLabel(o.note1) : "—"}</td>
+                                            <td style={td}>{feeLabel(o.succ_fee_2)}</td>
+                                            <td style={td}>{o.note2 ? noteLabel(o.note2) : "—"}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

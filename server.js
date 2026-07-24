@@ -2177,14 +2177,28 @@ app.get("/contracts/report", authenticate, (req, res) => {
   }
 
   const rows = db.prepare(
-    `SELECT id, template_name, data, created_by_name, created_at FROM contracts ${where} ORDER BY created_at DESC`
+    `SELECT id, template_id, template_name, data, created_by_name, created_at FROM contracts ${where} ORDER BY created_at DESC`
   ).all(...params);
+
+  // Ordered @@variable@@ list per template so the report can show EVERY fillable
+  // field (blank ones shown as "-"), not just the value/party we compute.
+  const tplVars = {};
+  for (const t of db.prepare("SELECT id, variables FROM contract_templates").all()) {
+    try { tplVars[t.id] = JSON.parse(t.variables) || []; } catch { tplVars[t.id] = []; }
+  }
+  const humanize = k => String(k).replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
   const parsed = rows.map(r => {
     const d = JSON.parse(r.data);
     const raw = String(d.down_payment || "0").replace(/[^\d.,]/g, "").replace(/\./g, "").replace(",", ".");
     const value = parseFloat(raw) || 0;
-    return { id: r.id, template_name: r.template_name, prepared_by: r.created_by_name, prepared_for: d.party2_name || "", value, created_at: r.created_at };
+    // Ordered union: template's declared vars first, then any extra data keys.
+    const order = [...(tplVars[r.template_id] || [])];
+    for (const k of Object.keys(d)) if (!order.includes(k)) order.push(k);
+    const fields = order
+      .filter(k => k !== "payment_schedule")
+      .map(k => ({ key: k, label: humanize(k), value: (d[k] ?? "").toString().trim() }));
+    return { id: r.id, template_name: r.template_name, prepared_by: r.created_by_name, prepared_for: d.party2_name || "", value, created_at: r.created_at, fields };
   });
 
   // Group by template_name + prepared_by
@@ -2251,6 +2265,9 @@ app.get("/pricing/report", authenticate, (req, res) => {
       prepared_by: r.created_by_name || "",
       value,
       created_at: r.created_at,
+      // Full captured payload so the history can show every fillable field
+      // (options, success fees, notes, discount, programs) — "-" when blank.
+      data: d,
     };
   });
 
