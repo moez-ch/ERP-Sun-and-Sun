@@ -36,6 +36,16 @@ const DEFAULT_EMAIL_TEMPLATES = [
   },
 ];
 
+// Read the download filename from a response's Content-Disposition, preferring
+// the RFC 5987 filename* (UTF-8, keeps Turkish chars) over the ASCII filename=.
+function filenameFromCD(res, fallback) {
+  const cd = res.headers.get("Content-Disposition") || "";
+  const star = cd.match(/filename\*=UTF-8''([^;]+)/i);
+  if (star) { try { return decodeURIComponent(star[1]); } catch { return star[1]; } }
+  const m = cd.match(/filename="?([^";]+)"?/i);
+  return m ? m[1] : fallback;
+}
+
 function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function randN(arr, n) {
   const s = new Set();
@@ -6369,11 +6379,9 @@ Kurallar:
                   const r = await fetch(`/contracts/file/${id}`, { headers: { Authorization: `Bearer ${token}` } });
                   if (!r.ok) { alert("Stored file not found."); return; }
                   const blob = await r.blob();
-                  const cd = r.headers.get("Content-Disposition") || "";
-                  const m = cd.match(/filename="?([^"]+)"?/);
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement("a");
-                  a.href = url; a.download = m ? m[1] : `contract_${id}.pdf`; a.click();
+                  a.href = url; a.download = filenameFromCD(r, `contract_${id}.pdf`); a.click();
                   URL.revokeObjectURL(url);
                 };
                 return (
@@ -7404,11 +7412,9 @@ Kurallar:
                     const r = await fetch(`/pricing/file/${id}`, { headers: { Authorization: `Bearer ${token}` } });
                     if (!r.ok) { alert(L("Kayıtlı dosya bulunamadı.", "Stored file not found.")); return; }
                     const blob = await r.blob();
-                    const cd = r.headers.get("Content-Disposition") || "";
-                    const m = cd.match(/filename="?([^"]+)"?/);
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
-                    a.href = url; a.download = m ? m[1] : `teklif_${id}.pdf`; a.click();
+                    a.href = url; a.download = filenameFromCD(r, `teklif_${id}.pdf`); a.click();
                     URL.revokeObjectURL(url);
                   };
                   const dash = v => (v !== undefined && v !== null && String(v).trim() !== "") ? String(v) : "—";

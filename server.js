@@ -2410,13 +2410,42 @@ app.get("/pricing/report", authenticate, (req, res) => {
 // else only their own.
 function serveStored(table) {
   return (req, res) => {
-    const row = db.prepare(`SELECT stored_file, created_by_name FROM ${table} WHERE id=?`).get(req.params.id);
+    const row = db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(req.params.id);
     if (!row || !row.stored_file) return res.status(404).json({ error: "No stored file" });
     if (req.user?.role !== "admin" && row.created_by_name !== req.user?.name)
       return res.status(403).json({ error: "Forbidden" });
-    const fp = path.join(STORAGE_DIR, row.stored_file);
+    const fp = path.resolve(STORAGE_DIR, row.stored_file);
     if (!fs.existsSync(fp)) return res.status(404).json({ error: "File missing on server" });
-    return res.download(fp, row.stored_file);
+
+    // Rebuild the ORIGINAL filename the user got at generation time, then prefix
+    // the officer who created it (e.g. "Ziynet_ABC_Ltd_KOSGEB.pdf"). Turkish
+    // chars survive via RFC 5987 filename* (with an ASCII filename= fallback,
+    // since HTTP headers are Latin-1 only).
+    const ext = path.extname(row.stored_file) || ".pdf";
+    let base = "";
+    if (table === "price_quotes") {
+      // quote & program both used: [company, program].join("_")
+      const company = (row.client_name || "").trim();
+      const program = (row.program_name || "").replace(/^Fiyat Teklifi[^_]*_/i, "").trim();
+      base = [company, program].filter(Boolean).join("_");
+    } else {
+      // contract used: [first 2 words of party2_name, "Sözleşme", template].join("_")
+      let party2 = "";
+      try { party2 = (JSON.parse(row.data || "{}").party2_name || "").trim(); } catch {}
+      const party2Words = party2.split(/\s+/).filter(Boolean).slice(0, 2).join("_");
+      base = [party2Words, "Sözleşme", row.template_name].filter(Boolean).join("_");
+    }
+    const officer = (row.created_by_name || "").trim();
+    let name = [officer, base].filter(Boolean).join("_")
+      .replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "_");
+    if (!name) name = path.basename(row.stored_file, ext);
+    const full = name + ext;
+    const asciiName = full.normalize("NFKD").replace(/[^\x20-\x7E]/g, "") || `download${ext}`;
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(full)}`
+    );
+    return res.sendFile(fp);
   };
 }
 app.get("/pricing/file/:id",   authenticate, serveStored("price_quotes"));
