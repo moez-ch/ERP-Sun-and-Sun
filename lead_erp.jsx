@@ -2188,8 +2188,43 @@ function inlinePastedHtml(html) {
     const col = cs.color;
     if (col && col !== 'rgb(0, 0, 0)' && col !== 'rgba(0, 0, 0, 0)') styles.push(`color:${col}`);
 
-    // Strip Word junk, keep only inline styles we computed
+    // Tables: preserve borders / padding / backgrounds as INLINE styles so they
+    // survive in email clients (Gmail strips <style> blocks — only inline sticks).
+    const tag = el.tagName;
+    const isTableEl = ['TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TD', 'TH'].includes(tag);
+    if (isTableEl) {
+      if (tag === 'TABLE') styles.push('border-collapse:collapse');
+      // Per-side borders (handles collapsed borders where only some sides render)
+      ['Top', 'Right', 'Bottom', 'Left'].forEach(side => {
+        const bw = cs['border' + side + 'Width'];
+        const bs = cs['border' + side + 'Style'];
+        const bc = cs['border' + side + 'Color'];
+        if (bw && parseFloat(bw) > 0 && bs && bs !== 'none') {
+          styles.push(`border-${side.toLowerCase()}:${bw} ${bs} ${bc}`);
+        }
+      });
+      // Cell padding + vertical alignment
+      if (tag === 'TD' || tag === 'TH') {
+        const pad = cs.padding;
+        if (pad && pad !== '0px') styles.push(`padding:${pad}`);
+        const va = cs.verticalAlign;
+        if (va && va !== 'baseline' && va !== 'middle') styles.push(`vertical-align:${va}`);
+      }
+      // Cell / row background fill
+      const bg = cs.backgroundColor;
+      if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') styles.push(`background-color:${bg}`);
+    }
+
+    // Structural attributes worth keeping (merged cells, table width)
+    const keepAttrs = {};
+    if (tag === 'TD' || tag === 'TH') {
+      if (el.getAttribute('colspan')) keepAttrs.colspan = el.getAttribute('colspan');
+      if (el.getAttribute('rowspan')) keepAttrs.rowspan = el.getAttribute('rowspan');
+    }
+
+    // Strip Word junk, keep only inline styles we computed + kept structural attrs
     [...el.attributes].forEach(a => el.removeAttribute(a.name));
+    Object.entries(keepAttrs).forEach(([k, v]) => el.setAttribute(k, v));
     if (styles.length) el.setAttribute('style', styles.join(';'));
   });
 
