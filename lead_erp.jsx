@@ -2367,6 +2367,10 @@ Kurallar:
   const EMPTY_OPT = () => ({ title: "", dp: "", dp_original: "", succ_fee_1: "", note1: "", succ_fee_2: "", note2: "" });
   const [pricingData, setPricingData] = useState({ num_options: 1, gen_note: "", design_id: "", theme: "blue", discount: false, client_name: "", opt: [EMPTY_OPT(), EMPTY_OPT(), EMPTY_OPT()] });
   const [pricingMode, setPricingMode] = useState("quote"); // "quote" | "program"
+  const [pricingReportView, setPricingReportView] = useState(false); // false=form, true=history
+  const [pricingReport, setPricingReport] = useState(null);
+  const [pricingReportLoading, setPricingReportLoading] = useState(false);
+  const [pricingReportFilters, setPricingReportFilters] = useState({ date_from: "", date_to: "", prepared_by: "" });
   const EMPTY_PROG = () => ({ name: "", fee: "", bonus: "" });
   const [programData, setProgramData] = useState({ num_programs: 1, party2_name: "", contract_date: new Date().toLocaleDateString("tr-TR"), notes: "", programs: [EMPTY_PROG(), EMPTY_PROG(), EMPTY_PROG()] });
   const [programGenerating, setProgramGenerating] = useState(false);
@@ -7273,10 +7277,99 @@ Kurallar:
           return (
             <div style={{ flex: 1, overflowY: "auto", padding: 32 }}>
               <div style={{ maxWidth: 580, margin: "0 auto" }}>
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>{t("pricing_title")}</div>
+                <div style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ fontSize: 22, fontWeight: 800 }}>{t("pricing_title")}</div>
+                  <button onClick={() => setPricingReportView(v => !v)}
+                    style={{ padding: "7px 14px", background: pricingReportView ? colors.primary : `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 7, color: pricingReportView ? "#fff" : colors.primaryLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    {pricingReportView ? (lang === "tr" ? "← Geri" : "← Back") : (lang === "tr" ? "📊 Geçmiş" : "📊 History")}
+                  </button>
                 </div>
 
+                {pricingReportView ? (() => {
+                  const runReport = async () => {
+                    setPricingReportLoading(true);
+                    const token = localStorage.getItem("sns_token");
+                    const params = new URLSearchParams();
+                    if (pricingReportFilters.date_from) params.append("date_from", pricingReportFilters.date_from);
+                    if (pricingReportFilters.date_to)   params.append("date_to",   pricingReportFilters.date_to);
+                    if (pricingReportFilters.prepared_by) params.append("prepared_by", pricingReportFilters.prepared_by);
+                    try {
+                      const r = await fetch(`/pricing/report?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+                      setPricingReport(await r.json());
+                    } catch (e) { alert("Report error: " + e.message); }
+                    finally { setPricingReportLoading(false); }
+                  };
+                  const fmt = v => v ? Number(v).toLocaleString("tr-TR") : "—";
+                  const L = (tr, en) => (lang === "tr" ? tr : en);
+                  return (
+                    <div>
+                      {/* Filters */}
+                      <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 18, marginBottom: 20, display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+                        {[
+                          { label: L("Başlangıç", "Start Date"), key: "date_from" },
+                          { label: L("Bitiş", "End Date"),        key: "date_to" },
+                        ].map(f => (
+                          <div key={f.key}>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{f.label}</div>
+                            <input type="date" value={pricingReportFilters[f.key]}
+                              onChange={e => setPricingReportFilters(p => ({ ...p, [f.key]: e.target.value }))}
+                              style={{ padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" }} />
+                          </div>
+                        ))}
+                        {isAdmin && (
+                          <div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{L("Hazırlayan", "Prepared By")}</div>
+                            <select value={pricingReportFilters.prepared_by}
+                              onChange={e => setPricingReportFilters(p => ({ ...p, prepared_by: e.target.value }))}
+                              style={{ padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", minWidth: 160 }}>
+                              <option value="">{L("Tümü", "All")}</option>
+                              {(pricingReport?.preparers || []).map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                          </div>
+                        )}
+                        <button onClick={runReport} disabled={pricingReportLoading}
+                          style={{ padding: "8px 20px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: pricingReportLoading ? 0.6 : 1 }}>
+                          {pricingReportLoading ? L("Yükleniyor…", "Loading…") : L("Raporu Getir", "Run Report")}
+                        </button>
+                      </div>
+
+                      {pricingReport && (
+                        <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
+                          <div style={{ padding: "12px 18px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
+                            <span>{L("Sonuçlar", "Results")} — {pricingReport.total_count} {L("teklif", "quote(s)")}</span>
+                            <span style={{ color: colors.primary }}>{fmt(pricingReport.total_value)} TL</span>
+                          </div>
+                          <div style={{ overflowX: "auto" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                              <thead>
+                                <tr style={{ background: colors.bg }}>
+                                  {[L("Tarih", "Date"), L("Hazırlayan", "Prepared By"), L("Müşteri", "Client"), L("Program", "Program"), L("Seçenekler", "Options"), L("Not", "Note"), L("Tutar", "Value")].map(h => (
+                                    <th key={h} style={{ padding: "9px 14px", textAlign: h === L("Tutar", "Value") ? "right" : "left", color: colors.textMuted, fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, borderBottom: `1px solid ${colors.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {pricingReport.quotes.length === 0 ? (
+                                  <tr><td colSpan={7} style={{ padding: "24px 16px", textAlign: "center", color: colors.textMuted }}>{L("Bu dönem için teklif bulunamadı.", "No quotes found for this period.")}</td></tr>
+                                ) : pricingReport.quotes.map(q => (
+                                  <tr key={q.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                                    <td style={{ padding: "9px 14px", color: colors.textMuted, whiteSpace: "nowrap" }}>{new Date(String(q.created_at).replace(" ", "T") + "Z").toLocaleString("tr-TR")}</td>
+                                    <td style={{ padding: "9px 14px" }}>{q.prepared_by || "—"}</td>
+                                    <td style={{ padding: "9px 14px", fontWeight: 600 }}>{q.client_name || "—"}</td>
+                                    <td style={{ padding: "9px 14px" }}>{q.program_name || "—"}</td>
+                                    <td style={{ padding: "9px 14px", color: colors.textMuted, maxWidth: 320 }}>{q.summary || `${q.options_count} ${L("seçenek", "option(s)")}`}</td>
+                                    <td style={{ padding: "9px 14px", color: colors.textMuted, maxWidth: 200 }}>{q.note || "—"}</td>
+                                    <td style={{ padding: "9px 14px", textAlign: "right", color: colors.primary, fontWeight: 600, whiteSpace: "nowrap" }}>{q.value ? fmt(q.value) + " TL" : "—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })() : (
                 <>
 
                 {/* Program presentations picker */}
@@ -7484,6 +7577,7 @@ Kurallar:
                   {pricingGenerating ? t("pricing_building") : t("pricing_download")}
                 </button>
               </>
+              )}
               </div>
             </div>
           );

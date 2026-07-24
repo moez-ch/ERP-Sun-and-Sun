@@ -562,6 +562,22 @@ try { db.exec(`ALTER TABLE program_presentations ADD COLUMN cover_color TEXT NOT
 try { db.exec(`ALTER TABLE program_presentations ADD COLUMN cover_title TEXT NOT NULL DEFAULT ''`); } catch {}
 try { db.exec(`ALTER TABLE program_presentations ADD COLUMN cover_subtitle TEXT NOT NULL DEFAULT ''`); } catch {}
 
+// ── PRICE QUOTES ─ log of every generated Fiyat Teklifi, powering the History
+// view. `data` holds the full form payload entered at creation (options, fees,
+// notes…); client_name + program_name are denormalised for quick listing.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS price_quotes (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    mode         TEXT NOT NULL DEFAULT 'quote',
+    client_name  TEXT,
+    program_name TEXT,
+    data         TEXT NOT NULL,
+    created_by   INTEGER,
+    created_by_name TEXT,
+    created_at   TEXT DEFAULT (datetime('now'))
+  )
+`);
+
 // Seed program presentations on first run
 if (db.prepare("SELECT COUNT(*) as c FROM program_presentations").get().c === 0) {
   const SEED = [
@@ -2147,11 +2163,18 @@ app.get("/contracts/history", authenticate, (req, res) => {
 // GET /contracts/report — aggregated reporting with date + preparer filters
 app.get("/contracts/report", authenticate, (req, res) => {
   const { date_from, date_to, prepared_by } = req.query;
+  const isAdmin = req.user?.role === "admin";
   let where = "WHERE 1=1";
   const params = [];
   if (date_from) { where += " AND date(created_at) >= date(?)"; params.push(date_from); }
   if (date_to)   { where += " AND date(created_at) <= date(?)"; params.push(date_to); }
-  if (prepared_by) { where += " AND created_by_name = ?"; params.push(prepared_by); }
+  // Visibility: admins (Esra) see everyone and may filter by preparer; everyone
+  // else is hard-locked to their own contracts, whatever the query param says.
+  if (isAdmin) {
+    if (prepared_by) { where += " AND created_by_name = ?"; params.push(prepared_by); }
+  } else {
+    where += " AND created_by_name = ?"; params.push(req.user.name);
+  }
 
   const rows = db.prepare(
     `SELECT id, template_name, data, created_by_name, created_at FROM contracts ${where} ORDER BY created_at DESC`
@@ -2174,9 +2197,74 @@ app.get("/contracts/report", authenticate, (req, res) => {
     groups[key].contracts.push(c);
   });
 
-  const preparers = [...new Set(db.prepare("SELECT DISTINCT created_by_name FROM contracts WHERE created_by_name IS NOT NULL").all().map(r => r.created_by_name))].sort();
+  const preparers = isAdmin
+    ? [...new Set(db.prepare("SELECT DISTINCT created_by_name FROM contracts WHERE created_by_name IS NOT NULL").all().map(r => r.created_by_name))].sort()
+    : [req.user.name];
 
-  res.json({ groups: Object.values(groups), total_count: parsed.length, total_value: parsed.reduce((s, c) => s + c.value, 0), preparers });
+  res.json({ groups: Object.values(groups), total_count: parsed.length, total_value: parsed.reduce((s, c) => s + c.value, 0), preparers, is_admin: isAdmin });
+});
+
+// GET /pricing/report — Fiyat Teklifi (price-quote) history. Same date/preparer
+// filters and visibility rules as /contracts/report: admins (Esra) see every
+// preparer, everyone else is hard-locked to their own quotes.
+app.get("/pricing/report", authenticate, (req, res) => {
+  const { date_from, date_to, prepared_by } = req.query;
+  const isAdmin = req.user?.role === "admin";
+  let where = "WHERE 1=1";
+  const params = [];
+  if (date_from) { where += " AND date(created_at) >= date(?)"; params.push(date_from); }
+  if (date_to)   { where += " AND date(created_at) <= date(?)"; params.push(date_to); }
+  if (isAdmin) {
+    if (prepared_by) { where += " AND created_by_name = ?"; params.push(prepared_by); }
+  } else {
+    where += " AND created_by_name = ?"; params.push(req.user.name);
+  }
+
+  const rows = db.prepare(
+    `SELECT id, mode, client_name, program_name, data, created_by_name, created_at FROM price_quotes ${where} ORDER BY created_at DESC`
+  ).all(...params);
+
+  const num = v => {
+    const raw = String(v ?? "").replace(/[^\d.,]/g, "").replace(/\./g, "").replace(",", ".");
+    return parseFloat(raw) || 0;
+  };
+
+  const quotes = rows.map(r => {
+    let d = {};
+    try { d = JSON.parse(r.data); } catch {}
+    const opts = Array.isArray(d.opt) ? d.opt : [];
+    const progs = Array.isArray(d.programs) ? d.programs : [];
+    // Headline value = first option's down payment (quote) / first program fee.
+    const value = r.mode === "program" ? num(progs[0]?.fee) : num(opts[0]?.dp);
+    // One-line summary of the options/programs entered at creation.
+    const summary = r.mode === "program"
+      ? progs.filter(p => p && p.name).map(p => `${p.name}${p.fee ? " — " + p.fee : ""}`).join("  |  ")
+      : opts.filter(o => o && (o.title || o.dp)).map(o => `${o.title || "Seçenek"}${o.dp ? " — " + o.dp : ""}`).join("  |  ");
+    return {
+      id: r.id,
+      mode: r.mode,
+      client_name: r.client_name || d.client_name || d.party2_name || "",
+      program_name: r.program_name || "",
+      options_count: r.mode === "program" ? progs.length : opts.length,
+      summary,
+      note: d.gen_note || d.notes || "",
+      prepared_by: r.created_by_name || "",
+      value,
+      created_at: r.created_at,
+    };
+  });
+
+  const preparers = isAdmin
+    ? [...new Set(db.prepare("SELECT DISTINCT created_by_name FROM price_quotes WHERE created_by_name IS NOT NULL").all().map(r => r.created_by_name))].sort()
+    : [req.user.name];
+
+  res.json({
+    quotes,
+    total_count: quotes.length,
+    total_value: quotes.reduce((s, q) => s + q.value, 0),
+    preparers,
+    is_admin: isAdmin,
+  });
 });
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -3339,6 +3427,15 @@ app.post("/pricing/generate-program", authenticate, async (req, res) => {
       finalPdfBytes = slidePdfBytes;
     }
 
+    // Log this generation for the History view (non-fatal if it fails).
+    try {
+      const presRow = db.prepare("SELECT name FROM program_presentations WHERE design_id=?").get(targetDesignId);
+      db.prepare("INSERT INTO price_quotes (mode, client_name, program_name, data, created_by, created_by_name) VALUES ('program',?,?,?,?,?)")
+        .run((party2_name || "").trim(), presRow?.name || "",
+             JSON.stringify({ num_programs: n, party2_name: party2_name || "", contract_date: contract_date || "", notes: notes || "", programs: p, design_id: targetDesignId }),
+             req.user?.id, req.user?.name || req.user?.email);
+    } catch (logErr) { console.error("[pricing/generate-program log]", logErr); }
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="pricing_${Date.now()}.pdf"`);
     res.send(finalPdfBytes);
@@ -3384,6 +3481,15 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
       console.warn("[pricing/generate] Canva unavailable — returning slide only:", canvaErr.message);
       finalPdfBytes = slidePdfBytes;
     }
+
+    // Log this generation for the History view (non-fatal if it fails).
+    try {
+      const presRow = db.prepare("SELECT name FROM program_presentations WHERE design_id=?").get(targetDesignId);
+      db.prepare("INSERT INTO price_quotes (mode, client_name, program_name, data, created_by, created_by_name) VALUES ('quote',?,?,?,?,?)")
+        .run((client_name || "").trim(), presRow?.name || "",
+             JSON.stringify({ ...data, client_name: client_name || "", design_id: targetDesignId }),
+             req.user?.id, req.user?.name || req.user?.email);
+    } catch (logErr) { console.error("[pricing/generate log]", logErr); }
 
     const safeName = (client_name || "").trim().replace(/[\/\\:*?"<>|]/g, "").replace(/\s+/g, "_") || `pricing_${Date.now()}`;
     // HTTP headers are Latin-1 only: an ASCII fallback for `filename=` (Turkish
