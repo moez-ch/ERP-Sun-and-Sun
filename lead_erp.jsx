@@ -6303,6 +6303,18 @@ Kurallar:
                   finally { setContractReportLoading(false); }
                 };
                 const fmt = v => v ? Number(v).toLocaleString("tr-TR") : "—";
+                const dlContract = async (id) => {
+                  const token = localStorage.getItem("sns_token");
+                  const r = await fetch(`/contracts/file/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                  if (!r.ok) { alert("Stored file not found."); return; }
+                  const blob = await r.blob();
+                  const cd = r.headers.get("Content-Disposition") || "";
+                  const m = cd.match(/filename="?([^"]+)"?/);
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url; a.download = m ? m[1] : `contract_${id}.pdf`; a.click();
+                  URL.revokeObjectURL(url);
+                };
                 return (
                   <div>
                     {/* Filters */}
@@ -6373,9 +6385,15 @@ Kurallar:
                                           <div key={j} style={{ borderBottom: j < rows.length - 1 ? `1px solid ${colors.border}` : "none", padding: "14px 18px 14px 32px" }}>
                                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
                                               <div style={{ fontWeight: 700, fontSize: 12, color: colors.textMuted }}>#{rows.length - j} · {c.prepared_for || c.template_name}</div>
-                                              <div style={{ fontSize: 12, color: colors.textMuted }}>
-                                                {new Date(c.created_at).toLocaleDateString("tr-TR")} · {c.prepared_by || "—"}
-                                                <span style={{ color: colors.primary, fontWeight: 700, marginLeft: 10 }}>{fmt(c.value)} TL</span>
+                                              <div style={{ fontSize: 12, color: colors.textMuted, display: "flex", alignItems: "center", gap: 10 }}>
+                                                <span>{new Date(c.created_at).toLocaleDateString("tr-TR")} · {c.prepared_by || "—"}</span>
+                                                <span style={{ color: colors.primary, fontWeight: 700 }}>{fmt(c.value)} TL</span>
+                                                {c.has_file && (
+                                                  <button onClick={(e) => { e.stopPropagation(); dlContract(c.id); }}
+                                                    style={{ padding: "4px 10px", background: `${colors.primary}18`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                                                    ⬇ İndir
+                                                  </button>
+                                                )}
                                               </div>
                                             </div>
                                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "8px 20px" }}>
@@ -7312,6 +7330,18 @@ Kurallar:
                   };
                   const fmt = v => v ? Number(v).toLocaleString("tr-TR") : "—";
                   const L = (tr, en) => (lang === "tr" ? tr : en);
+                  const dlFile = async (id) => {
+                    const token = localStorage.getItem("sns_token");
+                    const r = await fetch(`/pricing/file/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                    if (!r.ok) { alert(L("Kayıtlı dosya bulunamadı.", "Stored file not found.")); return; }
+                    const blob = await r.blob();
+                    const cd = r.headers.get("Content-Disposition") || "";
+                    const m = cd.match(/filename="?([^"]+)"?/);
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url; a.download = m ? m[1] : `teklif_${id}.pdf`; a.click();
+                    URL.revokeObjectURL(url);
+                  };
                   const dash = v => (v !== undefined && v !== null && String(v).trim() !== "") ? String(v) : "—";
                   const noteLabel = v => { const n = NOTE_OPTIONS.find(o => o.value === v); return n ? (lang === "tr" ? n.tr : n.value) : dash(v); };
                   const feeLabel = v => (v !== undefined && v !== null && String(v).trim() !== "") ? `${v}% + KDV` : "—";
@@ -7380,9 +7410,15 @@ Kurallar:
                                     {q.client_name || "—"}
                                     <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.4 }}>{isProgram ? L("Program Teklifi", "Program Quote") : L("Fiyat Teklifi", "Price Quote")}</span>
                                   </div>
-                                  <div style={{ fontSize: 12, color: colors.textMuted }}>
-                                    {new Date(String(q.created_at).replace(" ", "T") + "Z").toLocaleString("tr-TR")} · {q.prepared_by || "—"}
-                                    <span style={{ color: colors.primary, fontWeight: 700, marginLeft: 10 }}>{q.value ? fmt(q.value) + " TL" : "—"}</span>
+                                  <div style={{ fontSize: 12, color: colors.textMuted, display: "flex", alignItems: "center", gap: 10 }}>
+                                    <span>{new Date(String(q.created_at).replace(" ", "T") + "Z").toLocaleString("tr-TR")} · {q.prepared_by || "—"}</span>
+                                    <span style={{ color: colors.primary, fontWeight: 700 }}>{q.value ? fmt(q.value) + " TL" : "—"}</span>
+                                    {q.has_file && (
+                                      <button onClick={() => dlFile(q.id)}
+                                        style={{ padding: "4px 10px", background: `${colors.primary}18`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                                        ⬇ {L("İndir", "Download")}
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                                 {/* Top-level fields */}
