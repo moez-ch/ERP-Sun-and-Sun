@@ -675,6 +675,7 @@ function finalizeContractDoc(rowId, ext, bytes, data, user) {
     if (fname) db.prepare("UPDATE contracts SET stored_file=? WHERE id=?").run(fname, rowId);
   } catch (e) { console.warn("[contract persist]", e.message); }
   notifyOdooChatter(data?.party2_name, user?.name || user?.email, "Sözleşme", data?.odoo_partner_id);
+  pushDailyPrepToOdoo(); // refresh today's prep counts for the 18:30 report
 }
 
 // ── Odoo JSON-RPC (outbound) ──────────────────────────────────────
@@ -720,6 +721,40 @@ async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = n
     if (posted === null) return; // creds not configured
     console.log(`[odoo chatter] posted "${kindLabel}" note to partner #${targetId} (${name || "id " + targetId})`);
   } catch (e) { console.warn("[odoo chatter]", e.message); }
+}
+
+// ── Daily prep summary → Odoo config param (for the 18:30 pipeline report) ──
+// Proposals (price_quotes) & contracts live here, not in Odoo. On every
+// generation we recompute *today's* per-officer counts from SQLite (the source
+// of truth) and stash them in Odoo param `x_erp_daily_prep`, so whenever the
+// report action fires it reads an up-to-date snapshot. Turkey is UTC+3 with no
+// DST, so today-TR = date(created_at, '+3 hours'). Format is line-based (no JSON)
+// so Odoo's server-action sandbox can parse it: first line = date, then
+// "P\t<name>\t<count>" for proposals and "C\t<name>\t<count>" for contracts.
+function computeDailyPrep(dateStr) {
+  const q = (table) => db.prepare(
+    `SELECT COALESCE(NULLIF(TRIM(created_by_name),''),'—') AS name, COUNT(*) AS n
+       FROM ${table}
+      WHERE date(datetime(created_at, '+3 hours')) = ?
+      GROUP BY name ORDER BY n DESC, name`).all(dateStr);
+  return { proposals: q("price_quotes"), contracts: q("contracts") };
+}
+function serializeDailyPrep(dateStr, prep) {
+  const lines = [dateStr];
+  for (const r of prep.proposals) lines.push(`P\t${r.name}\t${r.n}`);
+  for (const r of prep.contracts) lines.push(`C\t${r.name}\t${r.n}`);
+  return lines.join("\n");
+}
+async function pushDailyPrepToOdoo() {
+  try {
+    const dateStr = new Date(Date.now() + 3 * 3600 * 1000).toISOString().slice(0, 10); // today in TR
+    const prep = computeDailyPrep(dateStr);
+    const value = serializeDailyPrep(dateStr, prep);
+    const r = await odooExec("ir.config_parameter", "set_param", ["x_erp_daily_prep", value]);
+    if (r === null) return null; // creds not configured
+    console.log(`[daily-prep] pushed ${dateStr}: ${prep.proposals.length} proposer(s), ${prep.contracts.length} contractor(s)`);
+    return { dateStr, prep };
+  } catch (e) { console.warn("[daily-prep]", e.message); return null; }
 }
 
 // Remove default seeded templates
@@ -2311,6 +2346,16 @@ app.post("/odoo/fill-company", authenticate, upload.single("file"), async (req, 
   }
 });
 
+// POST /report/push-prep-now — force-recompute today's proposal/contract prep
+// counts and push them to Odoo now (for testing the 18:30 report section).
+app.post("/report/push-prep-now", authenticate, async (req, res) => {
+  if (req.user?.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  const dateStr = new Date(Date.now() + 3 * 3600 * 1000).toISOString().slice(0, 10);
+  const prep = computeDailyPrep(dateStr);
+  const pushed = await pushDailyPrepToOdoo();
+  res.json({ ok: true, date: dateStr, pushedToOdoo: pushed !== null, ...prep });
+});
+
 // POST /contracts/ocr — extract text from tax certificate image via local EasyOCR
 app.post("/contracts/ocr", authenticate, upload.single("image"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No image provided" });
@@ -3684,6 +3729,7 @@ app.post("/pricing/generate-program", authenticate, async (req, res) => {
       const fname = persistGenerated("pricequote", info.lastInsertRowid, "pdf", Buffer.from(finalPdfBytes));
       if (fname) db.prepare("UPDATE price_quotes SET stored_file=? WHERE id=?").run(fname, info.lastInsertRowid);
       notifyOdooChatter(party2_name, req.user?.name || req.user?.email, "Fiyat Teklifi", odoo_partner_id);
+      pushDailyPrepToOdoo(); // refresh today's prep counts for the 18:30 report
     } catch (logErr) { console.error("[pricing/generate-program log]", logErr); }
 
     res.setHeader("Content-Type", "application/pdf");
@@ -3743,6 +3789,7 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
       const fname = persistGenerated("pricequote", info.lastInsertRowid, "pdf", Buffer.from(finalPdfBytes));
       if (fname) db.prepare("UPDATE price_quotes SET stored_file=? WHERE id=?").run(fname, info.lastInsertRowid);
       notifyOdooChatter(client_name, req.user?.name || req.user?.email, "Fiyat Teklifi", odoo_partner_id);
+      pushDailyPrepToOdoo(); // refresh today's prep counts for the 18:30 report
     } catch (logErr) { console.error("[pricing/generate log]", logErr); }
 
     const safeName = (client_name || "").trim().replace(/[\/\\:*?"<>|]/g, "").replace(/\s+/g, "_") || `pricing_${Date.now()}`;
