@@ -2249,6 +2249,68 @@ app.post("/contracts/pdf-tax", authenticate, upload.single("file"), async (req, 
   }
 });
 
+// POST /odoo/fill-company — read a vergi levhası PDF, find the matching company
+// in Odoo (by tax number first, then name), and fill ONLY the fields that are
+// currently empty in Odoo (tax number → vat, tax office → x_tax_office, address
+// → street). Never overwrites existing Odoo data. Also returns the extracted
+// fields so the form can be filled in the same click. Reports exactly what was
+// written and what was skipped.
+app.post("/odoo/fill-company", authenticate, upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No PDF provided" });
+  let fields;
+  try {
+    fields = await extractVergiLevhasi(req.file.buffer);
+  } catch (e) {
+    console.error("[odoo/fill-company] extract", e);
+    return res.status(500).json({ error: "Could not read the PDF. Make sure it is a GİB vergi levhası PDF." });
+  }
+  const name    = (fields.party2_name || "").trim();
+  const taxNo   = (fields.party2_tax_no || "").trim();
+  const office  = (fields.party2_tax_office || "").trim();
+  const address = (fields.party2_address || "").trim();
+  try {
+    // 1) resolve the Odoo partner — tax number is the reliable key
+    let ids = null, matchedBy = "";
+    if (taxNo) { ids = await odooExec("res.partner", "search", [[["vat", "=", taxNo]]], { limit: 2 }); if (ids) matchedBy = "vat"; }
+    if (ids === null) return res.json({ ok: false, disabled: true, fields });
+    if (!ids.length && name) {
+      ids = await odooExec("res.partner", "search", [[["is_company", "=", true], ["name", "ilike", name]]], { limit: 5 });
+      matchedBy = "name";
+    }
+    if (!ids || !ids.length) return res.json({ ok: false, notFound: true, fields });
+    if (matchedBy === "name" && ids.length > 1) {
+      const cands = await odooExec("res.partner", "read", [ids, ["id", "name", "vat", "city"]]);
+      return res.json({ ok: false, ambiguous: true, fields, candidates: cands });
+    }
+    const partnerId = ids[0];
+
+    // 2) read current values and fill only the empty ones
+    const cur = (await odooExec("res.partner", "read", [[partnerId], ["name", "vat", "x_tax_office", "street", "city"]]))[0];
+    const empty = v => v === false || v === undefined || v === null || String(v).trim() === "";
+    const plan = [
+      { key: "vat",          label: "Vergi No",      value: taxNo },
+      { key: "x_tax_office", label: "Vergi Dairesi", value: office },
+      { key: "street",       label: "Adres",         value: address },
+    ];
+    const write = {}, filled = [], skipped = [];
+    for (const f of plan) {
+      if (!f.value) continue;                       // nothing extracted for this field
+      if (empty(cur[f.key])) { write[f.key] = f.value; filled.push(f.label); }
+      else skipped.push(f.label);                   // Odoo already has a value → leave it
+    }
+    if (Object.keys(write).length) {
+      await odooExec("res.partner", "write", [[partnerId], write]);
+      const who = req.user?.name || req.user?.email || "Bir kullanıcı";
+      const body = `<p>📄 <b>${String(who).replace(/</g, "&lt;")}</b> vergi levhasından eksik bilgileri güncelledi: ${filled.join(", ")}.</p>`;
+      try { await odooExec("res.partner", "message_post", [[partnerId]], { body, message_type: "comment", subtype_xmlid: "mail.mt_note" }); } catch {}
+    }
+    res.json({ ok: true, fields, partner: { id: partnerId, name: cur.name }, matchedBy, filled, skipped });
+  } catch (e) {
+    console.error("[odoo/fill-company]", e);
+    res.status(502).json({ ok: false, error: "Odoo update failed", fields });
+  }
+});
+
 // POST /contracts/ocr — extract text from tax certificate image via local EasyOCR
 app.post("/contracts/ocr", authenticate, upload.single("image"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No image provided" });

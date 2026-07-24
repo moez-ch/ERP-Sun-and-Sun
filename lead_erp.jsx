@@ -2422,6 +2422,7 @@ Kurallar:
   const [contractPreviewHtml, setContractPreviewHtml] = useState("");
   const [contractFormPreviewHtml, setContractFormPreviewHtml] = useState("");
   const [contractOcrLoading, setContractOcrLoading] = useState(false);
+  const [odooFillLoading, setOdooFillLoading] = useState(false);
   const [contractUploadName, setContractUploadName] = useState("");
   const [contractUploadFile, setContractUploadFile] = useState(null);
   const [contractUploading, setContractUploading] = useState(false);
@@ -6021,6 +6022,41 @@ Kurallar:
             finally { setContractOcrLoading(false); }
           };
 
+          // Read a vergi levhası PDF, fill the form, AND push any info that's
+          // missing on the matching Odoo company (never overwrites existing).
+          const handleFillOdoo = async (file) => {
+            setOdooFillLoading(true);
+            try {
+              const token = localStorage.getItem("sns_token");
+              const fd = new FormData();
+              fd.append("file", file);
+              const r = await fetch("/odoo/fill-company", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+              const d = await r.json();
+              const L = (tr, en) => (lang === "tr" ? tr : en);
+              if (d.fields) setContractData(prev => ({ ...prev, ...d.fields })); // fill the form regardless
+              if (d.ok) {
+                const parts = [`${L("Firma", "Company")}: ${d.partner?.name || "?"}`];
+                parts.push(d.filled?.length
+                  ? `${L("Odoo'da güncellendi", "Updated in Odoo")}: ${d.filled.join(", ")}`
+                  : L("Odoo'da eksik bilgi yoktu — hiçbir şey değişmedi.", "Nothing was missing in Odoo — no changes."));
+                if (d.skipped?.length) parts.push(`${L("Zaten doluydu (dokunulmadı)", "Already filled (left as-is)")}: ${d.skipped.join(", ")}`);
+                alert(parts.join("\n"));
+              } else if (d.disabled) {
+                alert(L("Odoo bağlantısı yapılandırılmamış.", "Odoo connection is not configured."));
+              } else if (d.notFound) {
+                alert(L("Bu firma Odoo'da bulunamadı (vergi no / isim eşleşmedi). Bilgiler forma yine de dolduruldu.",
+                        "Company not found in Odoo (no tax-no / name match). The form was still filled."));
+              } else if (d.ambiguous) {
+                const names = (d.candidates || []).map(c => c.name).join(", ");
+                alert(L(`Odoo'da birden fazla eşleşme var: ${names}. Lütfen 🔍 Ara ile doğru firmayı seçin.`,
+                        `Multiple Odoo matches: ${names}. Please pick the right company with 🔍 Search.`));
+              } else {
+                alert(L("Odoo güncellemesi başarısız: ", "Odoo update failed: ") + (d.error || "?"));
+              }
+            } catch (e) { alert(e.message); }
+            finally { setOdooFillLoading(false); }
+          };
+
           const fv = contractTemplate?.visible_fields || {};
           const fieldVisible = k => fv[k] !== false;
 
@@ -7129,10 +7165,17 @@ Kurallar:
                     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionParty2")}</div>
-                        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6 }}>
-                          <input type="file" accept="application/pdf,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleOcr(e.target.files[0]); }} />
-                          <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{contractOcrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
-                        </label>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "5px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 6 }}>
+                            <input type="file" accept="application/pdf,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleOcr(e.target.files[0]); }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{contractOcrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
+                          </label>
+                          <label title={lang === "tr" ? "PDF'ten Odoo'daki eksik bilgileri doldur" : "Fill missing Odoo info from the PDF"}
+                            style={{ display: "flex", alignItems: "center", gap: 6, cursor: odooFillLoading ? "default" : "pointer", padding: "5px 10px", background: "#8b5cf622", border: "1px solid #8b5cf644", borderRadius: 6, opacity: odooFillLoading ? 0.6 : 1 }}>
+                            <input type="file" accept="application/pdf,.pdf" disabled={odooFillLoading} style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFillOdoo(e.target.files[0]); e.target.value = ""; }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: "#a78bfa" }}>{odooFillLoading ? (lang === "tr" ? "Odoo…" : "Odoo…") : (lang === "tr" ? "⇪ Odoo'yu Doldur" : "⇪ Fill Odoo")}</span>
+                          </label>
+                        </div>
                       </div>
                       <OdooCompanySearch colors={colors} lang={lang} onPick={c => setContractData(p => ({
                         ...p,
