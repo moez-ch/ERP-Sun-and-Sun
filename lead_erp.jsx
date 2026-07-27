@@ -1945,6 +1945,8 @@ function OdooCompanySearch({ colors, lang, onPick }) {
               <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
                 {[c.tax_no && `VKN ${c.tax_no}`, c.tax_office, c.city].filter(Boolean).join(" · ") || L("(detay yok)", "(no details)")}
               </div>
+              {c.address && <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>📍 {c.address}</div>}
+              {(c.phone || c.email) && <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{[c.phone && `📞 ${c.phone}`, c.email && `✉ ${c.email}`].filter(Boolean).join("  ·  ")}</div>}
             </div>
           ))}
         </div>
@@ -2380,6 +2382,7 @@ Kurallar:
   const [contractReport, setContractReport] = useState(null);
   const [contractReportLoading, setContractReportLoading] = useState(false);
   const [contractReportFilters, setContractReportFilters] = useState({ date_from: "", date_to: "", prepared_by: "" });
+  const [contractReportSearch, setContractReportSearch] = useState(""); // free-text company search on the report
   const [expandedContractGroup, setExpandedContractGroup] = useState(null);
   const [contractTemplate, setContractTemplate] = useState(null);
   const [editingFieldConfig, setEditingFieldConfig] = useState(null); // { tplId, fields: {key: bool} }
@@ -2479,6 +2482,7 @@ Kurallar:
   const [pricingReport, setPricingReport] = useState(null);
   const [pricingReportLoading, setPricingReportLoading] = useState(false);
   const [pricingReportFilters, setPricingReportFilters] = useState({ date_from: "", date_to: "", prepared_by: "" });
+  const [pricingReportSearch, setPricingReportSearch] = useState(""); // free-text company search on the quote report
   const EMPTY_PROG = () => ({ name: "", fee: "", bonus: "" });
   const [programData, setProgramData] = useState({ num_programs: 1, party2_name: "", contract_date: new Date().toLocaleDateString("tr-TR"), notes: "", programs: [EMPTY_PROG(), EMPTY_PROG(), EMPTY_PROG()] });
   const [programGenerating, setProgramGenerating] = useState(false);
@@ -6057,42 +6061,7 @@ Kurallar:
             finally { setContractOcrLoading(false); }
           };
 
-          // Read a vergi levhası PDF, fill the form, AND push any info that's
-          // missing on the matching Odoo company (never overwrites existing).
-          const handleFillOdoo = async (file) => {
-            setOdooFillLoading(true);
-            try {
-              const token = localStorage.getItem("sns_token");
-              const fd = new FormData();
-              fd.append("file", file);
-              const r = await fetch("/odoo/fill-company", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
-              const d = await r.json();
-              const L = (tr, en) => (lang === "tr" ? tr : en);
-              if (d.fields) setContractData(prev => ({ ...prev, ...d.fields })); // fill the form regardless
-              if (d.ok) {
-                const parts = [`${L("Firma", "Company")}: ${d.partner?.name || "?"}`];
-                parts.push(d.filled?.length
-                  ? `${L("Odoo'da güncellendi", "Updated in Odoo")}: ${d.filled.join(", ")}`
-                  : L("Odoo'da eksik bilgi yoktu — hiçbir şey değişmedi.", "Nothing was missing in Odoo — no changes."));
-                if (d.skipped?.length) parts.push(`${L("Zaten doluydu (dokunulmadı)", "Already filled (left as-is)")}: ${d.skipped.join(", ")}`);
-                alert(parts.join("\n"));
-              } else if (d.disabled) {
-                alert(L("Odoo bağlantısı yapılandırılmamış.", "Odoo connection is not configured."));
-              } else if (d.notFound) {
-                alert(L("Bu firma Odoo'da bulunamadı (vergi no / isim eşleşmedi). Bilgiler forma yine de dolduruldu.",
-                        "Company not found in Odoo (no tax-no / name match). The form was still filled."));
-              } else if (d.ambiguous) {
-                const names = (d.candidates || []).map(c => c.name).join(", ");
-                alert(L(`Odoo'da birden fazla eşleşme var: ${names}. Lütfen 🔍 Ara ile doğru firmayı seçin.`,
-                        `Multiple Odoo matches: ${names}. Please pick the right company with 🔍 Search.`));
-              } else {
-                alert(L("Odoo güncellemesi başarısız: ", "Odoo update failed: ") + (d.error || "?"));
-              }
-            } catch (e) { alert(e.message); }
-            finally { setOdooFillLoading(false); }
-          };
-
-          // Manual variant: push the values currently TYPED in the form into the
+          // Push the values currently TYPED in the form into the
           // matching Odoo company (fill-empty-only) — no PDF needed.
           const handleFillOdooManual = async () => {
             const L = (tr, en) => (lang === "tr" ? tr : en);
@@ -6527,11 +6496,56 @@ Kurallar:
                         style={{ padding: "8px 20px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: contractReportLoading ? 0.6 : 1 }}>
                         {contractReportLoading ? "Loading…" : "Run Report"}
                       </button>
+                      <div style={{ flex: 1, minWidth: 200 }}>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{lang === "tr" ? "Firma Ara" : "Search Company"}</div>
+                        <input value={contractReportSearch} onChange={e => setContractReportSearch(e.target.value)}
+                          placeholder={lang === "tr" ? "🔍 Firma adı… (ör. Analiz Kariyer)" : "🔍 Company name… (e.g. Analiz Kariyer)"}
+                          style={{ width: "100%", padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                      </div>
                     </div>
 
-                    {contractReport && (
+                    {contractReport && (() => {
+                      const q = contractReportSearch.trim().toLowerCase();
+                      const flatContracts = (contractReport.groups || []).flatMap(g => (g.contracts || []).map(c => ({ ...c, template_name: g.template_name, prepared_by: c.prepared_by || g.prepared_by })));
+                      const matches = q ? flatContracts.filter(c => `${c.prepared_for || ""} ${c.template_name || ""}`.toLowerCase().includes(q)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) : [];
+                      return (
                       <div>
-                        {/* Summary by template + preparer */}
+                        {q ? (
+                        /* Flat, company-name view while searching */
+                        <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
+                          <div style={{ padding: "12px 18px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>
+                            {lang === "tr" ? `"${contractReportSearch}" için ${matches.length} sözleşme` : `${matches.length} contract${matches.length !== 1 ? "s" : ""} matching "${contractReportSearch}"`}
+                          </div>
+                          {matches.length === 0 ? (
+                            <div style={{ padding: "24px 16px", textAlign: "center", color: colors.textMuted }}>{lang === "tr" ? "Eşleşme yok." : "No matches."}</div>
+                          ) : (
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                              <thead>
+                                <tr style={{ background: colors.bg }}>
+                                  {[lang === "tr" ? "Firma" : "Company", lang === "tr" ? "Sözleşme Türü" : "Contract Type", lang === "tr" ? "Tarih" : "Date", lang === "tr" ? "Hazırlayan" : "Prepared By", lang === "tr" ? "Tutar" : "Value", ""].map((h, hi) => (
+                                    <th key={hi} style={{ padding: "10px 16px", textAlign: hi === 4 ? "right" : "left", color: colors.textMuted, fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, borderBottom: `1px solid ${colors.border}` }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {matches.map((c, ci) => (
+                                  <tr key={ci} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                                    <td style={{ padding: "11px 16px", fontWeight: 600 }}>{c.prepared_for || "—"}</td>
+                                    <td style={{ padding: "11px 16px", color: colors.textMuted }}>{c.template_name}</td>
+                                    <td style={{ padding: "11px 16px", color: colors.textMuted }}>{new Date(c.created_at).toLocaleDateString("tr-TR")}</td>
+                                    <td style={{ padding: "11px 16px", color: colors.textMuted }}>{c.prepared_by || "—"}</td>
+                                    <td style={{ padding: "11px 16px", textAlign: "right", color: colors.primary, fontWeight: 700 }}>{fmt(c.value)} TL</td>
+                                    <td style={{ padding: "11px 16px", textAlign: "right" }}>{c.has_file && (
+                                      <button onClick={() => dlContract(c.id)} style={{ padding: "4px 10px", background: `${colors.primary}18`, border: `1px solid ${colors.primary}44`, borderRadius: 6, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>⬇ İndir</button>
+                                    )}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                        ) : (
+                        /* Summary by template + preparer */
                         <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
                           <div style={{ padding: "12px 18px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>
                             Results — {contractReport.total_count} contract{contractReport.total_count !== 1 ? "s" : ""}
@@ -6608,8 +6622,10 @@ Kurallar:
                             </tfoot>
                           </table>
                         </div>
+                        )}
                       </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 );
               })() : contractView === "templates" ? (
@@ -7249,11 +7265,6 @@ Kurallar:
                             <input type="file" accept="application/pdf,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleOcr(e.target.files[0]); }} />
                             <span style={{ fontSize: 11, fontWeight: 600, color: colors.primaryLight }}>{contractOcrLoading ? t("contract_ocrLoading") : t("contract_ocrBtn")}</span>
                           </label>
-                          <label title={lang === "tr" ? "PDF'ten Odoo'daki eksik bilgileri doldur" : "Fill missing Odoo info from the PDF"}
-                            style={{ display: "flex", alignItems: "center", gap: 6, cursor: odooFillLoading ? "default" : "pointer", padding: "5px 10px", background: "#8b5cf622", border: "1px solid #8b5cf644", borderRadius: 6, opacity: odooFillLoading ? 0.6 : 1 }}>
-                            <input type="file" accept="application/pdf,.pdf" disabled={odooFillLoading} style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFillOdoo(e.target.files[0]); e.target.value = ""; }} />
-                            <span style={{ fontSize: 11, fontWeight: 600, color: "#a78bfa" }}>{odooFillLoading ? (lang === "tr" ? "Odoo…" : "Odoo…") : (lang === "tr" ? "⇪ PDF'ten Doldur" : "⇪ From PDF")}</span>
-                          </label>
                           <button type="button" onClick={handleFillOdooManual} disabled={odooFillLoading}
                             title={lang === "tr" ? "Formdaki bilgileri Odoo'daki eksik alanlara yaz" : "Write the form values into the empty Odoo fields"}
                             style={{ display: "flex", alignItems: "center", gap: 6, cursor: odooFillLoading ? "default" : "pointer", padding: "5px 10px", background: "#8b5cf622", border: "1px solid #8b5cf644", borderRadius: 6, opacity: odooFillLoading ? 0.6 : 1, color: "#a78bfa", fontSize: 11, fontWeight: 600 }}>
@@ -7595,6 +7606,8 @@ Kurallar:
                       ))}
                     </div>
                   );
+                  const pqSearch = pricingReportSearch.trim().toLowerCase();
+                  const pricingQuotes = pricingReport ? (pqSearch ? pricingReport.quotes.filter(q => (q.client_name || "").toLowerCase().includes(pqSearch)) : pricingReport.quotes) : [];
                   return (
                     <div>
                       {/* Filters */}
@@ -7625,17 +7638,23 @@ Kurallar:
                           style={{ padding: "8px 20px", background: colors.primary, border: "none", borderRadius: 7, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: pricingReportLoading ? 0.6 : 1 }}>
                           {pricingReportLoading ? L("Yükleniyor…", "Loading…") : L("Raporu Getir", "Run Report")}
                         </button>
+                        <div style={{ flex: 1, minWidth: 200 }}>
+                          <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{L("Firma Ara", "Search Company")}</div>
+                          <input value={pricingReportSearch} onChange={e => setPricingReportSearch(e.target.value)}
+                            placeholder={L("🔍 Firma adı… (ör. Analiz Kariyer)", "🔍 Company name… (e.g. Analiz Kariyer)")}
+                            style={{ width: "100%", padding: "7px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                        </div>
                       </div>
 
                       {pricingReport && (
                         <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}>
                           <div style={{ padding: "12px 18px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-                            <span>{L("Sonuçlar", "Results")} — {pricingReport.total_count} {L("teklif", "quote(s)")}</span>
+                            <span>{L("Sonuçlar", "Results")} — {pqSearch ? pricingQuotes.length : pricingReport.total_count} {L("teklif", "quote(s)")}</span>
                             <span style={{ color: colors.primary }}>{fmt(pricingReport.total_value)} TL</span>
                           </div>
-                          {pricingReport.quotes.length === 0 ? (
-                            <div style={{ padding: "28px 16px", textAlign: "center", color: colors.textMuted, fontSize: 13 }}>{L("Bu dönem için teklif bulunamadı.", "No quotes found for this period.")}</div>
-                          ) : pricingReport.quotes.map(q => {
+                          {pricingQuotes.length === 0 ? (
+                            <div style={{ padding: "28px 16px", textAlign: "center", color: colors.textMuted, fontSize: 13 }}>{pqSearch ? L("Eşleşme yok.", "No matches.") : L("Bu dönem için teklif bulunamadı.", "No quotes found for this period.")}</div>
+                          ) : pricingQuotes.map(q => {
                             const d = q.data || {};
                             const isProgram = q.mode === "program";
                             const opts = Array.isArray(d.opt) ? d.opt.slice(0, d.num_options || d.opt.length) : [];
