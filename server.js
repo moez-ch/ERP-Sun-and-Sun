@@ -779,6 +779,36 @@ async function odooNoteSubtypeId() {
   return _noteSubtypeId;
 }
 
+// Render the first pages of a PDF to PNG so they can be shown INSIDE the Odoo
+// note. Odoo's chatter sanitiser drops <iframe>/<embed>/<object> but keeps
+// <img>, so a document can only unfold in place as images (day396 probe).
+// Uses poppler's pdftoppm; returns [] on any failure — never fatal, the note is
+// still posted with the PDF attached.
+function renderPdfPagesToPng(pdfBuffer, maxPages = 5) {
+  const stamp = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const base = path.join(STORAGE_DIR, `_pv_${stamp}`);
+  const src = `${base}.pdf`;
+  const out = [];
+  try {
+    fs.writeFileSync(src, pdfBuffer);
+    // -r 110 keeps a page readable on screen without producing huge files
+    execSync(`pdftoppm -png -r 110 -f 1 -l ${maxPages} "${src}" "${base}"`,
+             { stdio: "pipe", timeout: 60000 });
+    const dir = path.dirname(base);
+    const prefix = path.basename(base);
+    for (const f of fs.readdirSync(dir).filter(x => x.startsWith(prefix) && x.endsWith(".png")).sort()) {
+      const p = path.join(dir, f);
+      out.push(fs.readFileSync(p).toString("base64"));
+      try { fs.unlinkSync(p); } catch {}
+    }
+  } catch (e) {
+    console.warn("[pdf preview] pdftoppm failed:", e.message);
+  } finally {
+    try { fs.unlinkSync(src); } catch {}
+  }
+  return out;
+}
+
 // `attachment` (optional): {name, b64, mimetype}. Esra: "I get the note 'Esra
 // Serin created a price quote' but I can't access the quote itself — I need a
 // 'View Price Quote' like 'View Email'." So the generated PDF is uploaded to
@@ -810,12 +840,44 @@ async function odooPostHtmlNote(partnerId, html, attachment = null) {
         attIds = [attId];
         const base = String(process.env.ODOO_URL || "").replace(/\/+$/, "");
         const label = attachment.label || "Belgeyi Görüntüle";
-        viewLink =
-          `<div style="margin-top:8px;">` +
-          `<a href="${base}/web/content/${attId}?download=false" ` +
-          `style="display:inline-block;padding:5px 12px;background:#714B67;` +
-          `color:#ffffff;border-radius:4px;text-decoration:none;` +
-          `font-weight:600;font-size:12px;">\u{1F4C4} ${label}</a></div>`;
+
+        // Unfold the document IN PLACE, the same way the e-mail note does.
+        // Pages are rendered to PNG and uploaded, because the sanitiser keeps
+        // <img> but strips <iframe>/<embed>/<object>.
+        let pagesHtml = "";
+        if (attachment.mimetype === "application/pdf" && attachment.b64) {
+          const pages = renderPdfPagesToPng(Buffer.from(attachment.b64, "base64"), 5);
+          for (let i = 0; i < pages.length; i++) {
+            const pid = await odooExec("ir.attachment", "create", [{
+              name: `${attachment.name.replace(/\.pdf$/i, "")}_sayfa${i + 1}.png`,
+              datas: pages[i],
+              res_model: "res.partner",
+              res_id: Number(partnerId),
+              mimetype: "image/png",
+            }]);
+            if (pid) {
+              pagesHtml += `<img src="${base}/web/content/${pid}" width="700" ` +
+                `style="max-width:100%;margin-bottom:8px;border:1px solid #ddd;"/>`;
+            }
+          }
+        }
+
+        const btn = "cursor:pointer;font-weight:600;color:#714B67;padding:4px 0;";
+        if (pagesHtml) {
+          viewLink =
+            `<details><summary style="${btn}">\u{1F4C4} ${label}</summary>` +
+            `<div style="background-color:#ffffff;padding:10px;">${pagesHtml}` +
+            `<div style="margin-top:6px;"><a href="${base}/web/content/${attId}?download=true">` +
+            `⬇ ${attachment.name}</a></div></div></details>`;
+        } else {
+          // no preview possible (docx, or pdftoppm unavailable) — plain link
+          viewLink =
+            `<div style="margin-top:8px;">` +
+            `<a href="${base}/web/content/${attId}?download=false" ` +
+            `style="display:inline-block;padding:5px 12px;background:#714B67;` +
+            `color:#ffffff;border-radius:4px;text-decoration:none;` +
+            `font-weight:600;font-size:12px;">\u{1F4C4} ${label}</a></div>`;
+        }
       }
     } catch (e) {
       console.warn("[odoo chatter] attachment failed:", e.message);
