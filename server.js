@@ -763,22 +763,33 @@ async function findOdooPartner({ name, taxNo }) {
 // its own), then write the HTML onto the created message — mail.message.body is
 // an Html field and write() stores it verbatim. If that second call fails the
 // note is still perfectly readable, just unformatted.
+let _noteSubtypeId = null;
+async function odooNoteSubtypeId() {
+  if (_noteSubtypeId !== null) return _noteSubtypeId;
+  const rows = await odooExec("ir.model.data", "search_read",
+    [[["module", "=", "mail"], ["name", "=", "mt_note"]]], { fields: ["res_id"], limit: 1 });
+  _noteSubtypeId = rows && rows.length ? rows[0].res_id : false;
+  return _noteSubtypeId;
+}
+
 async function odooPostHtmlNote(partnerId, html) {
-  const plain = String(html)
-    .replace(/<br\s*\/?>/gi, " ")
-    .replace(/<\/p>/gi, " ")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/\s+/g, " ").trim();
-  const msgId = await odooExec("res.partner", "message_post", [[partnerId]],
-    { body: plain, message_type: "comment", subtype_xmlid: "mail.mt_note" });
-  if (msgId === null || msgId === undefined) return msgId;
-  try {
-    await odooExec("mail.message", "write", [[msgId], { body: html }]);
-  } catch (e) {
-    console.warn("[odoo chatter] html upgrade failed, plain text kept:", e.message);
-  }
-  return msgId;
+  // Create the message directly instead of message_post(). Two reasons:
+  //  * message_post NOTIFIES the record's followers — Esra asked that "quote
+  //    sent" / "contract sent" stay on the company card and never reach her
+  //    inbox, especially on a mass-mailing day.
+  //  * a str body given to message_post is escaped by Odoo 17+, which is what
+  //    made notes show raw <p>/<b> tags. Writing the field directly keeps the
+  //    HTML verbatim, so no post-then-patch dance is needed.
+  const subtypeId = await odooNoteSubtypeId();
+  if (subtypeId === null) return null;                 // creds not configured
+  const vals = {
+    model: "res.partner",
+    res_id: Number(partnerId),
+    body: html,
+    message_type: "comment",
+  };
+  if (subtypeId) vals.subtype_id = subtypeId;
+  return await odooExec("mail.message", "create", [vals]);
 }
 
 async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = null) {
