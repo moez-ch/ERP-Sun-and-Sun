@@ -1513,6 +1513,11 @@ app.get("/odoo/company-search", authenticate, async (req, res) => {
         city: r.city && r.city !== false ? r.city : "",
         phone: r.phone && r.phone !== false ? r.phone : "",
         email: r.email && r.email !== false ? r.email : "",
+        // Direct link to the contact card. Address + phone are often not enough
+        // to tell two similar companies apart — Esra decides from the notes on
+        // the card, so the picker needs a way to open it.
+        url: process.env.ODOO_URL
+          ? `${String(process.env.ODOO_URL).replace(/\/+$/, "")}/odoo/contacts/${r.id}` : "",
       };
     });
     res.json({ ok: true, results });

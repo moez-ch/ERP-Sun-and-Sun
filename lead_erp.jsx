@@ -1941,7 +1941,20 @@ function OdooCompanySearch({ colors, lang, onPick }) {
               style={{ padding: "8px 10px", cursor: "pointer", borderBottom: `1px solid ${colors.border}` }}
               onMouseEnter={e => (e.currentTarget.style.background = colors.bg)}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: colors.text }}>{c.name}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: colors.text, flex: 1 }}>{c.name}</div>
+                {c.url && (
+                  /* Open the Odoo contact card in a new tab: two companies with
+                     near-identical names are told apart from their notes, which
+                     the address/phone lines here cannot show. */
+                  <a href={c.url} target="_blank" rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    title={L("Firma kartını Odoo'da aç", "Open the company card in Odoo")}
+                    style={{ textDecoration: "none", fontSize: 13, padding: "1px 5px",
+                             borderRadius: 4, border: `1px solid ${colors.border}`,
+                             color: colors.primaryLight, flexShrink: 0 }}>🔍</a>
+                )}
+              </div>
               <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
                 {[c.tax_no && `VKN ${c.tax_no}`, c.tax_office, c.city].filter(Boolean).join(" · ") || L("(detay yok)", "(no details)")}
               </div>
@@ -6507,14 +6520,21 @@ Kurallar:
                     {contractReport && (() => {
                       const q = contractReportSearch.trim().toLowerCase();
                       const flatContracts = (contractReport.groups || []).flatMap(g => (g.contracts || []).map(c => ({ ...c, template_name: g.template_name, prepared_by: c.prepared_by || g.prepared_by })));
-                      const matches = q ? flatContracts.filter(c => `${c.prepared_for || ""} ${c.template_name || ""}`.toLowerCase().includes(q)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) : [];
+                      // The company list is ALWAYS shown now — Esra had to open
+                      // every row to find out which company a contract was for.
+                      // Searching just narrows the same list.
+                      const matches = (q
+                        ? flatContracts.filter(c => `${c.prepared_for || ""} ${c.template_name || ""}`.toLowerCase().includes(q))
+                        : flatContracts
+                      ).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                       return (
                       <div>
-                        {q ? (
-                        /* Flat, company-name view while searching */
+                        {/* Company view — one row per contract */}
                         <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
                           <div style={{ padding: "12px 18px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>
-                            {lang === "tr" ? `"${contractReportSearch}" için ${matches.length} sözleşme` : `${matches.length} contract${matches.length !== 1 ? "s" : ""} matching "${contractReportSearch}"`}
+                            {q
+                              ? (lang === "tr" ? `"${contractReportSearch}" için ${matches.length} sözleşme` : `${matches.length} contract${matches.length !== 1 ? "s" : ""} matching "${contractReportSearch}"`)
+                              : (lang === "tr" ? `${matches.length} sözleşme` : `${matches.length} contract${matches.length !== 1 ? "s" : ""}`)}
                           </div>
                           {matches.length === 0 ? (
                             <div style={{ padding: "24px 16px", textAlign: "center", color: colors.textMuted }}>{lang === "tr" ? "Eşleşme yok." : "No matches."}</div>
@@ -6544,11 +6564,12 @@ Kurallar:
                             </table>
                           )}
                         </div>
-                        ) : (
-                        /* Summary by template + preparer */
+
+                        {/* Totals by contract type + preparer, kept below the
+                            company list so the per-type figures are not lost. */}
                         <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
                           <div style={{ padding: "12px 18px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, fontWeight: 700 }}>
-                            Results — {contractReport.total_count} contract{contractReport.total_count !== 1 ? "s" : ""}
+                            {lang === "tr" ? "Özet" : "Summary"} — {contractReport.total_count} contract{contractReport.total_count !== 1 ? "s" : ""}
                           </div>
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                             <thead>
@@ -6622,7 +6643,6 @@ Kurallar:
                             </tfoot>
                           </table>
                         </div>
-                        )}
                       </div>
                       );
                     })()}
@@ -7272,12 +7292,17 @@ Kurallar:
                           </button>
                         </div>
                       </div>
+                      {/* Picking a company LINKS it and fills only what is still
+                          empty. What the vergi levhası already put in the form is
+                          authoritative and must not be overwritten by Odoo's
+                          (often older/shorter) values — Esra lost tax-plate data
+                          that way. */}
                       <OdooCompanySearch colors={colors} lang={lang} onPick={c => setContractData(p => ({
                         ...p,
-                        party2_name: c.name || p.party2_name,
-                        party2_tax_office: c.tax_office || p.party2_tax_office,
-                        party2_tax_no: c.tax_no || p.party2_tax_no,
-                        party2_address: c.address || p.party2_address,
+                        party2_name: p.party2_name || c.name || "",
+                        party2_tax_office: p.party2_tax_office || c.tax_office || "",
+                        party2_tax_no: p.party2_tax_no || c.tax_no || "",
+                        party2_address: p.party2_address || c.address || "",
                         odoo_partner_id: c.id,
                       }))} />
                       {fieldVisible('party2_name') && field(t("contract_party2Name"), "party2_name", { placeholder: t("contract_party2NamePh") })}
