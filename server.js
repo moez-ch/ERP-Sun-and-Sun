@@ -703,6 +703,31 @@ async function odooExec(model, method, args = [], kwargs = {}) {
 
 // Best-effort: find the company by name and post a chatter note. Non-blocking;
 // swallows every error so document generation is never affected.
+// Post a chatter note that actually RENDERS its HTML.
+// Odoo 17+ escapes a plain-string `body` handed to message_post — it expects a
+// Markup object, which JSON-RPC cannot send, so "<p><b>x</b></p>" shows up as
+// literal text in the chatter. Workaround: post a plain-text body (correct on
+// its own), then write the HTML onto the created message — mail.message.body is
+// an Html field and write() stores it verbatim. If that second call fails the
+// note is still perfectly readable, just unformatted.
+async function odooPostHtmlNote(partnerId, html) {
+  const plain = String(html)
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/p>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ").trim();
+  const msgId = await odooExec("res.partner", "message_post", [[partnerId]],
+    { body: plain, message_type: "comment", subtype_xmlid: "mail.mt_note" });
+  if (msgId === null || msgId === undefined) return msgId;
+  try {
+    await odooExec("mail.message", "write", [[msgId], { body: html }]);
+  } catch (e) {
+    console.warn("[odoo chatter] html upgrade failed, plain text kept:", e.message);
+  }
+  return msgId;
+}
+
 async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = null) {
   try {
     let targetId = Number(partnerId) || null; // exact match from the ERP Search picker, if any
@@ -717,7 +742,7 @@ async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = n
     }
     const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const body = `<p>📄 <b>${esc(userName || "Bir kullanıcı")}</b> bir ${esc(kindLabel)} oluşturdu.</p>`;
-    const posted = await odooExec("res.partner", "message_post", [[targetId]], { body, message_type: "comment", subtype_xmlid: "mail.mt_note" });
+    const posted = await odooPostHtmlNote(targetId, body);
     if (posted === null) return; // creds not configured
     console.log(`[odoo chatter] posted "${kindLabel}" note to partner #${targetId} (${name || "id " + targetId})`);
   } catch (e) { console.warn("[odoo chatter]", e.message); }
@@ -2337,7 +2362,7 @@ async function fillOdooCompany({ partnerId, name, taxNo, office, address, phone,
     await odooExec("res.partner", "write", [[partnerId], write]);
     const w = String(who || "Bir kullanıcı").replace(/</g, "&lt;");
     const body = `<p>✍️ <b>${w}</b> ${source || "formdan"} eksik firma bilgilerini güncelledi: ${filled.join(", ")}.</p>`;
-    try { await odooExec("res.partner", "message_post", [[partnerId]], { body, message_type: "comment", subtype_xmlid: "mail.mt_note" }); } catch {}
+    try { await odooPostHtmlNote(partnerId, body); } catch {}
   }
   return { ok: true, partner: { id: partnerId, name: cur.name }, matchedBy, filled, skipped };
 }
