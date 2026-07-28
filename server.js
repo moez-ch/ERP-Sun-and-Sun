@@ -674,7 +674,14 @@ function finalizeContractDoc(rowId, ext, bytes, data, user) {
     const fname = persistGenerated("contract", rowId, ext, Buffer.from(bytes));
     if (fname) db.prepare("UPDATE contracts SET stored_file=? WHERE id=?").run(fname, rowId);
   } catch (e) { console.warn("[contract persist]", e.message); }
-  notifyOdooChatter(data?.party2_name, user?.name || user?.email, "Sözleşme", data?.odoo_partner_id);
+  const cName = ((data?.party2_name || "Sozlesme").trim().replace(/[\/:*?"<>|]/g, "") || "Sozlesme");
+  notifyOdooChatter(data?.party2_name, user?.name || user?.email, "Sözleşme", data?.odoo_partner_id, {
+    name: `${cName}_Sozlesme.${ext}`,
+    b64: Buffer.from(bytes).toString("base64"),
+    mimetype: ext === "pdf" ? "application/pdf"
+      : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    label: "Sözleşmeyi Görüntüle",
+  });
   pushDailyPrepToOdoo(); // refresh today's prep counts for the 18:30 report
 }
 
@@ -772,7 +779,12 @@ async function odooNoteSubtypeId() {
   return _noteSubtypeId;
 }
 
-async function odooPostHtmlNote(partnerId, html) {
+// `attachment` (optional): {name, b64, mimetype}. Esra: "I get the note 'Esra
+// Serin created a price quote' but I can't access the quote itself — I need a
+// 'View Price Quote' like 'View Email'." So the generated PDF is uploaded to
+// Odoo and attached to the note: it becomes downloadable straight from the
+// company card, with no ERP login needed.
+async function odooPostHtmlNote(partnerId, html, attachment = null) {
   // Create the message directly instead of message_post(). Two reasons:
   //  * message_post NOTIFIES the record's followers — Esra asked that "quote
   //    sent" / "contract sent" stay on the company card and never reach her
@@ -782,17 +794,46 @@ async function odooPostHtmlNote(partnerId, html) {
   //    HTML verbatim, so no post-then-patch dance is needed.
   const subtypeId = await odooNoteSubtypeId();
   if (subtypeId === null) return null;                 // creds not configured
+
+  let attIds = [];
+  let viewLink = "";
+  if (attachment && attachment.b64) {
+    try {
+      const attId = await odooExec("ir.attachment", "create", [{
+        name: attachment.name,
+        datas: attachment.b64,
+        res_model: "res.partner",
+        res_id: Number(partnerId),
+        mimetype: attachment.mimetype || "application/pdf",
+      }]);
+      if (attId) {
+        attIds = [attId];
+        const base = String(process.env.ODOO_URL || "").replace(/\/+$/, "");
+        const label = attachment.label || "Belgeyi Görüntüle";
+        viewLink =
+          `<div style="margin-top:8px;">` +
+          `<a href="${base}/web/content/${attId}?download=false" ` +
+          `style="display:inline-block;padding:5px 12px;background:#714B67;` +
+          `color:#ffffff;border-radius:4px;text-decoration:none;` +
+          `font-weight:600;font-size:12px;">\u{1F4C4} ${label}</a></div>`;
+      }
+    } catch (e) {
+      console.warn("[odoo chatter] attachment failed:", e.message);
+    }
+  }
+
   const vals = {
     model: "res.partner",
     res_id: Number(partnerId),
-    body: html,
+    body: html + viewLink,
     message_type: "comment",
   };
   if (subtypeId) vals.subtype_id = subtypeId;
+  if (attIds.length) vals.attachment_ids = [[6, 0, attIds]];
   return await odooExec("mail.message", "create", [vals]);
 }
 
-async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = null) {
+async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = null, attachment = null) {
   try {
     let targetId = Number(partnerId) || null; // exact match from the ERP Search picker, if any
     const name = (companyName || "").trim();
@@ -808,7 +849,7 @@ async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = n
     }
     const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const body = `<p>📄 <b>${esc(userName || "Bir kullanıcı")}</b> bir ${esc(kindLabel)} oluşturdu.</p>`;
-    const posted = await odooPostHtmlNote(targetId, body);
+    const posted = await odooPostHtmlNote(targetId, body, attachment);
     if (posted === null) return; // creds not configured
     console.log(`[odoo chatter] posted "${kindLabel}" note to partner #${targetId} (${name || "id " + targetId})`);
   } catch (e) { console.warn("[odoo chatter]", e.message); }
@@ -3867,7 +3908,12 @@ app.post("/pricing/generate-program", authenticate, async (req, res) => {
              req.user?.id, req.user?.name || req.user?.email);
       const fname = persistGenerated("pricequote", info.lastInsertRowid, "pdf", Buffer.from(finalPdfBytes));
       if (fname) db.prepare("UPDATE price_quotes SET stored_file=? WHERE id=?").run(fname, info.lastInsertRowid);
-      notifyOdooChatter(party2_name, req.user?.name || req.user?.email, "Fiyat Teklifi", odoo_partner_id);
+      notifyOdooChatter(party2_name, req.user?.name || req.user?.email, "Fiyat Teklifi", odoo_partner_id, {
+        name: `${((party2_name || "Teklif").trim().replace(/[\/:*?"<>|]/g, "") || "Teklif")}_Fiyat_Teklifi.pdf`,
+        b64: Buffer.from(finalPdfBytes).toString("base64"),
+        mimetype: "application/pdf",
+        label: "Teklifi Görüntüle",
+      });
       pushDailyPrepToOdoo(); // refresh today's prep counts for the 18:30 report
     } catch (logErr) { console.error("[pricing/generate-program log]", logErr); }
 
@@ -3927,7 +3973,12 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
              req.user?.id, req.user?.name || req.user?.email);
       const fname = persistGenerated("pricequote", info.lastInsertRowid, "pdf", Buffer.from(finalPdfBytes));
       if (fname) db.prepare("UPDATE price_quotes SET stored_file=? WHERE id=?").run(fname, info.lastInsertRowid);
-      notifyOdooChatter(client_name, req.user?.name || req.user?.email, "Fiyat Teklifi", odoo_partner_id);
+      notifyOdooChatter(client_name, req.user?.name || req.user?.email, "Fiyat Teklifi", odoo_partner_id, {
+        name: `${((client_name || "Teklif").trim().replace(/[\/:*?"<>|]/g, "") || "Teklif")}_Fiyat_Teklifi.pdf`,
+        b64: Buffer.from(finalPdfBytes).toString("base64"),
+        mimetype: "application/pdf",
+        label: "Teklifi Görüntüle",
+      });
       pushDailyPrepToOdoo(); // refresh today's prep counts for the 18:30 report
     } catch (logErr) { console.error("[pricing/generate log]", logErr); }
 
