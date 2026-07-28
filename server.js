@@ -703,6 +703,59 @@ async function odooExec(model, method, args = [], kwargs = {}) {
 
 // Best-effort: find the company by name and post a chatter note. Non-blocking;
 // swallows every error so document generation is never affected.
+// ── Finding a company in Odoo ───────────────────────────────────────────────
+// A vergi levhası gives the FULL legal name ("FERZAN MENSUCAT SANAYI VE TICARET
+// LIMITED SIRKETI") while Odoo usually stores the short trading name ("Ferzan
+// Mensucat"). Odoo's `ilike` is a substring match, so the long form matches
+// nothing — which is why quotes were silently posting no chatter note and why
+// the tax certificate "found no match". Strip the legal-form words and retry on
+// the distinctive leading words.
+const LEGAL_FORM_WORDS = new Set([
+  "sanayi", "sanayii", "san", "ticaret", "tic", "limited", "ltd", "şirketi",
+  "sirketi", "şti", "sti", "anonim", "aş", "as", "a.ş", "a.s", "ve", "ithalat",
+  "ihracat", "ith", "ihr", "kollektif", "komandit", "kooperatifi", "kooperatif",
+  "dış", "dis", "pazarlama",
+]);
+
+function companyCore(name, take = 2) {
+  const toks = String(name || "")
+    .replace(/[.,]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter(w => !LEGAL_FORM_WORDS.has(w.toLocaleLowerCase("tr")));
+  return toks.slice(0, take).join(" ");
+}
+
+// Returns {ids, matchedBy} — or {disabled:true} when Odoo creds are missing.
+async function findOdooPartner({ name, taxNo }) {
+  const raw = String(taxNo || "").trim();
+  const digits = raw.replace(/\D/g, "");
+  if (digits) {
+    const byVat = await odooExec("res.partner", "search",
+      [[["vat", "in", [raw, digits]]]], { limit: 2 });
+    if (byVat === null) return { disabled: true };
+    if (byVat.length) return { ids: byVat, matchedBy: "vat" };
+  }
+  const nm = String(name || "").trim();
+  if (!nm) return { ids: [], matchedBy: "" };
+
+  let ids = await odooExec("res.partner", "search",
+    [[["is_company", "=", true], ["name", "ilike", nm]]], { limit: 5 });
+  if (ids === null) return { disabled: true };
+  if (ids.length) return { ids, matchedBy: "name" };
+
+  for (const take of [3, 2]) {
+    const core = companyCore(nm, take);
+    if (core.length < 4) continue;
+    ids = await odooExec("res.partner", "search",
+      [[["is_company", "=", true], ["name", "ilike", core]]], { limit: 5 });
+    if (ids && ids.length) return { ids, matchedBy: `core:${core}` };
+  }
+  // last resort: people as well as companies
+  ids = await odooExec("res.partner", "search", [[["name", "ilike", nm]]], { limit: 5 });
+  return { ids: ids || [], matchedBy: ids && ids.length ? "any" : "" };
+}
+
 // Post a chatter note that actually RENDERS its HTML.
 // Odoo 17+ escapes a plain-string `body` handed to message_post — it expects a
 // Markup object, which JSON-RPC cannot send, so "<p><b>x</b></p>" shows up as
@@ -734,11 +787,13 @@ async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = n
     const name = (companyName || "").trim();
     if (!targetId) {
       if (!name) return;
-      let ids = await odooExec("res.partner", "search", [[["is_company", "=", true], ["name", "ilike", name]]], { limit: 2 });
-      if (ids === null) return; // creds not configured
-      if (!ids.length) ids = await odooExec("res.partner", "search", [[["name", "ilike", name]]], { limit: 2 });
-      if (!ids || !ids.length) { console.log(`[odoo chatter] no partner match for "${name}"`); return; }
-      targetId = ids[0];
+      const found = await findOdooPartner({ name });
+      if (found.disabled) return;                       // creds not configured
+      if (!found.ids.length) { console.log(`[odoo chatter] no partner match for "${name}"`); return; }
+      targetId = found.ids[0];
+      if (found.matchedBy.startsWith("core")) {
+        console.log(`[odoo chatter] matched "${name}" via ${found.matchedBy}`);
+      }
     }
     const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const body = `<p>📄 <b>${esc(userName || "Bir kullanıcı")}</b> bir ${esc(kindLabel)} oluşturdu.</p>`;
@@ -2329,15 +2384,14 @@ async function fillOdooCompany({ partnerId, name, taxNo, office, address, phone,
     // explicit partner (came from 🔍 Search) — trust it, no name/tax lookup
     matchedBy = "id";
   } else {
-    let ids = null;
-    if (taxNo) { ids = await odooExec("res.partner", "search", [[["vat", "=", taxNo]]], { limit: 2 }); if (ids) matchedBy = "vat"; }
-    if (ids === null) return { disabled: true };     // odooExec null => creds missing
-    if (!ids.length && name) {
-      ids = await odooExec("res.partner", "search", [[["is_company", "=", true], ["name", "ilike", name]]], { limit: 5 });
-      matchedBy = "name";
-    }
-    if (!ids || !ids.length) return { notFound: true };
-    if (matchedBy === "name" && ids.length > 1) {
+    const found = await findOdooPartner({ name, taxNo });
+    if (found.disabled) return { disabled: true };   // creds missing
+    const ids = found.ids;
+    matchedBy = found.matchedBy;
+    if (!ids.length) return { notFound: true };
+    // A tax-number hit is exact; a name/core hit with several candidates must
+    // be disambiguated by the user rather than guessed at.
+    if (matchedBy !== "vat" && ids.length > 1) {
       const cands = await odooExec("res.partner", "read", [ids, ["id", "name", "vat", "city"]]);
       return { ambiguous: true, candidates: cands };
     }
