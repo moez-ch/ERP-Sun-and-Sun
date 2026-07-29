@@ -7476,7 +7476,9 @@ Kurallar:
             { value: "Based on approved loan",    tr: "Onaylatılan Kredi Tutarı Üzerinden Hesaplanacaktır" },
             { value: "Based on benefit provided", tr: "Sağlanan Fayda Üzerinden Hesaplanacaktır" },
           ];
-          const FEE_OPTIONS = Array.from({ length: 15 }, (_, i) => i + 1);
+          // 0–15. Starts at 0 so a quote can state an explicit "0% + KDV"
+          // performance bonus, which is different from leaving it unset.
+          const FEE_OPTIONS = Array.from({ length: 16 }, (_, i) => i);
           const pd = (k, v) => setPricingData(p => ({ ...p, [k]: v }));
           const pdOpt = (i, k, v) => setPricingData(p => {
             const opt = p.opt.map((o, idx) => idx === i ? { ...o, [k]: v } : o);
