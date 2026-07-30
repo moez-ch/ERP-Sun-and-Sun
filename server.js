@@ -480,9 +480,25 @@ db.exec(`
 try { db.exec(`ALTER TABLE contract_companies ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`); } catch {}
 db.exec(`CREATE TABLE IF NOT EXISTS dropdown_options (id INTEGER PRIMARY KEY AUTOINCREMENT, dropdown_key TEXT NOT NULL, value TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
 try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_dropdown_options ON dropdown_options (dropdown_key, value)`); } catch {}
-{ const ins = db.prepare("INSERT OR IGNORE INTO dropdown_options (dropdown_key, value) VALUES (?,?)");
-  for (const v of ["Projenin onaylanmasını takip eden","Hakedişin tamamının müşteri hesabına yatmasını takip eden","Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden"]) { ins.run("deadline_type", v); }
-  for (const v of ["onaylanan destek","onaylanan kredi","sağlanan fayda"]) { ins.run("success_bonus_type", v); }
+// Seed the defaults ONCE, not on every boot. This used to re-run at every
+// start, so an option Esra deleted came back the next time the service was
+// restarted — she reported deleting the same three entries repeatedly.
+db.exec(`CREATE TABLE IF NOT EXISTS app_flags (key TEXT PRIMARY KEY, value TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+{
+  const seeded = db.prepare("SELECT 1 FROM app_flags WHERE key='dropdown_defaults_seeded'").get();
+  // An existing install already has its options — and may have deliberately
+  // deleted some. Mark it seeded without inserting, so upgrading does not
+  // resurrect them one last time.
+  if (!seeded && db.prepare("SELECT COUNT(*) c FROM dropdown_options").get().c > 0) {
+    db.prepare("INSERT INTO app_flags (key, value) VALUES ('dropdown_defaults_seeded', datetime('now'))").run();
+    console.log("[dropdown-options] existing options found — marked seeded, nothing added");
+  } else if (!seeded) {
+    const ins = db.prepare("INSERT OR IGNORE INTO dropdown_options (dropdown_key, value) VALUES (?,?)");
+    for (const v of ["Projenin onaylanmasını takip eden","Hakedişin tamamının müşteri hesabına yatmasını takip eden","Hakedişin kısmen ya da tamamının müşteri hesabına yatmasını takip eden"]) { ins.run("deadline_type", v); }
+    for (const v of ["onaylanan destek","onaylanan kredi","sağlanan fayda"]) { ins.run("success_bonus_type", v); }
+    db.prepare("INSERT INTO app_flags (key, value) VALUES ('dropdown_defaults_seeded', datetime('now'))").run();
+    console.log("[dropdown-options] defaults seeded (first run only)");
+  }
 }
 
 // ── COMPANY IBANs (multiple IBANs per company) ────────────────────
@@ -1854,11 +1870,26 @@ app.get("/dropdown-options", authenticate, (req, res) => {
   res.json(grouped);
 });
 
+// Turkish-aware comparison: İ/I and i/ı differ from the default lowercase
+const trKey = s => String(s ?? "").replace(/İ/g, "i").replace(/I/g, "ı")
+                                  .toLowerCase().replace(/\s+/g, " ").trim();
+
+function findCaseDuplicate(key, value, exceptId = null) {
+  const want = trKey(value);
+  return db.prepare("SELECT id, value FROM dropdown_options WHERE dropdown_key=?")
+    .all(key)
+    .find(r => trKey(r.value) === want && String(r.id) !== String(exceptId));
+}
+
 // POST /dropdown-options — admin only
 app.post("/dropdown-options", authenticate, (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
   const { dropdown_key, value } = req.body || {};
   if (!dropdown_key?.trim() || !value?.trim()) return res.status(400).json({ error: "dropdown_key and value required" });
+  // The unique index is case-sensitive, so "Hakedişin ..." and "hakedişin ..."
+  // both fitted and the list filled up with near-identical entries.
+  const dupe = findCaseDuplicate(dropdown_key.trim(), value.trim());
+  if (dupe) return res.status(409).json({ error: "Already exists", existing: dupe.value });
   try {
     const r = db.prepare("INSERT INTO dropdown_options (dropdown_key, value) VALUES (?,?)").run(dropdown_key.trim(), value.trim());
     res.json({ ok: true, id: r.lastInsertRowid });
@@ -1872,6 +1903,11 @@ app.put("/dropdown-options/:id", authenticate, (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
   const { value } = req.body || {};
   if (!value?.trim()) return res.status(400).json({ error: "value required" });
+  const cur = db.prepare("SELECT dropdown_key FROM dropdown_options WHERE id=?").get(req.params.id);
+  if (cur) {
+    const dupe = findCaseDuplicate(cur.dropdown_key, value.trim(), req.params.id);
+    if (dupe) return res.status(409).json({ error: "Already exists", existing: dupe.value });
+  }
   try {
     db.prepare("UPDATE dropdown_options SET value=? WHERE id=?").run(value.trim(), req.params.id);
     res.json({ ok: true });
