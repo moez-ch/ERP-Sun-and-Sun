@@ -3423,7 +3423,9 @@ Kurallar:
   // ─── STYLES ──────────────────────────────────────────────────
   const font = "'DM Sans', 'Segoe UI', sans-serif";
   const mono = "'JetBrains Mono', 'Fira Code', monospace";
-  const colors = {
+  // Light/dark palettes. Same keys, so every existing colors.* reference keeps
+  // working — only the values swap.
+  const DARK_COLORS = {
     bg: "#0B0F19", surface: "#131825", surfaceHover: "#1A2035",
     border: "#1E2A42", borderLight: "#2A3A5C",
     primary: "#3B82F6", primaryDark: "#2563EB", primaryLight: "#60A5FA",
@@ -3431,6 +3433,35 @@ Kurallar:
     text: "#E2E8F0", textMuted: "#94A3B8", textDim: "#64748B",
     success: "#10B981", danger: "#EF4444", warning: "#F59E0B",
   };
+  const LIGHT_COLORS = {
+    bg: "#F5F6FA", surface: "#FFFFFF", surfaceHover: "#EEF1F7",
+    border: "#D8DEE9", borderLight: "#C3CCDB",
+    primary: "#2563EB", primaryDark: "#1D4ED8", primaryLight: "#1D4ED8",
+    accent: "#B45309", accentLight: "#D97706",
+    text: "#101828", textMuted: "#475467", textDim: "#667085",
+    success: "#047857", danger: "#B42318", warning: "#B45309",
+  };
+  const [uiTheme, setUiTheme] = useState(() => localStorage.getItem("sns_theme") || "dark");
+  useEffect(() => {
+    localStorage.setItem("sns_theme", uiTheme);
+    // the page background sits outside this component's tree
+    document.body.style.background = uiTheme === "light" ? "#F5F6FA" : "#0B0F19";
+    document.body.style.color = uiTheme === "light" ? "#101828" : "#E2E8F0";
+  }, [uiTheme]);
+  const colors = uiTheme === "light" ? LIGHT_COLORS : DARK_COLORS;
+  const ThemeToggle = ({ compact = false }) => (
+    <button
+      onClick={() => setUiTheme(t => (t === "light" ? "dark" : "light"))}
+      title={uiTheme === "light" ? "Koyu tema" : "Açık tema"}
+      style={{
+        padding: compact ? "6px 10px" : "5px 0", width: compact ? undefined : "100%",
+        background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6,
+        color: colors.textDim, fontSize: compact ? 13 : 11, fontWeight: 600,
+        cursor: "pointer", fontFamily: font,
+      }}>
+      {uiTheme === "light" ? "🌙" : "☀️"}{compact ? "" : uiTheme === "light" ? " Koyu" : " Açık"}
+    </button>
+  );
 
   const isAdmin = authUser?.role === "admin";
 
@@ -3567,6 +3598,7 @@ Kurallar:
                   </button>
                 ))}
               </div>
+              <div style={{ marginBottom: 8 }}><ThemeToggle /></div>
               <button
                 onClick={handleLogout}
                 style={{ width: "100%", padding: "7px 10px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textDim, fontSize: 11, fontWeight: 500, cursor: "pointer", fontFamily: font, textAlign: "left", transition: "all .15s" }}
@@ -3594,6 +3626,9 @@ Kurallar:
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ fontSize: 12, color: colors.textDim }}>{authUser.name}</span>
+              {/* light/dark toggle — this header is what shows when the app is
+                  opened from Odoo (kiosk), where the sidebar is hidden */}
+              <ThemeToggle compact />
               <button onClick={handleLogout}
                 style={{ padding: "6px 12px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textDim, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: font }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = colors.danger; e.currentTarget.style.color = colors.danger; }}
