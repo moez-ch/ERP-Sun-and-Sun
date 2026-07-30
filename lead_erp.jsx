@@ -2401,6 +2401,9 @@ Kurallar:
   const [editingFieldConfig, setEditingFieldConfig] = useState(null); // { tplId, fields: {key: bool} }
   const [renamingTplId, setRenamingTplId] = useState(null);
   const [renamingValue, setRenamingValue] = useState("");
+  // editing a template's wording without leaving the app
+  const [tplEditor, setTplEditor] = useState(null); // { tpl, paragraphs, html, edits, loading, saving, error, lost }
+  const [tplVersions, setTplVersions] = useState(null);
   const [dropdownExtras, setDropdownExtras] = useState({});
   const [addingDropdown, setAddingDropdown] = useState(null);
   const [newDropdownVal, setNewDropdownVal] = useState("");
@@ -6749,6 +6752,18 @@ Kurallar:
                             </div>
                             <div style={{ display: "flex", gap: 5, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                               <button onClick={() => { setRenamingTplId(tpl.id); setRenamingValue(tpl.name); }} style={{ padding: "4px 8px", background: `${colors.primary}15`, border: `1px solid ${colors.primary}33`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, cursor: "pointer" }}>✏</button>
+                              <button title={t("tplEdit_button")} onClick={async () => {
+                                setTplEditor({ tpl, loading: true, edits: {} });
+                                const token = localStorage.getItem("sns_token");
+                                try {
+                                  const r = await fetch(`/contracts/templates/${tpl.id}/paragraphs`, { headers: { Authorization: `Bearer ${token}` } });
+                                  const d = await r.json();
+                                  if (!r.ok) throw new Error(d.error || "hata");
+                                  setTplEditor({ tpl, loading: false, edits: {}, paragraphs: d.paragraphs || [], html: d.content ?? null, type: d.type });
+                                } catch (e) {
+                                  setTplEditor({ tpl, loading: false, edits: {}, error: e.message });
+                                }
+                              }} style={{ padding: "4px 8px", background: `${colors.primary}15`, border: `1px solid ${colors.primary}33`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, cursor: "pointer" }}>📝</button>
                               <button onClick={() => { setContractTemplate(tpl); resetContractData(tpl); setContractProgramCount(1); setShowParty3(false); setContractView("form"); }} style={{ padding: "4px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{t("contract_select")}</button>
                               <button onClick={() => deleteTemplate(tpl.id)} style={{ padding: "4px 8px", background: "rgba(229,115,115,0.12)", border: "1px solid rgba(229,115,115,0.3)", borderRadius: 5, color: "#e57373", fontSize: 11, cursor: "pointer" }}>✕</button>
                             </div>
@@ -6757,6 +6772,138 @@ Kurallar:
                       ))}
                     </div>
                   </div>
+                  {/* Template text editor — replaces "delete it and upload a new one" */}
+                  {tplEditor && (
+                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+                      onClick={e => { if (e.target === e.currentTarget && !tplEditor.saving) { setTplEditor(null); setTplVersions(null); } }}>
+                      <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, width: "min(920px, 96vw)", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                        <div style={{ padding: "14px 18px", borderBottom: `1px solid ${colors.border}`, display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700 }}>{t("tplEdit_title")}</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tplEditor.tpl?.name}</div>
+                          </div>
+                          <button onClick={async () => {
+                            const token = localStorage.getItem("sns_token");
+                            const r = await fetch(`/contracts/templates/${tplEditor.tpl.id}/versions`, { headers: { Authorization: `Bearer ${token}` } });
+                            setTplVersions(await r.json());
+                          }} style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 11, cursor: "pointer" }}>🕘 {t("tplEdit_versions")}</button>
+                          <button onClick={() => { setTplEditor(null); setTplVersions(null); }} disabled={tplEditor.saving}
+                            style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 13, cursor: "pointer" }}>✕</button>
+                        </div>
+
+                        <div style={{ padding: "10px 18px", borderBottom: `1px solid ${colors.border}`, fontSize: 11, color: colors.textMuted, lineHeight: 1.6 }}>
+                          {t("tplEdit_hint")}<br />
+                          <span style={{ color: colors.primaryLight }}>⚑ {t("tplEdit_placeholderWarn")}</span>
+                        </div>
+
+                        <div style={{ flex: 1, overflowY: "auto", padding: "12px 18px" }}>
+                          {tplEditor.loading && <div style={{ padding: 30, textAlign: "center", color: colors.textMuted, fontSize: 13 }}>{t("tplEdit_loading")}</div>}
+                          {tplEditor.error && <div style={{ padding: 16, color: "#e57373", fontSize: 12 }}>{tplEditor.error}</div>}
+
+                          {tplVersions && (
+                            <div style={{ marginBottom: 14, border: `1px solid ${colors.border}`, borderRadius: 8, overflow: "hidden" }}>
+                              <div style={{ padding: "8px 12px", background: colors.bg, fontSize: 12, fontWeight: 600 }}>{t("tplEdit_versions")}</div>
+                              {tplVersions.length === 0 ? (
+                                <div style={{ padding: 12, fontSize: 12, color: colors.textMuted }}>{t("tplEdit_noVersions")}</div>
+                              ) : tplVersions.map(v => (
+                                <div key={v.id} style={{ padding: "8px 12px", borderTop: `1px solid ${colors.border}`, display: "flex", alignItems: "center", gap: 10, fontSize: 12 }}>
+                                  <div style={{ flex: 1 }}>
+                                    <div>{new Date(v.created_at + "Z").toLocaleString("tr-TR")}</div>
+                                    <div style={{ fontSize: 10, color: colors.textMuted }}>{v.saved_by_name || "-"}{v.note ? ` · ${v.note}` : ""}</div>
+                                  </div>
+                                  <button onClick={async () => {
+                                    const token = localStorage.getItem("sns_token");
+                                    await fetch(`/contracts/templates/${tplEditor.tpl.id}/revert/${v.id}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+                                    const r = await fetch(`/contracts/templates/${tplEditor.tpl.id}/paragraphs`, { headers: { Authorization: `Bearer ${token}` } });
+                                    const d = await r.json();
+                                    setTplEditor(p => ({ ...p, edits: {}, paragraphs: d.paragraphs || [], html: d.content ?? null, saved: t("tplEdit_reverted") }));
+                                    setTplVersions(null);
+                                  }} style={{ padding: "4px 9px", background: `${colors.primary}18`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, cursor: "pointer" }}>{t("tplEdit_revert")}</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {tplEditor.lost && (
+                            <div style={{ marginBottom: 12, padding: 12, background: "rgba(229,115,115,0.10)", border: "1px solid rgba(229,115,115,0.35)", borderRadius: 8, fontSize: 12 }}>
+                              <div style={{ fontWeight: 700, color: "#e57373", marginBottom: 4 }}>{t("tplEdit_lostTitle")}</div>
+                              <div style={{ fontFamily: "monospace", marginBottom: 6 }}>{tplEditor.lost.join("  ")}</div>
+                              <div style={{ color: colors.textMuted }}>{t("tplEdit_lostBody")}</div>
+                            </div>
+                          )}
+
+                          {/* HTML templates edit as one block */}
+                          {tplEditor.html != null && (
+                            <textarea value={tplEditor.edits.__html ?? tplEditor.html}
+                              onChange={e => setTplEditor(p => ({ ...p, edits: { ...p.edits, __html: e.target.value } }))}
+                              spellCheck={false}
+                              style={{ width: "100%", minHeight: 420, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, fontSize: 12, fontFamily: "monospace", padding: 10, lineHeight: 1.5, resize: "vertical" }} />
+                          )}
+
+                          {/* .docx templates edit paragraph by paragraph */}
+                          {tplEditor.paragraphs?.map(p => {
+                            const val = tplEditor.edits[p.id] ?? p.text;
+                            const dirty = val !== p.text;
+                            const where = p.part.startsWith("header") ? t("tplEdit_header") : p.part.startsWith("footer") ? t("tplEdit_footer") : p.inTable ? t("tplEdit_table") : null;
+                            return (
+                              <div key={p.id} style={{ marginBottom: 8 }}>
+                                {(where || p.placeholders.length > 0) && (
+                                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 3 }}>
+                                    {where && <span style={{ fontSize: 9, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 4, padding: "1px 5px", color: colors.textMuted }}>{where}</span>}
+                                    {p.placeholders.map((ph, i) => (
+                                      <span key={i} style={{ fontSize: 9, fontFamily: "monospace", background: `${colors.primary}18`, border: `1px solid ${colors.primary}44`, borderRadius: 4, padding: "1px 5px", color: colors.primaryLight }}>{ph}</span>
+                                    ))}
+                                  </div>
+                                )}
+                                <textarea value={val} spellCheck={false} rows={Math.min(8, Math.max(1, Math.ceil(val.length / 95)))}
+                                  onChange={e => setTplEditor(prev => ({ ...prev, edits: { ...prev.edits, [p.id]: e.target.value }, saved: null }))}
+                                  style={{ width: "100%", background: dirty ? `${colors.primary}0e` : colors.bg, border: `1px solid ${dirty ? colors.primary : colors.border}`, borderRadius: 7, color: colors.text, fontSize: 12.5, padding: "7px 9px", lineHeight: 1.55, resize: "vertical", outline: "none", fontFamily: "inherit" }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div style={{ padding: "12px 18px", borderTop: `1px solid ${colors.border}`, display: "flex", alignItems: "center", gap: 10 }}>
+                          {(() => {
+                            const n = Object.keys(tplEditor.edits || {}).filter(k => k === "__html" ? tplEditor.edits.__html !== tplEditor.html : tplEditor.edits[k] !== tplEditor.paragraphs?.find(x => x.id === k)?.text).length;
+                            return <div style={{ flex: 1, fontSize: 11.5, color: tplEditor.saved ? "#66bb6a" : n ? colors.primaryLight : colors.textMuted }}>
+                              {tplEditor.saved ? `✓ ${tplEditor.saved}` : n ? t("tplEdit_changes", n) : t("tplEdit_noChanges")}
+                              {n > 0 && <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{t("tplEdit_mixedWarn")}</div>}
+                            </div>;
+                          })()}
+                          <button onClick={() => { setTplEditor(null); setTplVersions(null); }} disabled={tplEditor.saving}
+                            style={{ padding: "8px 14px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 7, color: colors.textMuted, fontSize: 12.5, cursor: "pointer" }}>{t("tplEdit_cancel")}</button>
+                          <button disabled={tplEditor.saving} onClick={async () => {
+                            const token = localStorage.getItem("sns_token");
+                            const body = tplEditor.html != null
+                              ? { content: tplEditor.edits.__html ?? tplEditor.html, force: !!tplEditor.lost }
+                              : { edits: Object.fromEntries(Object.entries(tplEditor.edits).filter(([k, v]) => v !== tplEditor.paragraphs.find(x => x.id === k)?.text)), force: !!tplEditor.lost };
+                            setTplEditor(p => ({ ...p, saving: true, error: null }));
+                            try {
+                              const r = await fetch(`/contracts/templates/${tplEditor.tpl.id}/paragraphs`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+                              const d = await r.json();
+                              if (r.status === 409 && d.error === "placeholders_removed") {
+                                setTplEditor(p => ({ ...p, saving: false, lost: d.lost }));
+                                return;
+                              }
+                              if (!r.ok) throw new Error(d.error || "hata");
+                              // reload so the editor shows exactly what was stored
+                              const r2 = await fetch(`/contracts/templates/${tplEditor.tpl.id}/paragraphs`, { headers: { Authorization: `Bearer ${token}` } });
+                              const d2 = await r2.json();
+                              setTplEditor(p => ({ ...p, saving: false, lost: null, edits: {}, paragraphs: d2.paragraphs || [], html: d2.content ?? null, saved: t("tplEdit_saved") }));
+                              const r3 = await fetch("/contracts/templates", { headers: { Authorization: `Bearer ${token}` } });
+                              if (r3.ok) setContractTemplates(await r3.json());
+                            } catch (e) {
+                              setTplEditor(p => ({ ...p, saving: false, error: e.message }));
+                            }
+                          }} style={{ padding: "8px 18px", background: tplEditor.lost ? "#e57373" : colors.primary, border: "none", borderRadius: 7, color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", opacity: tplEditor.saving ? 0.6 : 1 }}>
+                            {tplEditor.saving ? t("tplEdit_saving") : tplEditor.lost ? t("tplEdit_saveAnyway") : t("tplEdit_save")}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Right — live preview */}
                   <div style={{ flex: 1, position: "sticky", top: 0 }}>
                     {!contractPreviewTpl ? (

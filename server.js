@@ -144,6 +144,22 @@ try { db.exec(`ALTER TABLE contract_templates ADD COLUMN template_type TEXT NOT 
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN visible_fields TEXT`); } catch {}
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN default_party1_id INTEGER`); } catch {}
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN default_iban TEXT`); } catch {}
+
+// Every save of a template keeps the previous file, so an edit can be undone.
+// Esra's current workflow is to delete the template and upload a new one, which
+// loses the old wording entirely; this replaces that.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS contract_template_versions (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id   INTEGER NOT NULL,
+    file          BLOB NOT NULL,
+    filename      TEXT,
+    note          TEXT,
+    saved_by      INTEGER,
+    saved_by_name TEXT,
+    created_at    TEXT DEFAULT (datetime('now'))
+  )
+`);
 db.exec(`UPDATE contract_templates SET template_type = 'html' WHERE filename LIKE '%.html' AND template_type = 'docx'`);
 
 // Migration: inject @@payment_schedule@@ into docx templates that have an empty payment table
@@ -1966,6 +1982,226 @@ app.put("/contracts/templates/:id/party1", authenticate, (req, res) => {
 // PUT /contracts/templates/:id/fields
 app.put("/contracts/templates/:id/fields", authenticate, (req, res) => {
   db.prepare("UPDATE contract_templates SET visible_fields=? WHERE id=?").run(JSON.stringify(req.body.visible_fields ?? null), req.params.id);
+  res.json({ ok: true });
+});
+
+// ── Editing a template's wording in place ──────────────────────────────
+// The .docx is NOT converted to HTML. Contracts are legal documents and the
+// generator does Word-specific work on them (bold injection per field, [[ ]]
+// docxtemplater tags, @@var@@ tags split across runs). So the text inside the
+// existing XML is edited and everything else is left exactly as Word wrote it.
+
+const DOCX_PARTS = ["word/document.xml", "word/header1.xml", "word/header2.xml",
+                    "word/header3.xml", "word/footer1.xml", "word/footer2.xml",
+                    "word/footer3.xml"];
+
+const escXml = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                                   .replace(/>/g, "&gt;");
+const unescXml = s => String(s ?? "").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+                                     .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+                                     .replace(/&amp;/g, "&");
+
+// every <w:p> block in a part, with its plain text
+function paraBlocks(xml) {
+  const out = [];
+  const re = /<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g;
+  let m;
+  while ((m = re.exec(xml))) {
+    const block = m[0];
+    const text = [...block.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)]
+      .map(x => x[1]).join("");
+    out.push({ start: m.index, end: m.index + block.length, block,
+               text: unescXml(text) });
+  }
+  return out;
+}
+
+// Put newText into the paragraph's FIRST text run and drop the other text runs.
+// The run keeps its <w:rPr>, and <w:pPr> is untouched, so font, size, alignment,
+// numbering and spacing survive. A paragraph with mixed formatting inside it
+// (half bold) collapses to the first run's formatting — that is the one real
+// limitation and the UI warns about it.
+function setParaText(block, newText) {
+  const runs = [];
+  const re = /<w:r(?:\s[^>]*)?>[\s\S]*?<\/w:r>/g;
+  let m;
+  while ((m = re.exec(block))) {
+    runs.push({ start: m.index, end: m.index + m[0].length, xml: m[0] });
+  }
+  const textRuns = runs.filter(r => /<w:t(?:\s[^>]*)?>/.test(r.xml));
+  if (!textRuns.length) return null;          // image-only paragraph, skip
+
+  let out = block;
+  for (let i = textRuns.length - 1; i >= 1; i--) {   // back to front keeps indices valid
+    out = out.slice(0, textRuns[i].start) + out.slice(textRuns[i].end);
+  }
+  const first = textRuns[0];
+  const replaced = first.xml.replace(
+    /<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/,
+    `<w:t xml:space="preserve">${escXml(newText)}</w:t>`);
+  return out.slice(0, first.start) + replaced + out.slice(first.start + first.xml.length);
+}
+
+const findPlaceholders = t =>
+  [...String(t).matchAll(/@@[a-zA-Z0-9_]+@@|\[\[[^\]\n]+\]\]/g)].map(x => x[0]);
+
+// GET /contracts/templates/:id/paragraphs — the editable text of a template
+app.get("/contracts/templates/:id/paragraphs", authenticate, (req, res) => {
+  const row = db.prepare("SELECT file, template_type, name FROM contract_templates WHERE id=?")
+    .get(req.params.id);
+  if (!row) return res.status(404).json({ error: "Not found" });
+
+  if (row.template_type === "html") {
+    return res.json({ type: "html", name: row.name,
+                      content: row.file.toString("utf-8") });
+  }
+  try {
+    const zip = new PizZip(row.file);
+    const paragraphs = [];
+    for (const part of DOCX_PARTS) {
+      const f = zip.file(part);
+      if (!f) continue;
+      const xml = f.asText();
+      // a <w:p> sitting inside <w:tbl> is a table cell — worth showing in the UI
+      const tableRanges = [];
+      const tblRe = /<w:tbl(?:\s[^>]*)?>[\s\S]*?<\/w:tbl>/g;
+      let t;
+      while ((t = tblRe.exec(xml))) tableRanges.push([t.index, t.index + t[0].length]);
+
+      paraBlocks(xml).forEach((p, i) => {
+        if (!p.text.trim()) return;                       // skip blank spacers
+        if (!/<w:t(?:\s[^>]*)?>/.test(p.block)) return;
+        paragraphs.push({
+          id: `${part}|${i}`,
+          part: part.replace("word/", "").replace(".xml", ""),
+          index: i,
+          text: p.text,
+          inTable: tableRanges.some(([a, b]) => p.start >= a && p.end <= b),
+          placeholders: findPlaceholders(p.text),
+        });
+      });
+    }
+    res.json({ type: "docx", name: row.name, paragraphs });
+  } catch (e) {
+    res.status(500).json({ error: "Could not read the template: " + e.message });
+  }
+});
+
+// PUT /contracts/templates/:id/paragraphs — save edited wording
+app.put("/contracts/templates/:id/paragraphs", authenticate, (req, res) => {
+  const { edits, content, note, force } = req.body || {};
+  const row = db.prepare("SELECT * FROM contract_templates WHERE id=?").get(req.params.id);
+  if (!row) return res.status(404).json({ error: "Not found" });
+
+  const keepVersion = () =>
+    db.prepare(`INSERT INTO contract_template_versions
+                (template_id, file, filename, note, saved_by, saved_by_name)
+                VALUES (?,?,?,?,?,?)`)
+      .run(row.id, row.file, row.filename, note || null,
+           req.user.id, req.user.name || req.user.email);
+
+  // --- HTML templates: straight text replacement
+  if (row.template_type === "html") {
+    if (typeof content !== "string") return res.status(400).json({ error: "content required" });
+    const before = findPlaceholders(row.file.toString("utf-8"));
+    const after = findPlaceholders(content);
+    const lost = before.filter(p => !after.includes(p));
+    if (lost.length && !force) return res.status(409).json({ error: "placeholders_removed", lost });
+    keepVersion();
+    const buf = Buffer.from(content, "utf-8");
+    const variables = [...new Set([...content.matchAll(/@@([a-zA-Z0-9_]+)@@/g)].map(m => m[1]))];
+    db.prepare("UPDATE contract_templates SET file=?, variables=? WHERE id=?")
+      .run(buf, JSON.stringify(variables), row.id);
+    return res.json({ ok: true, changed: 1 });
+  }
+
+  if (!edits || typeof edits !== "object")
+    return res.status(400).json({ error: "edits required" });
+
+  try {
+    const zip = new PizZip(row.file);
+    // group the edits by the part they belong to
+    const byPart = {};
+    for (const [id, text] of Object.entries(edits)) {
+      const [part, idx] = String(id).split("|");
+      (byPart[part] ||= []).push([Number(idx), text]);
+    }
+
+    // check no placeholder was lost before writing anything
+    const lost = [];
+    for (const [part, list] of Object.entries(byPart)) {
+      const f = zip.file(part);
+      if (!f) continue;
+      const blocks = paraBlocks(f.asText());
+      for (const [idx, text] of list) {
+        if (!blocks[idx]) continue;
+        const before = findPlaceholders(blocks[idx].text);
+        const after = findPlaceholders(text);
+        for (const p of before) if (!after.includes(p)) lost.push(p);
+      }
+    }
+    if (lost.length && !force)
+      return res.status(409).json({ error: "placeholders_removed", lost: [...new Set(lost)] });
+
+    let changed = 0;
+    for (const [part, list] of Object.entries(byPart)) {
+      const f = zip.file(part);
+      if (!f) continue;
+      let xml = f.asText();
+      const blocks = paraBlocks(xml);
+      // apply back to front so earlier offsets stay valid
+      for (const [idx, text] of list.sort((a, b) => b[0] - a[0])) {
+        const b = blocks[idx];
+        if (!b || b.text === text) continue;
+        const rebuilt = setParaText(b.block, text);
+        if (!rebuilt) continue;
+        xml = xml.slice(0, b.start) + rebuilt + xml.slice(b.end);
+        changed++;
+      }
+      if (changed) zip.file(part, xml);
+    }
+    if (!changed) return res.json({ ok: true, changed: 0 });
+
+    keepVersion();
+    const buf = zip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+    // re-detect variables from the saved file
+    let variables = [];
+    try {
+      const z2 = new PizZip(buf);
+      const full = DOCX_PARTS.map(p => {
+        try { return mergeRuns(z2.file(p)?.asText() || ""); } catch { return ""; }
+      }).join("").replace(/<[^>]+>/g, " ");
+      variables = [...new Set([...full.matchAll(/@@([a-zA-Z0-9_]+)@@/g)].map(m => m[1]))];
+    } catch {}
+    db.prepare("UPDATE contract_templates SET file=?, variables=? WHERE id=?")
+      .run(buf, JSON.stringify(variables.length ? variables : JSON.parse(row.variables)), row.id);
+    res.json({ ok: true, changed });
+  } catch (e) {
+    console.error("[templates/paragraphs]", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /contracts/templates/:id/versions
+app.get("/contracts/templates/:id/versions", authenticate, (req, res) => {
+  res.json(db.prepare(`SELECT id, note, saved_by_name, created_at, length(file) AS bytes
+                       FROM contract_template_versions WHERE template_id=?
+                       ORDER BY id DESC`).all(req.params.id));
+});
+
+// POST /contracts/templates/:id/revert/:versionId — undo an edit
+app.post("/contracts/templates/:id/revert/:versionId", authenticate, (req, res) => {
+  const row = db.prepare("SELECT * FROM contract_templates WHERE id=?").get(req.params.id);
+  const ver = db.prepare("SELECT * FROM contract_template_versions WHERE id=? AND template_id=?")
+    .get(req.params.versionId, req.params.id);
+  if (!row || !ver) return res.status(404).json({ error: "Not found" });
+  // the current file becomes a version too, so a revert can itself be undone
+  db.prepare(`INSERT INTO contract_template_versions
+              (template_id, file, filename, note, saved_by, saved_by_name)
+              VALUES (?,?,?,?,?,?)`)
+    .run(row.id, row.file, row.filename, "geri alma öncesi",
+         req.user.id, req.user.name || req.user.email);
+  db.prepare("UPDATE contract_templates SET file=? WHERE id=?").run(ver.file, row.id);
   res.json({ ok: true });
 });
 
