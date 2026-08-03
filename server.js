@@ -713,7 +713,7 @@ function finalizeContractDoc(rowId, ext, bytes, data, user) {
     mimetype: ext === "pdf" ? "application/pdf"
       : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     label: "Sözleşmeyi Görüntüle",
-  });
+  }, user?.email);
   pushDailyPrepToOdoo(); // refresh today's prep counts for the 18:30 report
 }
 
@@ -811,6 +811,52 @@ async function odooNoteSubtypeId() {
   return _noteSubtypeId;
 }
 
+// ── Who wrote the note ──────────────────────────────────────────────────
+// The ERP talks to Odoo with ONE account (admin), so every chatter note used
+// to be authored by "Administrator" while only the body text named the real
+// person. Nobody could then delete their own mistakes: Odoo's own-messages
+// rule matches author_id, which was never theirs.
+//
+// So the acting user is resolved to their Odoo partner and set as author_id.
+// Matching is by e-mail first; ERP and Odoo logins do not always agree (Esra
+// signed in to the ERP as a gmail address for a while), so a name match is
+// tried next. If neither resolves, the note is still posted — authored by
+// admin, as before — because losing the note would be worse than losing the
+// attribution.
+const _authorCache = new Map();
+
+async function odooAuthorPartnerId(email, name) {
+  const key = `${(email || "").toLowerCase()}|${(name || "").toLowerCase()}`;
+  if (_authorCache.has(key)) return _authorCache.get(key);
+
+  let partnerId = null;
+  const mail = (email || "").trim().toLowerCase();
+  try {
+    if (mail) {
+      const byMail = await odooExec("res.users", "search_read",
+        [["|", ["login", "=ilike", mail], ["email", "=ilike", mail]]],
+        { fields: ["id", "name", "partner_id"], limit: 1 });
+      if (byMail && byMail.length) partnerId = byMail[0].partner_id?.[0] || null;
+    }
+    if (!partnerId && (name || "").trim()) {
+      const byName = await odooExec("res.users", "search_read",
+        [[["name", "=ilike", name.trim()], ["share", "=", false]]],
+        { fields: ["id", "name", "partner_id"], limit: 2 });
+      // only accept an unambiguous name match
+      if (byName && byName.length === 1) partnerId = byName[0].partner_id?.[0] || null;
+    }
+  } catch (e) {
+    console.warn("[odoo chatter] author lookup failed:", e.message);
+  }
+
+  if (!partnerId) {
+    console.warn(`[odoo chatter] no Odoo user for "${name || ""}" <${mail || "-"}> ` +
+      `- note will be authored by the API account`);
+  }
+  _authorCache.set(key, partnerId);
+  return partnerId;
+}
+
 // Render the first pages of a PDF to PNG so they can be shown INSIDE the Odoo
 // note. Odoo's chatter sanitiser drops <iframe>/<embed>/<object> but keeps
 // <img>, so a document can only unfold in place as images (day396 probe).
@@ -846,7 +892,7 @@ function renderPdfPagesToPng(pdfBuffer, maxPages = 5) {
 // 'View Price Quote' like 'View Email'." So the generated PDF is uploaded to
 // Odoo and attached to the note: it becomes downloadable straight from the
 // company card, with no ERP login needed.
-async function odooPostHtmlNote(partnerId, html, attachment = null) {
+async function odooPostHtmlNote(partnerId, html, attachment = null, authorPartnerId = null) {
   // Create the message directly instead of message_post(). Two reasons:
   //  * message_post NOTIFIES the record's followers — Esra asked that "quote
   //    sent" / "contract sent" stay on the company card and never reach her
@@ -923,11 +969,13 @@ async function odooPostHtmlNote(partnerId, html, attachment = null) {
     message_type: "comment",
   };
   if (subtypeId) vals.subtype_id = subtypeId;
+  // author_id decides who Odoo lets delete the note later
+  if (authorPartnerId) vals.author_id = Number(authorPartnerId);
   if (attIds.length) vals.attachment_ids = [[6, 0, attIds]];
   return await odooExec("mail.message", "create", [vals]);
 }
 
-async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = null, attachment = null) {
+async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = null, attachment = null, actorEmail = null) {
   try {
     let targetId = Number(partnerId) || null; // exact match from the ERP Search picker, if any
     const name = (companyName || "").trim();
@@ -943,7 +991,8 @@ async function notifyOdooChatter(companyName, userName, kindLabel, partnerId = n
     }
     const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const body = `<p>📄 <b>${esc(userName || "Bir kullanıcı")}</b> bir ${esc(kindLabel)} oluşturdu.</p>`;
-    const posted = await odooPostHtmlNote(targetId, body, attachment);
+    const authorId = await odooAuthorPartnerId(actorEmail, userName);
+    const posted = await odooPostHtmlNote(targetId, body, attachment, authorId);
     if (posted === null) return; // creds not configured
     console.log(`[odoo chatter] posted "${kindLabel}" note to partner #${targetId} (${name || "id " + targetId})`);
   } catch (e) { console.warn("[odoo chatter]", e.message); }
@@ -4247,7 +4296,7 @@ app.post("/pricing/generate-program", authenticate, async (req, res) => {
         b64: Buffer.from(finalPdfBytes).toString("base64"),
         mimetype: "application/pdf",
         label: "Teklifi Görüntüle",
-      });
+      }, req.user?.email);
       pushDailyPrepToOdoo(); // refresh today's prep counts for the 18:30 report
     } catch (logErr) { console.error("[pricing/generate-program log]", logErr); }
 
@@ -4312,7 +4361,7 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
         b64: Buffer.from(finalPdfBytes).toString("base64"),
         mimetype: "application/pdf",
         label: "Teklifi Görüntüle",
-      });
+      }, req.user?.email);
       pushDailyPrepToOdoo(); // refresh today's prep counts for the 18:30 report
     } catch (logErr) { console.error("[pricing/generate log]", logErr); }
 
