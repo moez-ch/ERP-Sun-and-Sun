@@ -1972,6 +1972,66 @@ app.delete("/dropdown-options/:id", authenticate, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── PUBLIC: KVKK / privacy policy mirror ────────────────────────────────
+// Meta refuses to publish the WhatsApp app without a Privacy Policy URL it can
+// fetch, and sunandsun.com.tr returns 403 to anything that is not a browser —
+// so Meta's crawler sees a rejection and calls the URL invalid, even though
+// the page loads fine for people.
+//
+// This mirrors the real page rather than copying its text: a legal document
+// duplicated by hand goes stale, and nobody would notice. Fetched with a
+// browser user agent, cached for six hours, and <base> injected so the site's
+// own CSS and images still resolve.
+//
+// Deliberately unauthenticated — a privacy policy that requires a login is not
+// a privacy policy.
+const PRIVACY_SOURCE = "https://sunandsun.com.tr/kisisel-veri-aydinlatma-metini/";
+let _privacyCache = { html: null, at: 0 };
+
+app.get("/privacy", async (req, res) => {
+  const SIX_HOURS = 6 * 60 * 60 * 1000;
+  if (_privacyCache.html && Date.now() - _privacyCache.at < SIX_HOURS) {
+    res.type("html").send(_privacyCache.html);
+    return;
+  }
+  try {
+    const r = await fetch(PRIVACY_SOURCE, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+          "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "tr-TR,tr;q=0.9",
+      },
+      redirect: "follow",
+    });
+    if (!r.ok) throw new Error(`upstream ${r.status}`);
+    let html = await r.text();
+    // make the page's relative assets and links point back at the real site
+    if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(/<head([^>]*)>/i,
+        `<head$1><base href="https://sunandsun.com.tr/">`);
+    }
+    _privacyCache = { html, at: Date.now() };
+    res.type("html").send(html);
+  } catch (e) {
+    console.warn("[privacy] mirror failed:", e.message);
+    // Never 500 here: Meta reads a failure as "invalid policy". Serve
+    // something real and point at the canonical copy.
+    res.type("html").send(`<!doctype html><html lang="tr"><head>
+<meta charset="utf-8"><title>Kişisel Verilerin Korunması Aydınlatma Metni</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+</head><body style="font-family:Arial,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;line-height:1.6;color:#222">
+<h1>Kişisel Verilerin Korunması Aydınlatma Metni</h1>
+<p>6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında, veri sorumlusu
+sıfatıyla Sun ve Sun Danışmanlık Bilişim Sanayi ve Ticaret Anonim Şirketi ve
+bağlı şirketleri tarafından toplanan kişisel verilerin işlenmesine ilişkin
+aydınlatma metnine aşağıdaki adresten ulaşabilirsiniz.</p>
+<p><a href="${PRIVACY_SOURCE}">${PRIVACY_SOURCE}</a></p>
+<p>İletişim: <a href="https://www.sunandsun.com.tr">www.sunandsun.com.tr</a></p>
+</body></html>`);
+  }
+});
+
 // GET /contracts/templates
 app.get("/contracts/templates", authenticate, (req, res) => {
   const rows = db.prepare("SELECT id, name, filename, variables, template_type, visible_fields, default_party1_id, default_iban, created_at FROM contract_templates ORDER BY name COLLATE NOCASE ASC").all();
