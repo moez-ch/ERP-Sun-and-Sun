@@ -593,6 +593,16 @@ try { db.exec(`ALTER TABLE program_presentations ADD COLUMN theme TEXT NOT NULL 
 try { db.exec(`ALTER TABLE program_presentations ADD COLUMN cover_color TEXT NOT NULL DEFAULT 'red'`); } catch {}
 try { db.exec(`ALTER TABLE program_presentations ADD COLUMN cover_title TEXT NOT NULL DEFAULT ''`); } catch {}
 try { db.exec(`ALTER TABLE program_presentations ADD COLUMN cover_subtitle TEXT NOT NULL DEFAULT ''`); } catch {}
+// Fixed quotes: the deck already carries its own final pricing page, so the
+// generator must NOT replace it with our options. Only the company name is
+// entered. The seed runs inside the migration so that un-ticking a quote later
+// is not undone on the next restart.
+const FIXED_QUOTE_SEED = `UPDATE program_presentations SET fixed_quote=1
+   WHERE name LIKE '%Yurt Dışı Pazar Araştırması Raporu'`;
+try {
+  db.exec(`ALTER TABLE program_presentations ADD COLUMN fixed_quote INTEGER NOT NULL DEFAULT 0`);
+  db.prepare(FIXED_QUOTE_SEED).run();
+} catch {}
 
 // ── PRICE QUOTES ─ log of every generated Fiyat Teklifi, powering the History
 // view. `data` holds the full form payload entered at creation (options, fees,
@@ -661,6 +671,8 @@ if (db.prepare("SELECT COUNT(*) as c FROM program_presentations").get().c === 0)
   ];
   const ins = db.prepare("INSERT INTO program_presentations (category, name, canva_link, design_id) VALUES (?,?,?,?)");
   for (const [cat, name, link] of SEED) ins.run(cat, name, link, "");
+  // On a fresh DB the migration above ran before these rows existed.
+  db.prepare(FIXED_QUOTE_SEED).run();
 
   // Resolve design IDs in the background
   (async () => {
@@ -4374,22 +4386,29 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
   const { num_options, opt, gen_note, design_id, theme, discount, client_name, odoo_partner_id } = req.body || {};
   const data = { num_options: num_options || 1, opt: opt || [], gen_note: gen_note || "", theme: theme || "blue", discount: !!discount };
   const targetDesignId = (design_id || "").trim() || PRICING_DESIGN_ID;
+  const pres = db.prepare("SELECT cover_color, cover_title, cover_subtitle, fixed_quote FROM program_presentations WHERE design_id=?").get(targetDesignId);
+  // A fixed quote keeps the deck's own pricing page: no options are entered, so
+  // there is no slide to build and nothing to swap in.
+  const fixedQuote = !!pres?.fixed_quote;
   try {
-    const slidePdfBytes = await generatePricingSlide(data);
+    const slidePdfBytes = fixedQuote ? null : await generatePricingSlide(data);
 
     let finalPdfBytes;
     try {
       const token = await getValidCanvaToken();
       const canvaPdfBytes = await exportCanvaDesignAsPdf(targetDesignId, token);
-      // Replace the deck's built-in pricing page (found by its "ÜCRETLENDİRME"
-      // heading); fall back to second-to-last if it can't be located.
-      const canvaDoc = await PDFDocument.load(canvaPdfBytes);
-      const slideIndex = await findPricingPageIndex(canvaPdfBytes, canvaDoc.getPageCount() - 1);
-      finalPdfBytes = await mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex);
+      if (fixedQuote) {
+        finalPdfBytes = canvaPdfBytes;
+      } else {
+        // Replace the deck's built-in pricing page (found by its "ÜCRETLENDİRME"
+        // heading); fall back to second-to-last if it can't be located.
+        const canvaDoc = await PDFDocument.load(canvaPdfBytes);
+        const slideIndex = await findPricingPageIndex(canvaPdfBytes, canvaDoc.getPageCount() - 1);
+        finalPdfBytes = await mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex);
+      }
 
       // Cover: either generate it (when the presentation is configured for it)
       // or keep Canva's and just stamp the company name on.
-      const pres = db.prepare("SELECT cover_color, cover_title, cover_subtitle FROM program_presentations WHERE design_id=?").get(targetDesignId);
       if (pres?.cover_title) {
         const coverPdfBytes = await generateCoverSlide({
           color: pres.cover_color || "red",
@@ -4402,6 +4421,13 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
         finalPdfBytes = await stampCompanyNameOnCover(finalPdfBytes, client_name);
       }
     } catch (canvaErr) {
+      // A normal quote can still be useful as the bare options slide. A fixed
+      // quote IS the Canva deck, so there is nothing to fall back to — say so
+      // rather than send a blank or half a document.
+      if (fixedQuote) {
+        console.error("[pricing/generate] Canva unavailable for a fixed quote:", canvaErr.message);
+        return res.status(502).json({ error: "Canva'ya ulaşılamadı, teklif oluşturulamadı. Lütfen tekrar deneyin." });
+      }
       console.warn("[pricing/generate] Canva unavailable — returning slide only:", canvaErr.message);
       finalPdfBytes = slidePdfBytes;
     }

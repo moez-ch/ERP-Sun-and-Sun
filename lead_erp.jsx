@@ -2514,6 +2514,11 @@ Kurallar:
   const [progPresDraft, setProgPresDraft] = useState({ category: "", name: "", canva_link: "" });
   const [progPresAdding, setProgPresAdding] = useState(false);
   const [selectedPresCategory, setSelectedPresCategory] = useState(null);
+  // Some decks carry their own final pricing page (the Yurt Dışı Pazar
+  // Araştırması quotes). For those only the company name is entered: the
+  // options must not be offered, because nothing would be done with them.
+  const fixedQuote = !!progPresEntations.find(
+    p => p.design_id && p.design_id === pricingData.design_id)?.fixed_quote;
   const [canvaSavingTheme, setCanvaSavingTheme] = useState({});// { [id]: bool }
 
   // ── Settings — companies state ────────────────────────────────
@@ -8063,6 +8068,21 @@ Kurallar:
                     placeholder={lang === "tr" ? "ör. ABC Tekstil A.Ş." : "e.g. ABC Tekstil A.Ş."} style={inputStyle} />
                 </div>
 
+                {/* Fixed quote: the deck's own pricing page is final */}
+                {fixedQuote && (
+                  <div style={{ background: "rgba(229,115,115,0.08)", border: "1px solid rgba(229,115,115,0.35)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#e57373", marginBottom: 6 }}>
+                      {lang === "tr" ? "Sabit fiyat teklifi" : "Fixed price quote"}
+                    </div>
+                    <div style={{ fontSize: 12.5, color: colors.text, lineHeight: 1.55 }}>
+                      {lang === "tr"
+                        ? "Bu fiyat teklifinde değişiklik yapılamaz. Ek talepleriniz için Esra Serin ile iletişime geçiniz."
+                        : "No modifications are permitted for this price quote; please direct any additional requests to Esra Serin."}
+                    </div>
+                  </div>
+                )}
+
+                {!fixedQuote && (<>
                 {/* Slide type */}
                 <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
                   <div style={{ ...labelStyle, marginBottom: 12 }}>{t("pricing_slideType")}</div>
@@ -8152,6 +8172,7 @@ Kurallar:
                     rows={3} placeholder="e.g. This proposal is valid until 15.05.2026."
                     style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }} />
                 </div>
+                </>)}
 
                 <button onClick={handleGenerate} disabled={pricingGenerating}
                   style={{ width: "100%", padding: "13px", background: pricingGenerating ? colors.border : colors.primary, border: "none", borderRadius: 9, color: "#fff", fontSize: 14, fontWeight: 700, cursor: pricingGenerating ? "not-allowed" : "pointer" }}>
