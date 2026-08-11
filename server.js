@@ -2807,32 +2807,70 @@ const pdfCanvasFactory = {
 
 function parseVergiLevhasi(items) {
   const U = s => (s || "").toLocaleUpperCase("tr-TR").replace(/\s+/g, " ").trim();
-  const anchorY = (...txts) => { const it = items.find(i => txts.some(t => U(i.str).includes(t))); return it ? it.y : null; };
   const join = arr => (arr || []).sort((a, b) => (b.y - a.y) || (a.x - b.x)).map(i => i.str.trim()).filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
-  const near = (labels, y) => labels.reduce((best, l) => Math.abs(l.y - y) < Math.abs(best.y - y) ? l : best, labels[0]).k;
   // GİB prints values in ALL CAPS; contracts want Title Case (Turkish locale).
   const titleTr = s => s.toLocaleLowerCase("tr-TR").replace(/(^|[\s\/])([a-zçğıiöşü])/g, (m, p, c) => p + c.toLocaleUpperCase("tr-TR"));
 
-  // Left column: each value line is assigned to its nearest label (value boxes
-  // are centred on the label, so wrapped values straddle it — fixed bands leak).
-  const L = [["adi", "ADI SOYADI"], ["tic", "ÜNVAN"], ["adr", "YERİ ADRES"], ["tur", "TÜRÜ"], ["ana", "ANA FAAL"]]
-    .map(([k, t]) => ({ k, y: anchorY(t) })).filter(l => l.y != null);
-  const lb = {};
-  if (L.length) for (const it of items.filter(i => i.x >= 185 && i.x < 485)) (lb[near(L, it.y)] ||= []).push(it);
+  // Columns are derived from where the labels actually sit, never from fixed
+  // pixel bands. GİB issues this document both landscape (842x595) and
+  // portrait (595x842); scale a landscape band down and the RIGHT column's
+  // labels land inside the LEFT column's band, so the parser harvested labels
+  // as if they were values and produced a company named
+  // "Onay Kodu 03/12/2007 Tc Kimlik No İşe Başlama Tarihi" with every other
+  // field empty. Anchoring on the labels makes orientation and scale irrelevant.
+  const find = t => items.find(i => U(i.str).includes(t));
+  const col = defs => defs.map(([k, t]) => { const it = find(t); return it ? { k, x: it.x, y: it.y } : null; }).filter(Boolean);
+
+  const L = col([["adi", "ADI SOYADI"], ["tic", "ÜNVAN"], ["adr", "YERİ ADRES"], ["tur", "VERGİ TÜRÜ"], ["ana", "FAALİYET"]]);
+  const R = col([["dai", "DAİRES"], ["kim", "VERGİ KİMLİK"], ["tck", "TC KİMLİK"], ["ise", "BAŞLAMA"]]);
+  if (!L.length) return { name: "", office: "", address: "", tckn: "" };
+
+  const leftX = Math.min(...L.map(l => l.x));
+  const rightX = R.length ? Math.min(...R.map(l => l.x)) : Infinity;
+  const PAD = 20;
+
+  // A value never shares its label's left edge, and never sits more than about
+  // half a row away from it. That second rule is what keeps the yearly
+  // matrah/tahakkuk table at the foot of the page out of the fields — it used
+  // to be swept into whichever label happened to be nearest.
+  const rowLimit = c => {
+    const ys = c.map(l => l.y).sort((a, b) => b - a);
+    const gaps = ys.slice(1).map((y, i) => ys[i] - y).filter(g => g > 0).sort((a, b) => a - b);
+    return Math.max(12, (gaps.length ? gaps[Math.floor(gaps.length / 2)] : 40) * 0.6);
+  };
+  const bucket = (c, cand) => {
+    const lim = rowLimit(c), out = {};
+    for (const it of cand) {
+      let best = null;
+      for (const l of c) if (!best || Math.abs(l.y - it.y) < Math.abs(best.y - it.y)) best = l;
+      if (best && Math.abs(best.y - it.y) <= lim) (out[best.k] ||= []).push(it);
+    }
+    return out;
+  };
+
+  let lb, rb;
+  if (R.length && rightX - leftX > 60) {
+    lb = bucket(L, items.filter(i => i.x > leftX + PAD && i.x < rightX - PAD));
+    rb = bucket(R, items.filter(i => i.x > rightX + PAD));
+  } else {
+    // one stacked column: every label shares a left edge, so the only rule
+    // left is "a value sits to the right of its label"
+    const all = [...L, ...R];
+    const b = bucket(all, items.filter(i => i.x > leftX + PAD));
+    lb = b; rb = b;
+  }
+
   const name = titleTr(join(lb.tic) || join(lb.adi));
   const address = titleTr(join(lb.adr));
-
-  // Right column: vergi dairesi value
-  const R = [["dai", "DAİRES"], ["kim", "VERGİ KİMLİK"], ["tck", "TC KİMLİK"], ["ise", "BAŞLAMA"]]
-    .map(([k, t]) => ({ k, y: anchorY(t) })).filter(l => l.y != null);
-  const rb = {};
-  if (R.length) for (const it of items.filter(i => i.x >= 538)) (rb[near(R, it.y)] ||= []).push(it);
   // GİB prints just the office name (e.g. "AKSU"); contracts want it title-cased
   // with the "Vergi Dairesi" suffix, e.g. "Aksu Vergi Dairesi".
   let office = join(rb.dai);
   if (office) office = /verg[iı]\s*da[iı]res/i.test(office) ? titleTr(office) : titleTr(office) + " Vergi Dairesi";
+  // A şahıs firması has no vergi kimlik no — its TC kimlik IS the tax number,
+  // and it is 11 digits where a company's is 10.
+  const tckn = (join(rb.tck).match(/\b\d{11}\b/) || [""])[0];
 
-  return { name, office, address };
+  return { name, office, address, tckn };
 }
 
 async function extractVergiLevhasi(pdfBuffer) {
@@ -2843,7 +2881,7 @@ async function extractVergiLevhasi(pdfBuffer) {
 
     const tc = await page.getTextContent();
     const items = tc.items.map(i => ({ str: i.str, x: Math.round(i.transform[4]), y: Math.round(i.transform[5]) })).filter(i => i.str.trim());
-    const { name, office, address } = parseVergiLevhasi(items);
+    const { name, office, address, tckn } = parseVergiLevhasi(items);
 
     // Tax number: decode the Code128 barcode from a rendered image
     let taxNo = "";
@@ -2857,6 +2895,10 @@ async function extractVergiLevhasi(pdfBuffer) {
     } catch (e) { console.warn("[pdf-tax] barcode decode failed:", e.message); }
     // Fallback: a plain 10-digit number in the text, if the barcode didn't decode
     if (!taxNo) { const m = items.map(i => i.str).join(" ").match(/\b\d{10}\b/); if (m) taxNo = m[0]; }
+    // Last resort, and the only number a şahıs firması has: the TC kimlik no,
+    // read from its own labelled cell rather than by scanning the page (the
+    // yearly table at the foot is full of digits).
+    if (!taxNo) taxNo = tckn;
 
     return { party2_name: name, party2_tax_office: office, party2_tax_no: taxNo, party2_address: address };
   } finally {
