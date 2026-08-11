@@ -17,6 +17,7 @@ import { PDFDocument } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { createCanvas } from "@napi-rs/canvas";
 import { readBarcodes } from "zxing-wasm/reader";
+import { createWorker } from "tesseract.js";
 import { randomBytes, createHash } from "node:crypto";
 
 // Locate a Chromium-based browser for Puppeteer. Paths vary by machine
@@ -2818,6 +2819,9 @@ function parseVergiLevhasi(rawItems) {
   const LBL = [["adi", "ADI SOYADI"], ["tic", "ÜNVAN"], ["adr", "YERİ ADRES"], ["tur", "VERGİ TÜRÜ"], ["ana", "FAALİYET"]];
   const RBL = [["dai", "DAİRES"], ["kim", "VERGİ KİMLİK"], ["tck", "TC KİMLİK"], ["ise", "BAŞLAMA"]];
   let items = rawItems;
+  // maps a point back from the upright working space to real PDF user space,
+  // so a region located here can be cropped off the rendered page
+  let inv = (x, y) => ({ x, y });
   {
     const anchors = LBL.map(([, t]) => rawItems.find(i => U(i.str).includes(t))).filter(Boolean);
     const sd = vs => { const m = vs.reduce((a, b) => a + b, 0) / vs.length; return Math.sqrt(vs.reduce((a, b) => a + (b - m) ** 2, 0) / vs.length); };
@@ -2828,6 +2832,8 @@ function parseVergiLevhasi(rawItems) {
       const below = rest.filter(i => i.y > ly).length >= rest.filter(i => i.y < ly).length;
       items = rawItems.map(i => below ? { str: i.str, x: i.y, y: -i.x }
                                       : { str: i.str, x: -i.y, y: i.x });
+      inv = below ? (x, y) => ({ x: -y, y: x })
+                  : (x, y) => ({ x: y, y: -x });
     }
   }
   // GİB prints values in ALL CAPS; contracts want Title Case (Turkish locale).
@@ -2902,7 +2908,23 @@ function parseVergiLevhasi(rawItems) {
   // and it is 11 digits where a company's is 10.
   const tckn = (join(rb.tck).match(/\b\d{11}\b/) || [""])[0];
 
-  return { name, office, address, tckn };
+  // Where the vergi kimlik no BELONGS, in real PDF coordinates. On some levhas
+  // that cell holds no text at all — the number is a barcode plus vector-drawn
+  // digits — so this box is what the OCR fallback crops. Locating it from the
+  // label beats scanning the page, which is full of other numbers (years,
+  // matrah and tahakkuk amounts, the issue date).
+  let vknBox = null;
+  const kim = R.find(l => l.k === "kim");
+  if (kim && rightX !== Infinity) {
+    const lim = rowLimit(R) * 1.5;
+    const cs = [[rightX + PAD, kim.y - lim], [rightX + PAD, kim.y + lim],
+                [rightX + PAD + 300, kim.y - lim], [rightX + PAD + 300, kim.y + lim]]
+      .map(([x, y]) => inv(x, y));
+    vknBox = { x0: Math.min(...cs.map(p => p.x)), y0: Math.min(...cs.map(p => p.y)),
+               x1: Math.max(...cs.map(p => p.x)), y1: Math.max(...cs.map(p => p.y)) };
+  }
+
+  return { name, office, address, tckn, vknBox };
 }
 
 async function extractVergiLevhasi(pdfBuffer) {
@@ -2913,7 +2935,7 @@ async function extractVergiLevhasi(pdfBuffer) {
 
     const tc = await page.getTextContent();
     const items = tc.items.map(i => ({ str: i.str, x: Math.round(i.transform[4]), y: Math.round(i.transform[5]) })).filter(i => i.str.trim());
-    const { name, office, address, tckn } = parseVergiLevhasi(items);
+    const { name, office, address, tckn, vknBox } = parseVergiLevhasi(items);
 
     // Tax number: decode the Code128 barcode from a rendered image
     let taxNo = "";
@@ -2927,9 +2949,46 @@ async function extractVergiLevhasi(pdfBuffer) {
     } catch (e) { console.warn("[pdf-tax] barcode decode failed:", e.message); }
     // Fallback: a plain 10-digit number in the text, if the barcode didn't decode
     if (!taxNo) { const m = items.map(i => i.str).join(" ").match(/\b\d{10}\b/); if (m) taxNo = m[0]; }
-    // Last resort, and the only number a şahıs firması has: the TC kimlik no,
-    // read from its own labelled cell rather than by scanning the page (the
-    // yearly table at the foot is full of digits).
+
+    // Last resort before giving up: read the digits printed under the barcode.
+    // Some levhas carry the number ONLY as ink — a barcode whose data region is
+    // 74 modules, which is not a whole number of 11-module Code128 symbols, so
+    // no reader will ever decode it, plus vector-drawn digits that are not text
+    // anywhere in the file. OCR is scoped to the vergi-kimlik-no cell rather
+    // than the page, because the page is full of other numbers (the issue date,
+    // the years, the matrah and tahakkuk amounts).
+    if (!taxNo && vknBox) {
+      try {
+        const vp2 = page.getViewport({ scale: 5 });
+        const { canvas: full, context: fc } = pdfCanvasFactory.create(vp2.width, vp2.height);
+        fc.fillStyle = "#fff"; fc.fillRect(0, 0, vp2.width, vp2.height);
+        await page.render({ canvasContext: fc, viewport: vp2, canvasFactory: pdfCanvasFactory }).promise;
+        const a = vp2.convertToViewportPoint(vknBox.x0, vknBox.y0);
+        const b = vp2.convertToViewportPoint(vknBox.x1, vknBox.y1);
+        const cx = Math.max(0, Math.min(a[0], b[0])), cy = Math.max(0, Math.min(a[1], b[1]));
+        const cw = Math.min(vp2.width - cx, Math.abs(b[0] - a[0]));
+        const ch = Math.min(vp2.height - cy, Math.abs(b[1] - a[1]));
+        if (cw > 20 && ch > 20) {
+          const PAD = 40;
+          const crop = createCanvas(cw + PAD * 2, ch + PAD * 2);
+          const cc = crop.getContext("2d");
+          cc.fillStyle = "#fff"; cc.fillRect(0, 0, crop.width, crop.height);
+          cc.drawImage(full, cx, cy, cw, ch, PAD, PAD, cw, ch);
+          const worker = await createWorker("eng");
+          try {
+            await worker.setParameters({ tessedit_char_whitelist: "0123456789" });
+            const { data: r } = await worker.recognize(crop.toBuffer("image/png"));
+            // exactly ten digits or nothing — a partial read is worse than a
+            // blank field, because nobody re-checks a filled one
+            const hit = (r.text.match(/\d{10,}/g) || []).find(t => t.length === 10);
+            if (hit) { taxNo = hit; console.log("[pdf-tax] tax number read by OCR"); }
+          } finally { await worker.terminate(); }
+        }
+      } catch (e) { console.warn("[pdf-tax] OCR fallback failed:", e.message); }
+    }
+
+    // The only number a şahıs firması has: the TC kimlik no, read from its own
+    // labelled cell rather than by scanning the page.
     if (!taxNo) taxNo = tckn;
 
     return { party2_name: name, party2_tax_office: office, party2_tax_no: taxNo, party2_address: address };
