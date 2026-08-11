@@ -2805,9 +2805,31 @@ const pdfCanvasFactory = {
   destroy: (o) => { o.canvas.width = 0; o.canvas.height = 0; },
 };
 
-function parseVergiLevhasi(items) {
+function parseVergiLevhasi(rawItems) {
   const U = s => (s || "").toLocaleUpperCase("tr-TR").replace(/\s+/g, " ").trim();
   const join = arr => (arr || []).sort((a, b) => (b.y - a.y) || (a.x - b.x)).map(i => i.str.trim()).filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+
+  // Orientation. GİB issues this document upright AND rotated a quarter turn.
+  // Upright, the block's labels share a left edge and run down the page;
+  // rotated, they share a baseline and run across it — so "below the label"
+  // becomes "to the side of it" and every geometric rule inverts. Detect it
+  // from the labels' own spread and rotate the coordinates, so everything
+  // below only ever deals with the upright case.
+  const LBL = [["adi", "ADI SOYADI"], ["tic", "ÜNVAN"], ["adr", "YERİ ADRES"], ["tur", "VERGİ TÜRÜ"], ["ana", "FAALİYET"]];
+  const RBL = [["dai", "DAİRES"], ["kim", "VERGİ KİMLİK"], ["tck", "TC KİMLİK"], ["ise", "BAŞLAMA"]];
+  let items = rawItems;
+  {
+    const anchors = LBL.map(([, t]) => rawItems.find(i => U(i.str).includes(t))).filter(Boolean);
+    const sd = vs => { const m = vs.reduce((a, b) => a + b, 0) / vs.length; return Math.sqrt(vs.reduce((a, b) => a + (b - m) ** 2, 0) / vs.length); };
+    if (anchors.length >= 2 && sd(anchors.map(a => a.x)) > sd(anchors.map(a => a.y))) {
+      const ly = anchors.reduce((a, b) => a + b.y, 0) / anchors.length;
+      const rest = rawItems.filter(i => Math.abs(i.y - ly) > 20);
+      // values sit on whichever side of the label baseline carries the content
+      const below = rest.filter(i => i.y > ly).length >= rest.filter(i => i.y < ly).length;
+      items = rawItems.map(i => below ? { str: i.str, x: i.y, y: -i.x }
+                                      : { str: i.str, x: -i.y, y: i.x });
+    }
+  }
   // GİB prints values in ALL CAPS; contracts want Title Case (Turkish locale).
   const titleTr = s => s.toLocaleLowerCase("tr-TR").replace(/(^|[\s\/])([a-zçğıiöşü])/g, (m, p, c) => p + c.toLocaleUpperCase("tr-TR"));
 
@@ -2821,8 +2843,8 @@ function parseVergiLevhasi(items) {
   const find = t => items.find(i => U(i.str).includes(t));
   const col = defs => defs.map(([k, t]) => { const it = find(t); return it ? { k, x: it.x, y: it.y } : null; }).filter(Boolean);
 
-  const L = col([["adi", "ADI SOYADI"], ["tic", "ÜNVAN"], ["adr", "YERİ ADRES"], ["tur", "VERGİ TÜRÜ"], ["ana", "FAALİYET"]]);
-  const R = col([["dai", "DAİRES"], ["kim", "VERGİ KİMLİK"], ["tck", "TC KİMLİK"], ["ise", "BAŞLAMA"]]);
+  const L = col(LBL);
+  const R = col(RBL);
   if (!L.length) return { name: "", office: "", address: "", tckn: "" };
 
   const leftX = Math.min(...L.map(l => l.x));
@@ -2865,7 +2887,17 @@ function parseVergiLevhasi(items) {
   // GİB prints just the office name (e.g. "AKSU"); contracts want it title-cased
   // with the "Vergi Dairesi" suffix, e.g. "Aksu Vergi Dairesi".
   let office = join(rb.dai);
-  if (office) office = /verg[iı]\s*da[iı]res/i.test(office) ? titleTr(office) : titleTr(office) + " Vergi Dairesi";
+  if (office) {
+    // Case-fold in Turkish before testing: JS's /i/ flag uses SIMPLE case
+    // folding, under which "İ" (U+0130) does not fold to "i", so a plain
+    // /vergi dairesi/i never matches GİB's all-caps "VERGİ DAİRESİ" and the
+    // suffix got appended twice — "Yıldırım Vergi Dairesi Müd. Vergi Dairesi".
+    const lower = office.toLocaleLowerCase("tr-TR");
+    // GİB prints the full office style ("… VERGİ DAİRESİ MÜD."); contracts use
+    // the short form, matching the seeded party records.
+    office = titleTr(office).replace(/\s*(Müd\.?|Müdürlüğü)\s*$/i, "").trim();
+    if (!/vergi\s*dairesi/.test(lower)) office += " Vergi Dairesi";
+  }
   // A şahıs firması has no vergi kimlik no — its TC kimlik IS the tax number,
   // and it is 11 digits where a company's is 10.
   const tckn = (join(rb.tck).match(/\b\d{11}\b/) || [""])[0];
