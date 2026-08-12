@@ -1985,6 +1985,60 @@ app.delete("/dropdown-options/:id", authenticate, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── PUBLIC: programme brochures, linked from WhatsApp buttons ───────────
+// A WhatsApp template's button URL is part of the structure Meta approves, so
+// changing it later costs another review cycle. That makes the URL the thing
+// that must never move — while the file behind it changes every time a
+// programme is revised. Hence a fixed key per programme with a swappable file:
+// replace public/brochures/icmpd.pdf and every message ever sent still works.
+//
+// Unauthenticated on purpose: the recipient is a lead who has no login, and
+// the whole point of the button is that it opens.
+//
+// Hits are counted here rather than in Odoo. Meta never reports who clicked a
+// template button, and Odoo's "tracked" url_type rewrites the URL in a way
+// that would itself need approval — counting at the destination sidesteps both.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS brochure_hits (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    key     TEXT NOT NULL,
+    hit_at  TEXT DEFAULT (datetime('now')),
+    ref     TEXT,
+    ua      TEXT
+  )
+`);
+
+const BROCHURE_DIR = path.join(__dirname, "public", "brochures");
+
+app.get("/brochure/:key", (req, res) => {
+  // the key names a file we ship; never let it name a path
+  const key = String(req.params.key || "").toLowerCase();
+  if (!/^[a-z0-9_-]{1,40}$/.test(key)) return res.status(404).send("Not found");
+  const file = path.join(BROCHURE_DIR, `${key}.pdf`);
+  if (!file.startsWith(BROCHURE_DIR) || !fs.existsSync(file)) {
+    return res.status(404).send("Not found");
+  }
+  try {
+    db.prepare("INSERT INTO brochure_hits (key, ref, ua) VALUES (?, ?, ?)")
+      .run(key, String(req.query.r || "").slice(0, 60),
+           String(req.get("user-agent") || "").slice(0, 200));
+  } catch (e) { console.warn("[brochure] hit not logged:", e.message); }
+  // inline so the phone's viewer opens it instead of downloading a file the
+  // recipient then has to go find
+  res.type("application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${key}.pdf"`);
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  fs.createReadStream(file).pipe(res);
+});
+
+app.get("/api/brochure-stats", authenticate, (req, res) => {
+  const rows = db.prepare(`
+    SELECT key, COUNT(*) AS clicks, MIN(hit_at) AS first_at, MAX(hit_at) AS last_at
+    FROM brochure_hits GROUP BY key ORDER BY clicks DESC
+  `).all();
+  res.json({ ok: true, brochures: rows });
+});
+
 // ── PUBLIC: KVKK / privacy policy mirror ────────────────────────────────
 // Meta refuses to publish the WhatsApp app without a Privacy Policy URL it can
 // fetch, and sunandsun.com.tr returns 403 to anything that is not a browser —
