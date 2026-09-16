@@ -4609,8 +4609,26 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
         finalPdfBytes = await mergeCanvaPdfWithSlide(canvaPdfBytes, slidePdfBytes, slideIndex);
       }
 
-      // Cover: either generate it (when the presentation is configured for it)
-      // or keep Canva's and just stamp the company name on.
+    } catch (canvaErr) {
+      // A normal quote can still be useful as the bare options slide. A fixed
+      // quote IS the Canva deck, so there is nothing to fall back to — say so
+      // rather than send a blank or half a document.
+      if (fixedQuote) {
+        console.error("[pricing/generate] Canva unavailable for a fixed quote:", canvaErr.message);
+        return res.status(502).json({ error: "Canva'ya ulaşılamadı, teklif oluşturulamadı. Lütfen tekrar deneyin." });
+      }
+      console.warn("[pricing/generate] Canva unavailable — returning slide only:", canvaErr.message);
+      finalPdfBytes = slidePdfBytes;
+    }
+
+    // Cover: either generate it (when the presentation is configured for it)
+    // or keep Canva's/the slide's and just stamp the company name on. This
+    // renders through headless Chrome and is a local PDF-rendering step, not
+    // a Canva call — a failure here (e.g. Chrome couldn't start in time) must
+    // never be reported as "Canva unavailable", and should not throw away a
+    // document Canva/the slide step already produced: skip the cosmetic
+    // cover step and still deliver the rest.
+    try {
       if (pres?.cover_title) {
         const coverPdfBytes = await generateCoverSlide({
           color: pres.cover_color || "red",
@@ -4622,16 +4640,8 @@ app.post("/pricing/generate", authenticate, async (req, res) => {
       } else {
         finalPdfBytes = await stampCompanyNameOnCover(finalPdfBytes, client_name);
       }
-    } catch (canvaErr) {
-      // A normal quote can still be useful as the bare options slide. A fixed
-      // quote IS the Canva deck, so there is nothing to fall back to — say so
-      // rather than send a blank or half a document.
-      if (fixedQuote) {
-        console.error("[pricing/generate] Canva unavailable for a fixed quote:", canvaErr.message);
-        return res.status(502).json({ error: "Canva'ya ulaşılamadı, teklif oluşturulamadı. Lütfen tekrar deneyin." });
-      }
-      console.warn("[pricing/generate] Canva unavailable — returning slide only:", canvaErr.message);
-      finalPdfBytes = slidePdfBytes;
+    } catch (coverErr) {
+      console.error("[pricing/generate] cover step failed — serving without the company-name stamp:", coverErr.message);
     }
 
     // Log this generation for the History view (non-fatal if it fails), persist
