@@ -3544,7 +3544,7 @@ function netReason(e) {
   return c?.code || c?.message || e?.message || String(e);
 }
 
-async function fetchRetry(url, opts, tries = 3) {
+async function fetchRetry(url, opts, tries = 6) {
   let lastErr;
   const host = (() => { try { return new URL(url).host; } catch { return url; } })();
   for (let i = 0; i < tries; i++) {
@@ -3552,7 +3552,7 @@ async function fetchRetry(url, opts, tries = 3) {
     catch (e) {
       lastErr = e;
       console.warn(`[canva fetch] ${host} attempt ${i + 1}/${tries}: ${netReason(e)}`);
-      if (i < tries - 1) await new Promise(r => setTimeout(r, 800 * (i + 1)));
+      if (i < tries - 1) await new Promise(r => setTimeout(r, Math.min(800 * (i + 1), 4000)));
     }
   }
   lastErr.message = `${lastErr.message} (${host}: ${netReason(lastErr)})`;
