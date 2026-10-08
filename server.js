@@ -2228,11 +2228,17 @@ function paraBlocks(xml) {
   return out;
 }
 
-// Put newText into the paragraph's FIRST text run and drop the other text runs.
-// The run keeps its <w:rPr>, and <w:pPr> is untouched, so font, size, alignment,
-// numbering and spacing survive. A paragraph with mixed formatting inside it
-// (half bold) collapses to the first run's formatting — that is the one real
-// limitation and the UI warns about it.
+// Patch newText into the paragraph with as little formatting damage as
+// possible. Word often splits a paragraph's sentence into several runs with
+// different <w:rPr> (e.g. a bold clause number followed by plain body text),
+// so a naive "replace everything" blows that formatting away. Instead we
+// diff newText against the paragraph's current text (common prefix/suffix)
+// and, when the changed region sits inside a single run, rewrite only that
+// run's <w:t> — every other run, and its bold/italic/font, is left
+// byte-for-byte untouched. Only when the edit crosses a run boundary (e.g.
+// the whole paragraph was rewritten) do we fall back to collapsing into the
+// first run's formatting — that is the one remaining limitation and the UI
+// warns about it.
 function setParaText(block, newText) {
   const runs = [];
   const re = /<w:r(?:\s[^>]*)?>[\s\S]*?<\/w:r>/g;
@@ -2243,6 +2249,42 @@ function setParaText(block, newText) {
   const textRuns = runs.filter(r => /<w:t(?:\s[^>]*)?>/.test(r.xml));
   if (!textRuns.length) return null;          // image-only paragraph, skip
 
+  const runTexts = textRuns.map(r => {
+    const tm = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/.exec(r.xml);
+    return tm ? unescXml(tm[1]) : "";
+  });
+  const oldText = runTexts.join("");
+
+  if (oldText === newText) return block;      // nothing to do
+
+  let prefix = 0;
+  const maxPrefix = Math.min(oldText.length, newText.length);
+  while (prefix < maxPrefix && oldText[prefix] === newText[prefix]) prefix++;
+  let suffix = 0;
+  const maxSuffix = Math.min(oldText.length - prefix, newText.length - prefix);
+  while (suffix < maxSuffix &&
+         oldText[oldText.length - 1 - suffix] === newText[newText.length - 1 - suffix]) suffix++;
+
+  const midStart = prefix, midEnd = oldText.length - suffix;
+  let pos = 0, runIdx = -1, localStart = -1, localEnd = -1;
+  for (let i = 0; i < runTexts.length; i++) {
+    const start = pos, end = pos + runTexts[i].length;
+    if (midStart >= start && midEnd <= end) { runIdx = i; localStart = midStart - start; localEnd = midEnd - start; break; }
+    pos = end;
+  }
+
+  if (runIdx !== -1) {
+    const target = textRuns[runIdx];
+    const newRunText = runTexts[runIdx].slice(0, localStart)
+      + newText.slice(prefix, newText.length - suffix)
+      + runTexts[runIdx].slice(localEnd);
+    const replaced = target.xml.replace(
+      /<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/,
+      `<w:t xml:space="preserve">${escXml(newRunText)}</w:t>`);
+    return block.slice(0, target.start) + replaced + block.slice(target.end);
+  }
+
+  // Fallback: the edit crosses a run boundary — collapse to the first run.
   let out = block;
   for (let i = textRuns.length - 1; i >= 1; i--) {   // back to front keeps indices valid
     out = out.slice(0, textRuns[i].start) + out.slice(textRuns[i].end);
