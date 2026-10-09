@@ -1177,8 +1177,15 @@ function AttendanceView({ colors, font, lang, onBack }) {
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [newEmp,  setNewEmp]  = useState("");
 
-  const [employees, setEmployees] = useState(DEFAULT_ATT_EMPLOYEES);
+  const [allEmployees, setEmployees] = useState(DEFAULT_ATT_EMPLOYEES);
+  const [empDates, setEmpDates] = useState({});   // { [name]: { start, end } } — end = last working day
+  const [editEmp, setEditEmp] = useState(null);
   const [data, setData] = useState({});
+  // who is employed on a given day / anywhere inside a range — people who left (or have not started yet) drop out
+  // of the table, dashboard and reports for those periods, while their records stay in the database
+  const activeOn = (name, d) => { const x = empDates[name] || {}, k = attDK(d); return (!x.start || x.start <= k) && (!x.end || x.end >= k); };
+  const activeBetween = (name, a, b) => { const x = empDates[name] || {}; return (!x.start || x.start <= attDK(b)) && (!x.end || x.end >= attDK(a)); };
+  const employees = allEmployees.filter(n => activeBetween(n, new Date(year, month, 1), new Date(year, month + 1, 0)));
   const attAuthHeaders = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sns_token")}` });
 
   // employees and monthly records now live server-side (attendance_employees / attendance_records
@@ -1187,6 +1194,9 @@ function AttendanceView({ colors, font, lang, onBack }) {
   useEffect(() => {
     fetch("/attendance/employees", { headers: attAuthHeaders() })
       .then(r => r.json()).then(list => { if (Array.isArray(list) && list.length) setEmployees(list); })
+      .catch(() => {});
+    fetch("/attendance/employee-dates", { headers: attAuthHeaders() })
+      .then(r => r.json()).then(d => { if (d && typeof d === "object") setEmpDates(d); })
       .catch(() => {});
   }, []);
 
@@ -1199,6 +1209,11 @@ function AttendanceView({ colors, font, lang, onBack }) {
   function saveEmployees(list) {
     setEmployees(list);
     fetch("/attendance/employees", { method: "PUT", headers: attAuthHeaders(), body: JSON.stringify({ names: list }) }).catch(() => {});
+  }
+
+  function saveEmpDates(name, start, end) {
+    setEmpDates(p => ({ ...p, [name]: { start, end } }));
+    fetch(`/attendance/employee-dates/${encodeURIComponent(name)}`, { method: "PUT", headers: attAuthHeaders(), body: JSON.stringify({ start, end }) }).catch(() => {});
   }
 
   function setEntry(emp, dk, field, val) {
@@ -1474,20 +1489,35 @@ tr.leave{background:#f0f9ff}
       {/* Employee manager */}
       {showEmpMgr && (
         <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, marginBottom: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 10, fontFamily: font }}>{tr("Manage employees — click × to remove","Çalışanları yönet — kaldırmak için × tıkla")}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 4, fontFamily: font }}>{tr("Manage employees — click a name to set start / end date","Çalışanları yönet — başlangıç / bitiş tarihi için isme tıkla")}</div>
+          <div style={{ fontSize: 11, color: colors.textDim, marginBottom: 10, fontFamily: font }}>{tr("Someone who left keeps all their data, but is hidden from the table, dashboard and reports after the end date (last working day). × deletes the person from the list entirely.","Ayrılan kişinin verisi saklanır; bitiş tarihinden (son çalışma günü) sonra tabloda, panelde ve raporlarda görünmez. × kişiyi listeden tamamen siler.")}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-            {employees.map((emp, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 20, padding: "3px 10px", fontSize: 12, color: colors.text, fontFamily: font }}>
-                {emp}
-                <button onClick={() => saveEmployees(employees.filter((_,j) => j!==i))} style={{ background:"none", border:"none", color:colors.textDim, cursor:"pointer", fontSize:14, padding:0, lineHeight:1, marginLeft:2 }}>×</button>
+            {allEmployees.map((emp, i) => {
+              const dd = empDates[emp] || {};
+              const fmtD = v => v ? `${v.slice(8,10)}.${v.slice(5,7)}.${v.slice(0,4)}` : "";
+              return (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, background: colors.bg, border: `1px solid ${editEmp === emp ? colors.primary : colors.border}`, borderRadius: 20, padding: "3px 10px", fontSize: 12, color: dd.end ? colors.textDim : colors.text, fontFamily: font }}>
+                <span onClick={() => setEditEmp(editEmp === emp ? null : emp)} style={{ cursor: "pointer" }}>
+                  {emp}{dd.end ? ` · ${tr("left","ayrıldı")} ${fmtD(dd.end)}` : ""}{dd.start ? ` · ${tr("from","başlangıç")} ${fmtD(dd.start)}` : ""}
+                </span>
+                <button onClick={() => { if (window.confirm(tr(`Remove ${emp} from the list entirely? To keep their data and just hide them, set an end date instead.`, `${emp} listeden tamamen silinsin mi? Verisi saklanıp sadece gizlenmesi için bunun yerine bitiş tarihi girin.`))) saveEmployees(allEmployees.filter((_,j) => j!==i)); }} style={{ background:"none", border:"none", color:colors.textDim, cursor:"pointer", fontSize:14, padding:0, lineHeight:1, marginLeft:2 }}>×</button>
               </div>
-            ))}
+              );
+            })}
           </div>
+          {editEmp && (() => { const dd = empDates[editEmp] || {}; const inp = { background:colors.bg, border:`1px solid ${colors.border}`, borderRadius:6, padding:"5px 8px", color:colors.text, fontSize:12, fontFamily:font };
+            return (
+            <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap", marginBottom:10, padding:"8px 10px", border:`1px dashed ${colors.border}`, borderRadius:8, fontFamily:font, fontSize:12, color:colors.text }}>
+              <b>{editEmp}</b>
+              <label>{tr("Start date","Başlangıç tarihi")} <input type="date" value={dd.start || ""} onChange={e => saveEmpDates(editEmp, e.target.value, dd.end || "")} style={inp} /></label>
+              <label>{tr("End date (last working day)","Bitiş tarihi (son çalışma günü)")} <input type="date" value={dd.end || ""} onChange={e => saveEmpDates(editEmp, dd.start || "", e.target.value)} style={inp} /></label>
+              <span style={{ color:colors.textDim }}>{tr("Leave empty = no limit","Boş = sınırsız")}</span>
+            </div>); })()}
           <div style={{ display:"flex", gap:8 }}>
-            <input value={newEmp} onChange={e=>setNewEmp(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&newEmp.trim()){saveEmployees([...employees,newEmp.trim()]);setNewEmp("");}}}
+            <input value={newEmp} onChange={e=>setNewEmp(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&newEmp.trim()){saveEmployees([...allEmployees,newEmp.trim()]);setNewEmp("");}}}
               placeholder={tr("Type name and press Enter…","İsim yaz ve Enter'a bas…")}
               style={{ flex:1, background:colors.bg, border:`1px solid ${colors.border}`, borderRadius:6, padding:"6px 10px", color:colors.text, fontSize:12, fontFamily:font, outline:"none" }} />
-            <button onClick={()=>{if(newEmp.trim()){saveEmployees([...employees,newEmp.trim()]);setNewEmp("");}}}
+            <button onClick={()=>{if(newEmp.trim()){saveEmployees([...allEmployees,newEmp.trim()]);setNewEmp("");}}}
               style={{ background:colors.primary, border:"none", borderRadius:6, padding:"6px 14px", color:"#fff", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:font }}>
               {tr("Add","Ekle")}
             </button>
@@ -1540,12 +1570,13 @@ tr.leave{background:#f0f9ff}
               </tr>
             </thead>
             <tbody>
-              {employees.map((emp,ei) => {
+              {employees.filter(emp => activeBetween(emp, wDays[0], wDays[wDays.length - 1])).map((emp,ei) => {
                 const wdiff = empWeekDiff(emp, wDays);
                 return (
                   <tr key={ei} style={{ background: ei%2===0 ? "transparent" : `${colors.bg}99` }}>
                     <td style={{ ...tdSt, fontFamily:font, fontSize:12, fontWeight:600, color:colors.text, padding:"10px 14px", position:"sticky", left:0, background: ei%2===0 ? colors.surface : `${colors.bg}ee`, zIndex:1 }}>{emp}</td>
                     {wDays.map((d,di) => {
+                      if (!activeOn(emp, d)) return <td key={di} style={{ ...tdSt, minWidth:100, background:`${colors.bg}66` }} />;
                       const dk   = attDK(d);
                       const ent  = data[emp]?.[dk] || { in:"", out:"", type:"", leaveStart:"", leaveEnd:"", halfWith:"" };
                       const { type, halfWith, isOff } = attFlags(ent);

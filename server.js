@@ -552,6 +552,17 @@ db.exec(`
     UNIQUE(employee, date)
   );
 `);
+// start/end date per tracked employee (end = last working day). People with an end date stay in the data
+// but disappear from the table, dashboard and reports for every month after it (and before their start).
+if (!db.prepare("PRAGMA table_info(attendance_employees)").all().some(c => c.name === "end_date")) {
+  db.exec("ALTER TABLE attendance_employees ADD COLUMN start_date TEXT DEFAULT ''");
+  db.exec("ALTER TABLE attendance_employees ADD COLUMN end_date TEXT DEFAULT ''");
+  const setD = db.prepare("UPDATE attendance_employees SET start_date = ?, end_date = ? WHERE name = ?");
+  setD.run("", "2026-06-29", "Şura Kurtoğlu");
+  setD.run("", "2026-09-07", "Ece Zaloğlu");
+  setD.run("2026-09-07", "", "Majd Aguir");
+  setD.run("2026-09-01", "", "Beyza Eda Ersoy");
+}
 if (db.prepare("SELECT COUNT(*) as c FROM attendance_employees").get().c === 0) {
   const ins = db.prepare("INSERT INTO attendance_employees (name, sort_order) VALUES (?, ?)");
   [
@@ -1876,11 +1887,30 @@ app.put("/attendance/employees", authenticate, (req, res) => {
   const { names } = req.body || {};
   if (!Array.isArray(names)) return res.status(400).json({ error: "names array required" });
   const tx = db.transaction(list => {
+    const old = {};
+    db.prepare("SELECT name, start_date, end_date FROM attendance_employees").all().forEach(r => { old[r.name] = r; });
     db.prepare("DELETE FROM attendance_employees").run();
-    const ins = db.prepare("INSERT INTO attendance_employees (name, sort_order) VALUES (?, ?)");
-    list.forEach((name, i) => { if (name?.trim()) ins.run(name.trim(), i + 1); });
+    const ins = db.prepare("INSERT INTO attendance_employees (name, sort_order, start_date, end_date) VALUES (?, ?, ?, ?)");
+    list.forEach((name, i) => { if (name?.trim()) { const o = old[name.trim()] || {}; ins.run(name.trim(), i + 1, o.start_date || "", o.end_date || ""); } });
   });
   tx(names);
+  res.json({ ok: true });
+});
+
+// GET /attendance/employee-dates — { [name]: { start, end } } (YYYY-MM-DD, empty = open)
+app.get("/attendance/employee-dates", authenticate, (_req, res) => {
+  const out = {};
+  db.prepare("SELECT name, start_date, end_date FROM attendance_employees").all()
+    .forEach(r => { out[r.name] = { start: r.start_date || "", end: r.end_date || "" }; });
+  res.json(out);
+});
+
+// PUT /attendance/employee-dates/:name — set start / end (last working day) date; empty string clears it
+app.put("/attendance/employee-dates/:name", authenticate, (req, res) => {
+  const ok = v => v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const { start = "", end = "" } = req.body || {};
+  if (!ok(start) || !ok(end)) return res.status(400).json({ error: "dates must be YYYY-MM-DD" });
+  db.prepare("UPDATE attendance_employees SET start_date = ?, end_date = ? WHERE name = ?").run(start, end, req.params.name);
   res.json({ ok: true });
 });
 
