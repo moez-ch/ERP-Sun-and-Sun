@@ -1211,6 +1211,17 @@ function AttendanceView({ colors, font, lang, onBack }) {
     fetch("/attendance/employees", { method: "PUT", headers: attAuthHeaders(), body: JSON.stringify({ names: list }) }).catch(() => {});
   }
 
+  async function syncMonthToOdoo() {
+    if (!window.confirm(tr(`Send ${MONTHS[month]} ${year} to Odoo work entries? Days already in Odoo are only changed where they differ.`, `${MONTHS[month]} ${year} Odoo iş girişlerine aktarılsın mı? Odoo'da aynı olan günler değiştirilmez.`))) return;
+    try {
+      const r = await fetch("/attendance/sync-odoo", { method: "POST", headers: attAuthHeaders(), body: JSON.stringify({ year, month: month + 1 }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || r.status);
+      window.alert(tr(`Odoo updated: ${j.yazildi} days written, ${j.ayni} already the same, ${j.atlandi_bordro} skipped (already on a payslip).`, `Odoo güncellendi: ${j.yazildi} gün yazıldı, ${j.ayni} gün zaten aynı, ${j.atlandi_bordro} gün atlandı (bordroda).`)
+        + (j.bilinmeyen?.length ? "\n" + tr("Not found in Odoo: ", "Odoo'da bulunamadı: ") + j.bilinmeyen.join(", ") : ""));
+    } catch (e) { window.alert(tr("Odoo sync failed: ", "Odoo aktarımı başarısız: ") + e.message); }
+  }
+
   function saveEmpDates(name, start, end) {
     setEmpDates(p => ({ ...p, [name]: { start, end } }));
     fetch(`/attendance/employee-dates/${encodeURIComponent(name)}`, { method: "PUT", headers: attAuthHeaders(), body: JSON.stringify({ start, end }) }).catch(() => {});
@@ -1482,6 +1493,10 @@ tr.leave{background:#f0f9ff}
           <button onClick={() => setShowEmpMgr(s => !s)}
             style={{ padding: "6px 14px", background: showEmpMgr ? `${colors.primary}20` : "transparent", border: `1px solid ${showEmpMgr ? colors.primary : colors.border}`, borderRadius: 6, color: showEmpMgr ? colors.primaryLight : colors.textMuted, fontSize: 12, cursor: "pointer", fontFamily: font }}>
             👥 {tr("Employees","Çalışanlar")}
+          </button>
+          <button onClick={syncMonthToOdoo}
+            style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>
+            ⇄ {tr("Sync month to Odoo","Ayı Odoo'ya aktar")}
           </button>
         </div>
       </div>

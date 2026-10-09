@@ -1952,6 +1952,48 @@ app.put("/attendance/records/:employee/:date", authenticate, (req, res) => {
     leaveStart ?? "", leaveEnd ?? "", halfWith ?? "", lunchBreak ? 1 : 0
   );
   res.json({ ok: true });
+  scheduleAttendanceOdooPush(req.params.employee, req.params.date);
+});
+
+// ── Attendance -> Odoo work entries ─────────────────────────────────────────
+// Each tracker day becomes Odoo work entries (worked / holiday / half holiday / paid or unpaid leave); the mapping
+// lives on the Odoo side (automation on model x_att_import). Only days inside the employee's start/end dates go.
+function attendancePayload(rows) {
+  const dates = {};
+  db.prepare("SELECT name, start_date, end_date FROM attendance_employees").all().forEach(r => { dates[r.name] = r; });
+  return rows.filter(r => { const d = dates[r.employee]; return d && (!d.start_date || d.start_date <= r.date) && (!d.end_date || d.end_date >= r.date); })
+    .map(r => ({ name: r.employee, date: r.date, in: r.check_in, out: r.check_out, type: r.type,
+                 leaveStart: r.leave_start, leaveEnd: r.leave_end, halfWith: r.half_with }));
+}
+async function pushAttendanceToOdoo(payload) {
+  if (!payload.length) return { yazildi: 0, ayni: 0, atlandi_bordro: 0, bilinmeyen: [], surum_yok: 0 };
+  const id = await odooExec("x_att_import", "create", [{ x_payload: JSON.stringify(payload) }]);
+  if (id == null) throw new Error("Odoo connection is not configured on this server (.env)");
+  const [row] = await odooExec("x_att_import", "read", [[id], ["x_result"]]);
+  return JSON.parse(row.x_result);
+}
+// a day is pushed 30 s after the last edit, so typing "08:30" does not push "0", "08", "08:3"...
+const _attPushTimers = new Map();
+function scheduleAttendanceOdooPush(employee, date) {
+  const key = employee + "|" + date;
+  clearTimeout(_attPushTimers.get(key));
+  _attPushTimers.set(key, setTimeout(async () => {
+    _attPushTimers.delete(key);
+    try {
+      const rows = db.prepare("SELECT * FROM attendance_records WHERE employee = ? AND date = ?").all(employee, date);
+      await pushAttendanceToOdoo(attendancePayload(rows));
+    } catch (e) { console.error("[attendance->odoo]", employee, date, e.message); }
+  }, 30000));
+}
+// POST /attendance/sync-odoo { year, month } — push a whole month (admin only); used to backfill past months
+app.post("/attendance/sync-odoo", authenticate, async (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  const { year, month } = req.body || {};
+  if (!year || !month) return res.status(400).json({ error: "year and month required" });
+  try {
+    const rows = db.prepare("SELECT * FROM attendance_records WHERE date LIKE ?").all(`${year}-${String(month).padStart(2, "0")}%`);
+    res.json(await pushAttendanceToOdoo(attendancePayload(rows)));
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // GET /dropdown-options — all custom options grouped by key
