@@ -128,6 +128,41 @@ async def ocr(file: UploadFile = File(...)):
     return {"ok": True, "rawText": full_text, "fields": fields}
 
 
+@app.post("/ocr_lines")
+async def ocr_lines(file: UploadFile = File(...)):
+    """Generic reader for business cards (no tax-certificate parsing).
+    Returns every recognised line with its confidence and box so the caller can
+    flag uncertain text. Tries the upright image first and rotates only when the
+    first read is poor, so a normal card costs one pass instead of four."""
+    contents = await file.read()
+    try:
+        reader = get_ocr_reader()
+        raw = Image.open(io.BytesIO(contents))
+        raw = ImageOps.exif_transpose(raw).convert("RGB")
+        img = preprocess_for_ocr(raw)
+        best, best_score, best_angle = None, -1, 0
+        for angle in [0, 90, 270, 180]:
+            rotated = img.rotate(angle, expand=True)
+            res = reader.readtext(np.array(rotated), detail=1, paragraph=False,
+                                  contrast_ths=0.05, adjust_contrast=0.7,
+                                  low_text=0.3, text_threshold=0.6)
+            score = sum(r[2] for r in res) / max(len(res), 1)
+            if len(res) > 2 and score > best_score:
+                best, best_score, best_angle = res, score, angle
+            if best is not None and best_score >= 0.6:
+                break
+        if not best:
+            raise HTTPException(422, "No text found in image")
+        best.sort(key=lambda r: (r[0][0][1] + r[0][2][1]) / 2)
+        lines = [{"text": r[1], "conf": round(float(r[2]), 3),
+                  "box": [[int(p[0]), int(p[1])] for p in r[0]]} for r in best if r[2] > 0.05]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"OCR failed: {e}")
+    return {"ok": True, "angle": best_angle, "meanConf": round(best_score, 3), "lines": lines}
+
+
 def _fix_digit_ocr(s: str) -> str:
     """Fix common OCR character→digit substitutions in a string expected to be numeric."""
     return (s.replace('O', '0').replace('o', '0')
