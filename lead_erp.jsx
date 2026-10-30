@@ -1084,7 +1084,7 @@ function attDayDiff(ent) {
     const lunchDed = ent?.lunchBreak ? 60 : 0;
     w -= Math.max(0, attRangeMins(ent.leaveStart, ent.leaveEnd) - lunchDed);
   }
-  return w - (type === "half_holiday" ? 300 : 600); // half-day public holiday expects 5h instead of 10h
+  return w - (type === "half_holiday" ? 270 : 600); // half-day public holiday expects 4.5h (08:30–13:00) instead of 10h
 }
 function attFmt(m) { if (m==null) return "—"; const s=m>=0?"+":"-", a=Math.abs(m); return `${s}${Math.floor(a/60)}h ${String(a%60).padStart(2,"0")}m`; }
 function attAbsStr(mins) { const a=Math.abs(mins); return a<60?`${a}m`:`${Math.floor(a/60)}h${a%60>0?` ${a%60}m`:""}`; }
