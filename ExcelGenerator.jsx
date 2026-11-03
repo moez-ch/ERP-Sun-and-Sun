@@ -30,6 +30,8 @@ export default function ExcelGeneratorView({ colors, font, onBack }) {
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState(null);
   const [q, setQ] = useState("");
+  const [vw, setVw] = useState(window.innerWidth);
+  useEffect(() => { const f = () => setVw(window.innerWidth); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
 
   useEffect(() => { api("/excelgen/meta").then((r) => r.json()).then(setMeta).catch((e) => setErr(e.message)); }, []);
   const fields = useMemo(() => (meta && S.base ? meta.fields[S.base] || [] : []), [meta, S.base]);
@@ -155,7 +157,7 @@ export default function ExcelGeneratorView({ colors, font, onBack }) {
 
       {step === 0 && (<>
         <Title h="What do you want a list of?" p="Pick the kind of record. Every row of your Excel will be one of these." />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${vw >= 1250 ? 4 : vw >= 750 ? 2 : 1}, 1fr)`, gap: 16 }}>
           {Object.entries(meta.sources).map(([k, v]) => (
             <button key={k} onClick={() => pickSource(k)} style={{ ...card, marginBottom: 0, textAlign: "left", cursor: "pointer", fontFamily: font, color: c.text, border: `2px solid ${S.base === k ? c.primary : c.border}`, background: S.base === k ? c.surfaceHover : c.surface }}>
               <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{v.label}</div><div style={muted}>{v.hint}</div>
