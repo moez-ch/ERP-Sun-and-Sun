@@ -10,6 +10,12 @@ const SKIP_TYPES = new Set(["binary", "one2many", "html", "properties", "propert
 const SOURCES = {
   companies:         { model: "res.partner",     label: "Companies",         hint: "Firms in the contact database" },
   contacts:          { model: "res.partner",     label: "Contacts (people)", hint: "People attached to a company" },
+  "crm.lead":        { model: "crm.lead",        label: "Pipeline cards",    hint: "Opportunities / program tracking cards" },
+  "project.task":    { model: "project.task",    label: "Tasks",             hint: "To-Do and project tasks" },
+  "hr.employee":     { model: "hr.employee",     label: "Employees",         hint: "Staff records" },
+  "hr.leave":        { model: "hr.leave",        label: "Time off",          hint: "Leave requests" },
+  "fleet.vehicle":   { model: "fleet.vehicle",   label: "Vehicles",          hint: "Company cars" },
+  "mailing.contact": { model: "mailing.contact", label: "Mailing contacts",  hint: "Mass-mailing list entries" },
 };
 const VIRTUAL = [
   { name: "@contacts",   label: "Contact person(s)" },
