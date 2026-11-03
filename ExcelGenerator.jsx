@@ -106,7 +106,7 @@ export default function ExcelGeneratorView({ colors, font, onBack }) {
       else val = <input type={g === "date" ? "date" : g === "number" ? "number" : "text"} style={input} value={Array.isArray(f.value) ? "" : f.value ?? ""} onChange={(e) => upd({ value: e.target.value })} />;
     }
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1.5fr 40px", gap: 12, alignItems: "start", padding: "12px 0", borderBottom: `1px solid ${c.border}` }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(160px,1.3fr) minmax(130px,1fr) minmax(160px,1.5fr) 40px", gap: 12, alignItems: "start", padding: "12px 0", borderBottom: `1px solid ${c.border}` }}>
         <select style={input} value={f.field} onChange={(e) => { const nf = fmap[e.target.value]; const ng = nf ? grp(nf.type) : "char"; upd({ field: e.target.value, op: OPS[ng][0][0], value: ng === "selection" ? [] : "" }); }}>
           <option value="">Choose a field…</option>{fields.map((x) => <option key={x.name} value={x.name}>{x.label}</option>)}
         </select>
@@ -135,7 +135,7 @@ export default function ExcelGeneratorView({ colors, font, onBack }) {
   const stat = (n, l) => (<div key={l} style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: "12px 20px" }}><div style={{ fontSize: 24, fontWeight: 700 }}>{n}</div><div style={muted}>{l}</div></div>);
 
   return (
-    <div style={{ animation: "slideIn .3s ease", maxWidth: 1100 }}>
+    <div style={{ animation: "slideIn .3s ease", width: "100%" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22, flexWrap: "wrap" }}>
         <button style={btn} onClick={onBack}>← Back</button>
         <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: font, margin: 0 }}>📊 Excel Generator</h1>
@@ -155,7 +155,7 @@ export default function ExcelGeneratorView({ colors, font, onBack }) {
 
       {step === 0 && (<>
         <Title h="What do you want a list of?" p="Pick the kind of record. Every row of your Excel will be one of these." />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(230px,1fr))", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 16 }}>
           {Object.entries(meta.sources).map(([k, v]) => (
             <button key={k} onClick={() => pickSource(k)} style={{ ...card, marginBottom: 0, textAlign: "left", cursor: "pointer", fontFamily: font, color: c.text, border: `2px solid ${S.base === k ? c.primary : c.border}`, background: S.base === k ? c.surfaceHover : c.surface }}>
               <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{v.label}</div><div style={muted}>{v.hint}</div>
@@ -192,9 +192,9 @@ export default function ExcelGeneratorView({ colors, font, onBack }) {
 
       {step === 2 && (<>
         <Title h="Which columns do you want?" p="Click a field on the left to add it. On the right, rename a header by typing in it and reorder with the arrows." />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 22 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 22 }}>
           <div><input style={{ ...input, marginBottom: 10 }} placeholder="Search fields…" value={q} onChange={(e) => setQ(e.target.value)} />
-            <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, height: 420, overflow: "auto", background: c.surface }}>
+            <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, height: "max(320px, calc(100vh - 330px))", overflow: "auto", background: c.surface }}>
               {avail.length ? avail.map((x) => (
                 <div key={x.key} onClick={() => set({ columns: [...S.columns, { key: x.key, label: x.label }] })} style={{ padding: "9px 14px", borderBottom: `1px solid ${c.border}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = c.surfaceHover)} onMouseLeave={(e) => (e.currentTarget.style.background = "none")}>
@@ -202,7 +202,7 @@ export default function ExcelGeneratorView({ colors, font, onBack }) {
                 </div>)) : <div style={{ padding: 20, ...muted }}>No field matches.</div>}
             </div></div>
           <div><div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, padding: "9px 0" }}>{S.columns.length} column{S.columns.length === 1 ? "" : "s"} in your Excel</div>
-            <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, height: 420, overflow: "auto", background: c.surface }}>
+            <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, height: "max(320px, calc(100vh - 330px))", overflow: "auto", background: c.surface }}>
               {S.columns.length ? S.columns.map((x, i) => (
                 <div key={x.key} style={{ padding: "6px 10px", borderBottom: `1px solid ${c.border}`, display: "flex", gap: 4, alignItems: "center" }}>
                   <input style={{ ...input, border: "1px solid transparent", background: "none" }} value={x.label} onChange={(e) => set({ columns: S.columns.map((y, j) => (j === i ? { ...y, label: e.target.value } : y)) })} />
@@ -246,7 +246,7 @@ export default function ExcelGeneratorView({ colors, font, onBack }) {
 function PvTable({ c, head, rows, title }) {
   return (<>
     <div style={{ color: c.textMuted, fontSize: 12, marginBottom: 8 }}>{title}:</div>
-    <div style={{ overflow: "auto", maxHeight: 440, border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface }}>
+    <div style={{ overflow: "auto", maxHeight: "max(300px, calc(100vh - 520px))", border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface }}>
       <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
         <thead><tr>{head.map((h, i) => <th key={i} style={{ position: "sticky", top: 0, background: c.surfaceHover, color: c.text, textAlign: "left", padding: "9px 14px", whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
         <tbody>{rows.map((r, i) => <tr key={i}>{r.map((v, j) => <td key={j} title={String(v ?? "")} style={{ padding: "8px 14px", borderBottom: `1px solid ${c.border}`, whiteSpace: "nowrap", maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", color: c.text }}>{String(v ?? "")}</td>)}</tr>)}</tbody>

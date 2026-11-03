@@ -8243,7 +8243,7 @@ Kurallar:
                     {lang === "tr" ? "Excel dosyalarınızı işlemek için bir araç seçin." : "Choose a tool to process your Excel files."}
                   </p>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, maxWidth: 1020 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 }}>
                   {[
                     { id: "keyword_hunter", icon: "🔍", title: lang === "tr" ? "Anahtar Kelime Avcısı" : "Keyword Hunter",    desc: lang === "tr" ? "Excel dosyasından anahtar kelimeyle eşleşen satırları çıkar ve indir." : "Extract rows matching your keywords from a large Excel file and download the results.", color: colors.primary },
                     { id: "excel_cleaner",  icon: "🧹", title: lang === "tr" ? "Excel Temizleyici" : "Excel Cleaner",          desc: lang === "tr" ? "Anahtar kelimeyle eşleşen satırları işaretle ve temizlenmiş dosyayı indir." : "Flag rows matching your keywords, review them, and download a cleaned file.", color: colors.success },
