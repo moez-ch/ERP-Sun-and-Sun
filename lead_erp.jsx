@@ -2022,7 +2022,7 @@ export default function App() {
   // Odoo hand-off: ?app=<slug> => open straight on that screen with the ERP
   // chrome hidden (kiosk); ?sso_token=... => log the user in automatically.
   // Each Odoo app tile passes a slug that maps to the ERP view it should land on.
-  const KIOSK_VIEWS = { contracts: "contracts", teklif: "pricing" };
+  const KIOSK_VIEWS = { contracts: "contracts", teklif: "pricing", excelgen: "tools" };
   const appParam = new URLSearchParams(window.location.search).get("app");
   const kioskView = KIOSK_VIEWS[appParam] || null;
   const kiosk = !!kioskView;
@@ -2316,7 +2316,7 @@ function Dashboard({ authUser, onLogout: handleLogout, kiosk = false, kioskView 
     } catch { return []; }
   });
   const [view, setView] = useState(kioskView || "dashboard"); // dashboard | leads | agent | pipeline | detail
-  const [toolsSubView, setToolsSubView] = useState(null); // null | "keyword_hunter" | "excel_cleaner"
+  const [toolsSubView, setToolsSubView] = useState(kioskView === "tools" ? "excel_generator" : null); // null | "keyword_hunter" | "excel_cleaner"
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
@@ -3677,7 +3677,7 @@ Kurallar:
               <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
                 <img src={snsLogo} alt="Sun&Sun" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
-              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>{view === "pricing" ? "Fiyat Teklifi" : "Sözleşmeler"}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>{view === "pricing" ? "Fiyat Teklifi" : view === "tools" ? (lang === "tr" ? "Excel Oluşturucu" : "Excel Generator") : "Sözleşmeler"}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ fontSize: 12, color: colors.textDim }}>{authUser.name}</span>
@@ -8271,7 +8271,7 @@ Kurallar:
               <ExcelCleanerView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />
             )}
             {toolsSubView === "excel_generator" && isAdmin && (
-              <ExcelGeneratorView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />
+              <ExcelGeneratorView colors={colors} font={font} lang={lang} onBack={kiosk ? undefined : () => setToolsSubView(null)} />
             )}
             {toolsSubView === "attendance" && (
               <AttendanceView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />

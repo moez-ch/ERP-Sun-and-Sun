@@ -153,7 +153,7 @@ export default function ExcelGeneratorView({ colors, font, lang, onBack }) {
   return (
     <div style={{ animation: "slideIn .3s ease", width: "100%" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22, flexWrap: "wrap" }}>
-        <button style={btn} onClick={onBack}>← {tr("Back", "Geri")}</button>
+        {onBack && <button style={btn} onClick={onBack}>← {tr("Back", "Geri")}</button>}
         <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: font, margin: 0 }}>📊 {tr("Excel Generator", "Excel Oluşturucu")}</h1>
         <div style={{ display: "flex", gap: 6, marginLeft: 18 }}>
           {STEPS.map((n, i) => (
