@@ -8271,7 +8271,7 @@ Kurallar:
               <ExcelCleanerView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />
             )}
             {toolsSubView === "excel_generator" && isAdmin && (
-              <ExcelGeneratorView colors={colors} font={font} onBack={() => setToolsSubView(null)} />
+              <ExcelGeneratorView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />
             )}
             {toolsSubView === "attendance" && (
               <AttendanceView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />

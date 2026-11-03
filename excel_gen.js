@@ -122,11 +122,11 @@ export function registerExcelGen(app, { authenticate, requireAdmin, odooExec, da
     return dom;
   }
 
-  function plain(v, f) {
+  function plain(v, f, yes = "Yes") {
     if (v === false || v === null || v === undefined) return "";
     if (f?.type === "many2one") return Array.isArray(v) && v.length > 1 ? v[1] : "";
     if (f?.type === "selection") { const m = f.selection.find((s) => s[0] === v); return m ? m[1] : v; }
-    if (f?.type === "boolean") return v ? "Yes" : "";
+    if (f?.type === "boolean") return v ? yes : "";
     if (f?.type === "datetime" && typeof v === "string") return v.slice(0, 16);
     return v;
   }
@@ -148,6 +148,7 @@ export function registerExcelGen(app, { authenticate, requireAdmin, odooExec, da
   }
 
   async function runGeneric(spec, model) {
+    const yes = spec.lang === "tr" ? "Evet" : "Yes";
     const FL = await fieldsOf(model);
     const cols = (spec.columns || []).filter((c) => FL[c.key]);
     let recs = await odooExec(model, "search_read", [buildDomain(spec, FL)], { fields: cols.length ? cols.map((c) => c.key) : ["id"], limit: ROW_LIMIT + 1 });
@@ -155,7 +156,7 @@ export function registerExcelGen(app, { authenticate, requireAdmin, odooExec, da
     recs = recs.slice(0, ROW_LIMIT);
     const names = await m2mNames(FL, cols, recs);
     const rows = recs.map((r) => cols.map((c) => FL[c.key].type === "many2many"
-      ? (r[c.key] || []).map((i) => names[c.key]?.[i] ?? String(i)).join(", ") : plain(r[c.key], FL[c.key])));
+      ? (r[c.key] || []).map((i) => names[c.key]?.[i] ?? String(i)).join(", ") : plain(r[c.key], FL[c.key], yes)));
     return { cols, main: rows, side: [], stats: { matched: recs.length, rows: rows.length, side_rows: 0, excluded: { closed: 0, reference: 0 }, no_phone: 0, truncated, limit: ROW_LIMIT } };
   }
 
@@ -166,6 +167,9 @@ export function registerExcelGen(app, { authenticate, requireAdmin, odooExec, da
     if (src.model !== "res.partner") return runGeneric(spec, src.model);
     const F = await fieldsOf("res.partner");
     const closed = await closedMarkers(F);
+    const tr = spec.lang === "tr";
+    const yes = tr ? "Evet" : "Yes";
+    const PT = tr ? { cm: "Yetkili cep", fm: "Firma cep", ln: "Sabit hat" } : { cm: "Contact mobile", fm: "Company mobile", ln: "Landline" };
     const rules = spec.rules || {}, phoneMode = spec.phone || "any", dncMode = rules.dnc || "include";
     const cols = (spec.columns || []).filter((c) => c.key.startsWith("@") || F[c.key]);
     const want = new Set(["name", "x_kaynak", "child_ids", "parent_id", ...NUMF, ...DNC_FIELDS, ...Object.keys(closed), ...cols.filter((c) => !c.key.startsWith("@")).map((c) => c.key)]);
@@ -210,14 +214,14 @@ export function registerExcelGen(app, { authenticate, requireAdmin, odooExec, da
           (notes[u.x_partner_id[0]] ||= []).push(u);
       } catch { /* notice model optional */ }
     }
-    const DURUM = { aranmayacak: "Do not call", inceleme_bekliyor: "Under review" };
+    const DURUM = tr ? { aranmayacak: "Aranmayacak", inceleme_bekliyor: "İnceleme bekliyor" } : { aranmayacak: "Do not call", inceleme_bekliyor: "Under review" };
     const notice = (c) => {
       const bits = [];
-      if (c.x_aranmak_istemiyor) bits.push("Wants no calls");
+      if (c.x_aranmak_istemiyor) bits.push(tr ? "Aranmak istemiyor" : "Wants no calls");
       if (DURUM[c.x_arama_durumu]) bits.push(DURUM[c.x_arama_durumu]);
-      if (["evet", "inceleme"].includes(c.x_aranmasin_kesin)) bits.push("Do-not-call: " + c.x_aranmasin_kesin);
+      if (["evet", "inceleme"].includes(c.x_aranmasin_kesin)) bits.push((tr ? "Aranmasın: " : "Do-not-call: ") + c.x_aranmasin_kesin);
       const n = notes[c.id]?.[0];
-      if (n) bits.push("Note: " + ((n.x_ifade || "") + (n.x_not_metin ? " - " + n.x_not_metin.slice(0, 160).replace(/\n/g, " ") : "")).replace(/^[ -]+|[ -]+$/g, ""));
+      if (n) bits.push((tr ? "Not: " : "Note: ") + ((n.x_ifade || "") + (n.x_not_metin ? " - " + n.x_not_metin.slice(0, 160).replace(/\n/g, " ") : "")).replace(/^[ -]+|[ -]+$/g, ""));
       return bits.join(" | ");
     };
     const m2m = await m2mNames(F, cols, kept);
@@ -229,7 +233,7 @@ export function registerExcelGen(app, { authenticate, requireAdmin, odooExec, da
       if (key === "@company") return base === "contacts" && r.parent_id ? r.parent_id[1] : r.name;
       if (key === "@notice") return notice(ctx(r));
       const f = F[key];
-      return f.type === "many2many" ? (r[key] || []).map((i) => m2m[key]?.[i] ?? String(i)).join(", ") : plain(r[key], f);
+      return f.type === "many2many" ? (r[key] || []).map((i) => m2m[key]?.[i] ?? String(i)).join(", ") : plain(r[key], f, yes);
     };
 
     const main = [], side = [];
@@ -238,22 +242,22 @@ export function registerExcelGen(app, { authenticate, requireAdmin, odooExec, da
       let cat = "", opts;
       if (base === "contacts") {
         const [mob, land] = numbers(r);
-        if (mob.length) { cat = "contact_mobile"; opts = [{ contact: r.name, phone: mob.join(" / "), ptype: "Contact mobile" }]; }
-        else if (land.length) { cat = "landline"; opts = [{ contact: r.name, phone: land.join(" / "), ptype: "Landline" }]; }
+        if (mob.length) { cat = "contact_mobile"; opts = [{ contact: r.name, phone: mob.join(" / "), ptype: PT.cm }]; }
+        else if (land.length) { cat = "landline"; opts = [{ contact: r.name, phone: land.join(" / "), ptype: PT.ln }]; }
         else opts = [];
       } else {
         const people = r.child_ids.map((i) => kids[i]).filter(Boolean);
         const prow = [];
-        for (const p of people) { const [mob] = numbers(p); if (mob.length) prow.push({ contact: p.name, phone: mob.join(" / "), ptype: "Contact mobile" }); }
+        for (const p of people) { const [mob] = numbers(p); if (mob.length) prow.push({ contact: p.name, phone: mob.join(" / "), ptype: PT.cm }); }
         const names = people.map((p) => p.name).filter(Boolean).join(" / ");
         if (prow.length) { cat = "contact_mobile"; opts = prow; }
         else {
           const [cm, cl] = numbers(r);
-          if (cm.length) { cat = "company_mobile"; opts = [{ contact: names, phone: cm.join(" / "), ptype: "Company mobile" }]; }
+          if (cm.length) { cat = "company_mobile"; opts = [{ contact: names, phone: cm.join(" / "), ptype: PT.fm }]; }
           else {
             const lands = [...cl], seen = new Set(cl.map(digits10));
             for (const p of people) for (const x of numbers(p)[1]) if (!seen.has(digits10(x))) { seen.add(digits10(x)); lands.push(x); }
-            if (lands.length) { cat = "landline"; opts = [{ contact: names, phone: lands.join(" / "), ptype: "Landline" }]; }
+            if (lands.length) { cat = "landline"; opts = [{ contact: names, phone: lands.join(" / "), ptype: PT.ln }]; }
             else opts = [];
           }
         }
@@ -302,11 +306,11 @@ export function registerExcelGen(app, { authenticate, requireAdmin, odooExec, da
     const { cols, main, side, stats } = await run(spec);
     const head = cols.map((c) => c.label || c.key);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, sheetFrom(head, main), safeName(spec.sheet1, "List"));
-    if (spec.rules?.dnc === "sheet2") XLSX.utils.book_append_sheet(wb, sheetFrom([...head, "Notice"], side), safeName(spec.sheet2, "Do not call - review"));
+    XLSX.utils.book_append_sheet(wb, sheetFrom(head, main), safeName(spec.sheet1, spec.lang === "tr" ? "Liste" : "List"));
+    if (spec.rules?.dnc === "sheet2") XLSX.utils.book_append_sheet(wb, sheetFrom([...head, spec.lang === "tr" ? "Uyarı" : "Notice"], side), safeName(spec.sheet2, spec.lang === "tr" ? "Aranmayacaklar - inceleme" : "Do not call - review"));
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
     try { fs.appendFileSync(LOGF, JSON.stringify({ at: new Date().toISOString(), by: req.user?.email || req.user?.name, spec, stats }) + "\n"); } catch { /* log is best effort */ }
-    const fname = String(spec.filename || "export").replace(/[^\w-]+/g, "_") + ".xlsx";
+    const fname = String(spec.filename || (spec.lang === "tr" ? "liste" : "export")).replace(/[^\w-]+/g, "_") + ".xlsx";
     res.set({ "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${fname}"`, "X-Stats": JSON.stringify(stats), "Access-Control-Expose-Headers": "X-Stats" });
     res.send(buf);
   }));
