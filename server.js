@@ -19,6 +19,7 @@ import { createCanvas } from "@napi-rs/canvas";
 import { readBarcodes } from "zxing-wasm/reader";
 import { createWorker } from "tesseract.js";
 import { randomBytes, createHash } from "node:crypto";
+import { registerExcelGen } from "./excel_gen.js";
 
 // Locate a Chromium-based browser for Puppeteer. Paths vary by machine
 // (dev box vs. the 192.168.1.135 server), so probe common locations and
@@ -1090,6 +1091,9 @@ function requireAdmin(req, res, next) {
     return res.status(403).json({ error: "Admin access required" });
   next();
 }
+
+// Excel Tools -> Excel Generator (admin only, reads Odoo, see excel_gen.js)
+registerExcelGen(app, { authenticate, requireAdmin, odooExec, dataDir: __dirname });
 
 // ── ROUTES ────────────────────────────────────────────────────────
 

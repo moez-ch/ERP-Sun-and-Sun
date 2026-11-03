@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import snsLogo from "./sns_logo.png";
 import * as XLSX from "xlsx";
 import LoginPage from "./LoginPage.jsx";
+import ExcelGeneratorView from "./ExcelGenerator.jsx";
 import { TRANSLATIONS } from "./i18n.js";
 
 // ─── CONSTANTS & UTILITIES ───────────────────────────────────────
@@ -8247,6 +8248,7 @@ Kurallar:
                     { id: "keyword_hunter", icon: "🔍", title: lang === "tr" ? "Anahtar Kelime Avcısı" : "Keyword Hunter",    desc: lang === "tr" ? "Excel dosyasından anahtar kelimeyle eşleşen satırları çıkar ve indir." : "Extract rows matching your keywords from a large Excel file and download the results.", color: colors.primary },
                     { id: "excel_cleaner",  icon: "🧹", title: lang === "tr" ? "Excel Temizleyici" : "Excel Cleaner",          desc: lang === "tr" ? "Anahtar kelimeyle eşleşen satırları işaretle ve temizlenmiş dosyayı indir." : "Flag rows matching your keywords, review them, and download a cleaned file.", color: colors.success },
                     { id: "attendance",     icon: "⏱", title: lang === "tr" ? "Mesai Takibi" : "Attendance Tracker",          desc: lang === "tr" ? "Giriş/çıkış tablosunu yükle, çalışan başına fazla/eksik mesaiyi hesapla." : "Upload a check-in/out sheet and calculate overtime & undertime per employee.", color: colors.accent },
+                    ...(isAdmin ? [{ id: "excel_generator", icon: "📊", title: lang === "tr" ? "Excel Oluşturucu" : "Excel Generator", desc: lang === "tr" ? "Odoo verisinden filtre ve sütun seçerek Excel listesi oluştur." : "Pick filters and columns from live Odoo data and download a ready Excel list.", color: colors.primaryLight || colors.primary }] : []),
                   ].map(tool => (
                     <button key={tool.id} onClick={() => setToolsSubView(tool.id)}
                       style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 28, cursor: "pointer", textAlign: "left", fontFamily: font, transition: "all .2s" }}
@@ -8267,6 +8269,9 @@ Kurallar:
             )}
             {toolsSubView === "excel_cleaner" && (
               <ExcelCleanerView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />
+            )}
+            {toolsSubView === "excel_generator" && isAdmin && (
+              <ExcelGeneratorView colors={colors} font={font} onBack={() => setToolsSubView(null)} />
             )}
             {toolsSubView === "attendance" && (
               <AttendanceView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />

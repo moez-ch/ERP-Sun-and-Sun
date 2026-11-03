@@ -50,6 +50,10 @@ export default defineConfig({
         target: "http://localhost:3001",
         changeOrigin: false,
       },
+      "/excelgen": {
+        target: "http://localhost:3001",
+        changeOrigin: false,
+      },
       "/pricing": {
         target: "http://localhost:3001",
         changeOrigin: false,
