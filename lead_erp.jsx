@@ -6266,7 +6266,7 @@ Kurallar:
                       </div>
                     ))}
                     {extras.map(o => (
-                      <div key={o.id} style={{ display: "flex", alignItems: "center", padding: "6px 10px", gap: 4, opacity: o.hidden ? 0.4 : 1, background: value === o.value ? `${colors.primary}15` : "transparent" }}>
+                      <div key={o.id} style={{ display: "flex", alignItems: "center", padding: "6px 10px", gap: 4, background: value === o.value ? `${colors.primary}15` : "transparent" }}>
                         {editingDropdownOption?.id === o.id
                           ? <>
                               <input autoFocus value={editingDropdownOption.value}
@@ -6277,7 +6277,7 @@ Kurallar:
                               <button onClick={() => setEditingDropdownOption(null)} style={addCancelSt}>✕</button>
                             </>
                           : <>
-                              <span onClick={() => { onChange(o.value); setOpenDropdown(null); }} style={{ flex: 1, cursor: "pointer", color: value === o.value ? colors.primary : colors.text, fontSize: 12 }}>{o.value}</span>
+                              <span onClick={() => { onChange(o.value); setOpenDropdown(null); }} style={{ flex: 1, cursor: "pointer", color: value === o.value ? colors.primary : colors.text, fontSize: 12, opacity: o.hidden ? 0.4 : 1 }}>{o.value}</span>
                               {isAdmin && <>
                                 <button onClick={() => toggleHideOption(o.id, dropdownKey, !o.hidden)} title={o.hidden ? "Unhide" : "Hide"} style={editBtnSt}>{o.hidden ? "Unhide" : "Hide"}</button>
                                 <button onClick={() => setEditingDropdownOption({ id: o.id, value: o.value, dropdownKey })} style={editBtnSt}>✏</button>
