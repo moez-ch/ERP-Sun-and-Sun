@@ -481,6 +481,7 @@ db.exec(`
 `);
 try { db.exec(`ALTER TABLE contract_companies ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`); } catch {}
 db.exec(`CREATE TABLE IF NOT EXISTS dropdown_options (id INTEGER PRIMARY KEY AUTOINCREMENT, dropdown_key TEXT NOT NULL, value TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+try { db.exec(`ALTER TABLE dropdown_options ADD COLUMN hidden INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS uq_dropdown_options ON dropdown_options (dropdown_key, value)`); } catch {}
 // Seed the defaults ONCE, not on every boot. This used to re-run at every
 // start, so an option Esra deleted came back the next time the service was
@@ -2002,10 +2003,20 @@ app.post("/attendance/sync-odoo", authenticate, async (req, res) => {
 
 // GET /dropdown-options — all custom options grouped by key
 app.get("/dropdown-options", authenticate, (req, res) => {
-  const rows = db.prepare("SELECT id, dropdown_key, value FROM dropdown_options ORDER BY dropdown_key, created_at").all();
+  // Hidden options are only ever sent to admins; everyone else never sees them.
+  const isAdm = req.user.role === "admin";
+  const rows = db.prepare("SELECT id, dropdown_key, value, hidden FROM dropdown_options ORDER BY dropdown_key, created_at").all()
+    .filter(r => isAdm || !r.hidden);
   const grouped = {};
-  rows.forEach(r => { (grouped[r.dropdown_key] = grouped[r.dropdown_key] || []).push({ id: r.id, value: r.value }); });
+  rows.forEach(r => { (grouped[r.dropdown_key] = grouped[r.dropdown_key] || []).push({ id: r.id, value: r.value, ...(isAdm ? { hidden: !!r.hidden } : {}) }); });
   res.json(grouped);
+});
+
+// PUT /dropdown-options/:id/hidden — admin only; toggles visibility for non-admins
+app.put("/dropdown-options/:id/hidden", authenticate, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  db.prepare("UPDATE dropdown_options SET hidden=? WHERE id=?").run(req.body?.hidden ? 1 : 0, req.params.id);
+  res.json({ ok: true });
 });
 
 // Turkish-aware comparison: İ/I and i/ı differ from the default lowercase

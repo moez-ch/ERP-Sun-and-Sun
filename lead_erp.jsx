@@ -6224,6 +6224,11 @@ Kurallar:
             await fetch(`/dropdown-options/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
             setDropdownExtras(prev => ({ ...prev, [dropdownKey]: (prev[dropdownKey] || []).filter(o => o.id !== id) }));
           };
+          const toggleHideOption = async (id, dropdownKey, hidden) => {
+            const token = localStorage.getItem("sns_token");
+            const r = await fetch(`/dropdown-options/${id}/hidden`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ hidden }) });
+            if ((await r.json()).ok) setDropdownExtras(prev => ({ ...prev, [dropdownKey]: (prev[dropdownKey] || []).map(o => o.id === id ? { ...o, hidden } : o) }));
+          };
           const saveEditOption = async () => {
             if (!editingDropdownOption || !editingDropdownOption.value.trim()) return;
             const { id, value, dropdownKey } = editingDropdownOption;
@@ -6261,7 +6266,7 @@ Kurallar:
                       </div>
                     ))}
                     {extras.map(o => (
-                      <div key={o.id} style={{ display: "flex", alignItems: "center", padding: "6px 10px", gap: 4, background: value === o.value ? `${colors.primary}15` : "transparent" }}>
+                      <div key={o.id} style={{ display: "flex", alignItems: "center", padding: "6px 10px", gap: 4, opacity: o.hidden ? 0.4 : 1, background: value === o.value ? `${colors.primary}15` : "transparent" }}>
                         {editingDropdownOption?.id === o.id
                           ? <>
                               <input autoFocus value={editingDropdownOption.value}
@@ -6274,6 +6279,7 @@ Kurallar:
                           : <>
                               <span onClick={() => { onChange(o.value); setOpenDropdown(null); }} style={{ flex: 1, cursor: "pointer", color: value === o.value ? colors.primary : colors.text, fontSize: 12 }}>{o.value}</span>
                               {isAdmin && <>
+                                <button onClick={() => toggleHideOption(o.id, dropdownKey, !o.hidden)} title={o.hidden ? "Unhide" : "Hide"} style={editBtnSt}>{o.hidden ? "Unhide" : "Hide"}</button>
                                 <button onClick={() => setEditingDropdownOption({ id: o.id, value: o.value, dropdownKey })} style={editBtnSt}>✏</button>
                                 <button onClick={() => deleteDropdownOption(o.id, dropdownKey)} style={delBtnSt}>✕</button>
                               </>}
