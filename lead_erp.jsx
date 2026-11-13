@@ -6246,7 +6246,7 @@ Kurallar:
           const missingRequired = () => {
             const out = [];
             Object.keys(REQ_PARENT).concat(ALL_CONTRACT_FIELDS.map(f => f.key)).filter((k, i, a) => a.indexOf(k) === i).forEach(k => {
-              if (k === "party3" || k === "multi_program" || !isReq(k) || !fieldVisible(k)) return;
+              if (k === "party3" || k === "multi_program" || k === "payment_schedule" || !isReq(k) || !fieldVisible(k)) return;
               if (REQ_PARENT[k] && !fieldVisible(REQ_PARENT[k])) return;
               if (contractTemplate?.template_type === "html" && !HTML_FORM_KEYS.includes(k)) return;
               const label = ALL_CONTRACT_FIELDS.find(f => f.key === k)?.label || k;
@@ -7664,7 +7664,7 @@ Kurallar:
                     {/* Payment schedule */}
                     {fieldVisible('payment_schedule') && (<div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionSchedule")}{reqMark('payment_schedule')}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionSchedule")}</div>
                         <button onClick={() => setContractData(p => ({ ...p, payment_schedule: [...p.payment_schedule, { subject: "Hizmet Başlangıç Ücreti", subjectCustom: "", dateType: "calendar", date: "", dateText: "", amount: "" }] }))}
                           style={{ padding: "4px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                           {t("contract_addRow")}

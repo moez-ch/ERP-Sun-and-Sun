@@ -2595,7 +2595,7 @@ function missingRequiredFields(tplRow, data) {
   const out = [];
   // Every visible field is obligatory unless an admin exempted it (req[k] === false).
   for (const k of Object.keys(REQ_FIELD_LABELS)) {
-    if (req[k] === false || vis?.[k] === false) continue;
+    if (k === "payment_schedule" || req[k] === false || vis?.[k] === false) continue; // installments may be left empty
     if (REQ_PARENT[k] && vis?.[REQ_PARENT[k]] === false) continue;
     if (isHtml && !REQ_HTML_KEYS.includes(k)) continue; // the simplified pricing form shows only some fields
     if (k === "payment_schedule") { if (!Array.isArray(data.payment_schedule) || !data.payment_schedule.length) out.push(REQ_FIELD_LABELS[k]); continue; }
