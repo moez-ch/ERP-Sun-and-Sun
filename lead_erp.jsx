@@ -6211,6 +6211,50 @@ Kurallar:
           const fv = contractTemplate?.visible_fields || {};
           const fieldVisible = k => fv[k] !== false;
 
+          // ── Obligatory fields (admin chooses per template; * for everyone, ☆/★ toggle for admins) ──
+          const reqMap = contractTemplate?.required_fields || {};
+          const isReq = k => !!reqMap[k];
+          const toggleRequired = async k => {
+            if (!contractTemplate) { alert(lang === "tr" ? "Önce bir şablon seçin." : "Select a template first."); return; }
+            const next = { ...reqMap, [k]: !reqMap[k] };
+            if (!next[k]) delete next[k];
+            const token = localStorage.getItem("sns_token");
+            const r = await fetch(`/contracts/templates/${contractTemplate.id}/required`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ required_fields: next }) });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok || !d.ok) { alert((lang === "tr" ? "Kaydedilemedi: " : "Could not save: ") + (d.error || r.status)); return; }
+            setContractTemplates(p => p.map(x => x.id === contractTemplate.id ? { ...x, required_fields: d.required_fields } : x));
+            setContractTemplate(p => ({ ...p, required_fields: d.required_fields }));
+          };
+          const reqMark = k => isAdmin
+            ? <button type="button" onClick={e => { e.preventDefault(); toggleRequired(k); }}
+                title={lang === "tr" ? "Bu alanı zorunlu yap / kaldır (yalnızca yönetici)" : "Make this field obligatory / optional (admin only)"}
+                style={{ marginLeft: 6, padding: "0 7px", fontSize: 10, fontWeight: 600, borderRadius: 10, cursor: "pointer", lineHeight: "16px",
+                  border: `1px solid ${isReq(k) ? "#e57373" : colors.border}`, background: isReq(k) ? "rgba(229,115,115,0.15)" : "transparent", color: isReq(k) ? "#e57373" : colors.textMuted }}>
+                {isReq(k) ? (lang === "tr" ? "★ Zorunlu" : "★ Required") : (lang === "tr" ? "☆ Zorunlu yap" : "☆ Make required")}
+              </button>
+            : (isReq(k) ? <span style={{ color: "#e57373", marginLeft: 3 }}>*</span> : null);
+          // logical field -> data keys, per program (same table as the server's missingRequiredFields)
+          const REQ_PROG = {
+            program_name: ["program_name", "program2_name", "program3_name"], down_payment: ["down_payment", "program2_fee", "program3_fee"],
+            down_payment_deadline: ["down_payment_deadline", "program2_fee_deadline", "program3_fee_deadline"],
+            success_bonus: ["success_bonus", "program2_bonus", "program3_bonus"], sb1ddl: ["sb1ddl", "program2_bonus_deadline", "program3_bonus_deadline"],
+            success_bonus_2: ["success_bonus_2", "program2_bonus_2", "program3_bonus_2"],
+            success_bonus_2_deadline: ["success_bonus_2_deadline", "program2_bonus_2_deadline", "program3_bonus_2_deadline"],
+          };
+          const HTML_FORM_KEYS = ["party2_name", "financier", "program_name", "down_payment", "success_bonus", "success_bonus_type", "success_bonus_type_2", "contract_date", "notes"];
+          const missingRequired = () => {
+            const out = [];
+            Object.keys(reqMap).forEach(k => {
+              if (!reqMap[k] || !fieldVisible(k)) return;
+              if (contractTemplate?.template_type === "html" && !HTML_FORM_KEYS.includes(k)) return;
+              const label = ALL_CONTRACT_FIELDS.find(f => f.key === k)?.label || k;
+              if (k === "payment_schedule") { if (!(dataWithCompany.payment_schedule || []).length) out.push(label); return; }
+              const keys = REQ_PROG[k] ? REQ_PROG[k].slice(0, contractProgramCount) : [k];
+              if (keys.some(dk => String(dataWithCompany[dk] ?? "").trim() === "")) out.push(label);
+            });
+            return out;
+          };
+
           const addDropdownOption = async (dropdownKey, value) => {
             if (!value?.trim()) return;
             const token = localStorage.getItem("sns_token");
@@ -6381,6 +6425,12 @@ Kurallar:
 
           const handleGenerate = async (format = "pdf") => {
             if (!contractTemplate) { alert("Lütfen bir sözleşme şablonu seçin."); return; }
+            if (format === "word" && !isAdmin) { alert(lang === "tr" ? "Word indirme yalnızca yöneticilere açıktır." : "Word downloads are restricted to admins."); return; }
+            const missing = missingRequired();
+            if (missing.length) {
+              alert((lang === "tr" ? "Zorunlu alanlar boş, dosya indirilemez:\n• " : "Required fields are empty, the file cannot be downloaded:\n• ") + missing.join("\n• "));
+              return;
+            }
             setContractGenerating(true);
             try {
               const token = localStorage.getItem("sns_token");
@@ -6389,7 +6439,7 @@ Kurallar:
               const r = await fetch("/contracts/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ templateId: contractTemplate.id, data: dataWithCompany, format, filename }),
+                body: JSON.stringify({ templateId: contractTemplate.id, data: { ...dataWithCompany, _programCount: contractProgramCount }, format, filename }),
               });
               if (!r.ok) { const e = await r.json(); alert("Hata: " + e.error); return; }
               const blob = await r.blob();
@@ -6513,7 +6563,7 @@ Kurallar:
 
           const field = (label, key, opts = {}) => (
             <div key={key} style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{label}</div>
+              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{label}{opts.reqKey && reqMark(opts.reqKey)}</div>
               {opts.textarea ? (
                 <textarea value={contractData[key] || ""} onChange={e => setContractData(p => ({ ...p, [key]: e.target.value }))}
                   rows={2} placeholder={opts.placeholder || ""}
@@ -7277,14 +7327,14 @@ Kurallar:
                   {/* Client name */}
                   <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Client</div>
-                    {field("Company Name", "party2_name", { placeholder: "e.g. ABC Ltd." })}
+                    {field("Company Name", "party2_name", { placeholder: "e.g. ABC Ltd.", reqKey: "party2_name" })}
                   </div>
 
                   {/* Contract details (programs + notes) */}
                   <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionDetails")}</div>
                     <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_financier")}</div>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_financier")}{reqMark('financier')}</div>
                       <input value={contractData.financier || ""} onChange={e => setContractData(p => ({ ...p, financier: e.target.value }))} placeholder="e.g. KOSGEB, TÜBİTAK" style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                     </div>
                     {[
@@ -7297,14 +7347,14 @@ Kurallar:
                           <div style={{ fontSize: 11, fontWeight: 700, color: colors.primary, textTransform: "uppercase", letterSpacing: 0.5 }}>{prog.label}</div>
                           {idx > 0 && <button onClick={() => { setContractProgramCount(p => p - 1); setContractData(p => ({ ...p, [prog.nameKey]: "", [prog.feeKey]: "", [prog.bonusKey]: "" })); }} style={{ fontSize: 11, color: "#e57373", background: "none", border: "none", cursor: "pointer" }}>{t("contract_remove")}</button>}
                         </div>
-                        {field(t("contract_programName"), prog.nameKey, { placeholder: t("contract_programNamePh") })}
+                        {field(t("contract_programName"), prog.nameKey, { placeholder: t("contract_programNamePh"), reqKey: "program_name" })}
                         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                           <div>
-                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_serviceFeeVat")}</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_serviceFeeVat")}{reqMark('down_payment')}</div>
                             <input value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))} placeholder="e.g. 50.000" style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                           </div>
                           <div>
-                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus")}</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus")}{reqMark('success_bonus')}</div>
                             <input value={contractData[prog.bonusKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusKey]: e.target.value }))} placeholder="e.g. 5" style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                           </div>
                         </div>
@@ -7319,7 +7369,7 @@ Kurallar:
                       <div style={{ display: "grid", gridTemplateColumns: (fieldVisible('success_bonus_2')||fieldVisible('success_bonus_type_2')) ? "1fr 1fr" : "1fr", gap: 10 }}>
                         {[["success_bonus_type","@@success_bonus_type@@"],...(fieldVisible('success_bonus_2')||fieldVisible('success_bonus_type_2')?[["success_bonus_type_2","@@success_bonus_type_2@@"]]:[])] .map(([key, tag], i) => (
                           <div key={key}>
-                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} {i+1}</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} {i+1}{reqMark(i === 0 ? 'success_bonus_type' : 'success_bonus_type_2')}</div>
                             {renderCustomDropdown(`sbt_a_${i}`, "success_bonus_type", contractData[key] || "", v => setContractData(p => ({ ...p, [key]: v })), [{ value: "", label: "—" }], { width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13 })}
                             {contractData[key] === "sağlanan fayda" && (
                               <div style={{ marginTop: 6, padding: "8px 10px", background: `${colors.primary}12`, border: `1px solid ${colors.primary}33`, borderRadius: 6, fontSize: 11, color: colors.textMuted, fontStyle: "italic", lineHeight: 1.5 }}>
@@ -7331,12 +7381,12 @@ Kurallar:
                       </div>
                     </div>
                     <div style={{ marginBottom: 10 }}>
-                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}</div>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}{reqMark('contract_date')}</div>
                       {renderDatePicker("cdate_a", contractData.contract_date || "", v => setContractData(p => ({ ...p, contract_date: v })), { width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" })}
                       {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{t("contract_days")[new Date(contractData.contract_date + "T12:00:00").getDay()]}</div>}
                     </div>
                     <div style={{ marginTop: 6 }}>
-                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_notes")}</div>
+                      <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_notes")}{reqMark('notes')}</div>
                       <textarea value={contractData.notes || ""} onChange={e => setContractData(p => ({ ...p, notes: e.target.value }))} rows={3} placeholder={t("contract_notesPh")} style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
                     </div>
                   </div>
@@ -7415,7 +7465,7 @@ Kurallar:
                       <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionDetails")}</div>
 
                       {fieldVisible('financier') && <div style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Financier</div>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>Financier{reqMark('financier')}</div>
                         <input value={contractData.financier || ""} onChange={e => setContractData(p => ({ ...p, financier: e.target.value }))} placeholder="e.g. KOSGEB, TÜBİTAK" style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                       </div>}
 
@@ -7435,37 +7485,37 @@ Kurallar:
                                 style={{ fontSize: 11, color: "#e57373", background: "none", border: "none", cursor: "pointer", padding: "0 4px" }}>{t("contract_remove")}</button>
                             )}
                           </div>
-                          {fieldVisible('program_name') && field(t("contract_programName"), prog.nameKey, { placeholder: t("contract_programNamePh") })}
+                          {fieldVisible('program_name') && field(t("contract_programName"), prog.nameKey, { placeholder: t("contract_programNamePh"), reqKey: "program_name" })}
                           {/* Service Fee */}
                           {fieldVisible('down_payment') && (
                           <div style={{ marginBottom: 10 }}>
-                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_serviceFeeShort")}</div>
+                            <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_serviceFeeShort")}{reqMark('down_payment')}</div>
                             <input type="number" min="0" value={contractData[prog.feeKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeKey]: e.target.value }))}
                               placeholder="e.g. 50000"
                               style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-                            {fieldVisible('down_payment_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.feeDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeDeadlineKey]: e.target.value }))} placeholder={t("contract_deadlinePh")} style={dlStyle} /></>}
+                            {fieldVisible('down_payment_deadline') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, marginBottom: 2 }}>{t("contract_deadline")}{reqMark('down_payment_deadline')}</div><input value={contractData[prog.feeDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.feeDeadlineKey]: e.target.value }))} placeholder={t("contract_deadlinePh")} style={dlStyle} /></>}
                           </div>
                           )}
                           {/* Success Bonuses */}
                           {(fieldVisible('success_bonus') || fieldVisible('success_bonus_2')) && (
                           <div style={{ display: "grid", gridTemplateColumns: fieldVisible('success_bonus') && fieldVisible('success_bonus_2') ? "1fr 1fr" : "1fr", gap: 10 }}>
                             {fieldVisible('success_bonus') && <div>
-                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus1")}</div>
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus1")}{reqMark('success_bonus')}</div>
                               <select value={contractData[prog.bonusKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusKey]: e.target.value }))}
                                 style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('sb1ddl') && <>{prog.bonusDdlTypeKey && fieldVisible('sb1ddl_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadlineType")}</div>{renderCustomDropdown(`dlt_1_${prog.label}`, "deadline_type", contractData[prog.bonusDdlTypeKey] || "", v => setContractData(p => ({ ...p, [prog.bonusDdlTypeKey]: v })), [{ value: "", label: "—" }], dlStyle)}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonusDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDeadlineKey]: e.target.value }))} placeholder={t("contract_deadlinePh")} style={dlStyle} /></>}
+                              {fieldVisible('sb1ddl') && <>{prog.bonusDdlTypeKey && fieldVisible('sb1ddl_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadlineType")}{reqMark('sb1ddl_type')}</div>{renderCustomDropdown(`dlt_1_${prog.label}`, "deadline_type", contractData[prog.bonusDdlTypeKey] || "", v => setContractData(p => ({ ...p, [prog.bonusDdlTypeKey]: v })), [{ value: "", label: "—" }], dlStyle)}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}{reqMark('sb1ddl')}</div><input value={contractData[prog.bonusDeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonusDeadlineKey]: e.target.value }))} placeholder={t("contract_deadlinePh")} style={dlStyle} /></>}
                             </div>}
                             {fieldVisible('success_bonus_2') && <div>
-                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus2")}</div>
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_successBonus2")}{reqMark('success_bonus_2')}</div>
                               <select value={contractData[prog.bonus2Key] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2Key]: e.target.value }))}
                                 style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}>
                                 <option value="">—</option>
                                 {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}%</option>)}
                               </select>
-                              {fieldVisible('success_bonus_2_deadline') && <>{prog.bonus2DdlTypeKey && fieldVisible('sb1ddl_2_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadlineType")}</div>{renderCustomDropdown(`dlt_2_${prog.label}`, "deadline_type", contractData[prog.bonus2DdlTypeKey] || "", v => setContractData(p => ({ ...p, [prog.bonus2DdlTypeKey]: v })), [{ value: "", label: "—" }], dlStyle)}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}</div><input value={contractData[prog.bonus2DeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DeadlineKey]: e.target.value }))} placeholder={t("contract_deadlinePh")} style={dlStyle} /></>}
+                              {fieldVisible('success_bonus_2_deadline') && <>{prog.bonus2DdlTypeKey && fieldVisible('sb1ddl_2_type') && <><div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadlineType")}{reqMark('sb1ddl_2_type')}</div>{renderCustomDropdown(`dlt_2_${prog.label}`, "deadline_type", contractData[prog.bonus2DdlTypeKey] || "", v => setContractData(p => ({ ...p, [prog.bonus2DdlTypeKey]: v })), [{ value: "", label: "—" }], dlStyle)}</>}<div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6, marginBottom: 2 }}>{t("contract_deadline")}{reqMark('success_bonus_2_deadline')}</div><input value={contractData[prog.bonus2DeadlineKey] || ""} onChange={e => setContractData(p => ({ ...p, [prog.bonus2DeadlineKey]: e.target.value }))} placeholder={t("contract_deadlinePh")} style={dlStyle} /></>}
                             </div>}
                           </div>
                           )}
@@ -7485,7 +7535,7 @@ Kurallar:
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                           {[["success_bonus_type","@@success_bonus_type@@"],...(fieldVisible('success_bonus_2')||fieldVisible('success_bonus_type_2')?[["success_bonus_type_2","@@success_bonus_type_2@@"]]:[])] .map(([key, tag], i) => (
                             <div key={key}>
-                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} {i+1}</div>
+                              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_perfBonusType")} {i+1}{reqMark(i === 0 ? 'success_bonus_type' : 'success_bonus_type_2')}</div>
                               {renderCustomDropdown(`sbt_b_${i}`, "success_bonus_type", contractData[key] || "", v => setContractData(p => ({ ...p, [key]: v })), [{ value: "", label: "—" }], { width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13 })}
                               {contractData[key] === "sağlanan fayda" && (
                                 <div style={{ marginTop: 6, padding: "8px 10px", background: `${colors.primary}12`, border: `1px solid ${colors.primary}33`, borderRadius: 6, fontSize: 11, color: colors.textMuted, fontStyle: "italic", lineHeight: 1.5 }}>
@@ -7498,14 +7548,14 @@ Kurallar:
                       </div>}
 
                       {fieldVisible('contract_date') && <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}</div>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_contractDate")}{reqMark('contract_date')}</div>
                         {renderDatePicker("cdate_b", contractData.contract_date || "", v => setContractData(p => ({ ...p, contract_date: v })), { width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none" })}
                         {contractData.contract_date && <div style={{ fontSize: 10, color: colors.primary, fontWeight: 600, marginTop: 3, paddingLeft: 2 }}>{t("contract_days")[new Date(contractData.contract_date + "T12:00:00").getDay()]}</div>}
                       </div>}
 
                       {/* Notes */}
                       {fieldVisible('notes') && <div style={{ marginTop: 6 }}>
-                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_notes")}</div>
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_notes")}{reqMark('notes')}</div>
                         <textarea value={contractData.notes || ""} onChange={e => setContractData(p => ({ ...p, notes: e.target.value }))}
                           rows={3} placeholder={t("contract_notesPh")}
                           style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
@@ -7545,17 +7595,17 @@ Kurallar:
                         party2_address: p.party2_address || c.address || "",
                         odoo_partner_id: c.id,
                       }))} />
-                      {fieldVisible('party2_name') && field(t("contract_party2Name"), "party2_name", { placeholder: t("contract_party2NamePh") })}
+                      {fieldVisible('party2_name') && field(t("contract_party2Name"), "party2_name", { placeholder: t("contract_party2NamePh"), reqKey: "party2_name" })}
                       {(fieldVisible('party2_tax_office') || fieldVisible('party2_tax_no')) && (
                       <div style={{ display: "grid", gridTemplateColumns: fieldVisible('party2_tax_office') && fieldVisible('party2_tax_no') ? "1fr 1fr" : "1fr", gap: 10 }}>
                         {fieldVisible('party2_tax_office') && <div>
-                          <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_taxOffice")}</div>
+                          <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_taxOffice")}{reqMark('party2_tax_office')}</div>
                           <input value={contractData.party2_tax_office || ""} onChange={e => setContractData(p => ({ ...p, party2_tax_office: e.target.value }))}
                             placeholder="Örn: Çankaya"
                             style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                         </div>}
                         {fieldVisible('party2_tax_no') && <div>
-                          <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_taxNo")}</div>
+                          <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: 600 }}>{t("contract_taxNo")}{reqMark('party2_tax_no')}</div>
                           <input value={contractData.party2_tax_no || ""} onChange={e => setContractData(p => ({ ...p, party2_tax_no: e.target.value }))}
                             placeholder="10 digits"
                             style={{ width: "100%", padding: "8px 10px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.text, fontSize: 13, outline: "none", boxSizing: "border-box" }} />
@@ -7563,7 +7613,7 @@ Kurallar:
                       </div>
                       )}
                       {fieldVisible('party2_address') && <div style={{ marginTop: 10 }}>
-                        {field(t("contract_address"), "party2_address", { placeholder: "...", textarea: true })}
+                        {field(t("contract_address"), "party2_address", { placeholder: "...", textarea: true, reqKey: "party2_address" })}
                       </div>}
                     </div>
 
@@ -7612,7 +7662,7 @@ Kurallar:
                     {/* Payment schedule */}
                     {fieldVisible('payment_schedule') && (<div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionSchedule")}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("contract_sectionSchedule")}{reqMark('payment_schedule')}</div>
                         <button onClick={() => setContractData(p => ({ ...p, payment_schedule: [...p.payment_schedule, { subject: "Hizmet Başlangıç Ücreti", subjectCustom: "", dateType: "calendar", date: "", dateText: "", amount: "" }] }))}
                           style={{ padding: "4px 10px", background: `${colors.primary}22`, border: `1px solid ${colors.primary}44`, borderRadius: 5, color: colors.primaryLight, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
                           {t("contract_addRow")}
@@ -7677,7 +7727,7 @@ Kurallar:
                       style={{ flex: 1, padding: "13px", background: colors.primary, border: "none", borderRadius: 8, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (contractGenerating || !contractTemplate || !contractData.party1_id) ? 0.6 : 1 }}>
                       {contractGenerating ? t("contract_generating") : "⬇ Download PDF"}
                     </button>
-                    {contractTemplate?.template_type === "docx" && (
+                    {contractTemplate?.template_type === "docx" && isAdmin && (
                       <button onClick={() => handleGenerate("word")} disabled={contractGenerating || !contractTemplate || !contractData.party1_id}
                         style={{ flex: 1, padding: "13px", background: "transparent", border: `2px solid ${colors.primary}`, borderRadius: 8, color: colors.primaryLight, fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (contractGenerating || !contractTemplate || !contractData.party1_id) ? 0.6 : 1 }}>
                         ⬇ Download Word

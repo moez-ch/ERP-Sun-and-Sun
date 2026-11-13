@@ -144,6 +144,8 @@ db.exec(`
 `);
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN template_type TEXT NOT NULL DEFAULT 'docx'`); } catch {}
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN visible_fields TEXT`); } catch {}
+// Fields an admin marked "obligatory" for this template ({ party2_name: true, ... }).
+try { db.exec(`ALTER TABLE contract_templates ADD COLUMN required_fields TEXT`); } catch {}
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN default_party1_id INTEGER`); } catch {}
 try { db.exec(`ALTER TABLE contract_templates ADD COLUMN default_iban TEXT`); } catch {}
 
@@ -2188,8 +2190,8 @@ aydınlatma metnine aşağıdaki adresten ulaşabilirsiniz.</p>
 
 // GET /contracts/templates
 app.get("/contracts/templates", authenticate, (req, res) => {
-  const rows = db.prepare("SELECT id, name, filename, variables, template_type, visible_fields, default_party1_id, default_iban, created_at FROM contract_templates ORDER BY name COLLATE NOCASE ASC").all();
-  res.json(rows.map(r => ({ ...r, variables: JSON.parse(r.variables), visible_fields: r.visible_fields ? JSON.parse(r.visible_fields) : null })));
+  const rows = db.prepare("SELECT id, name, filename, variables, template_type, visible_fields, required_fields, default_party1_id, default_iban, created_at FROM contract_templates ORDER BY name COLLATE NOCASE ASC").all();
+  res.json(rows.map(r => ({ ...r, variables: JSON.parse(r.variables), visible_fields: r.visible_fields ? JSON.parse(r.visible_fields) : null, required_fields: r.required_fields ? JSON.parse(r.required_fields) : {} })));
 });
 
 // POST /contracts/templates — upload .docx or .html, detect @@var@@ tags
@@ -2276,6 +2278,15 @@ app.put("/contracts/templates/:id/party1", authenticate, (req, res) => {
   const { default_party1_id } = req.body || {};
   db.prepare("UPDATE contract_templates SET default_party1_id=? WHERE id=?").run(default_party1_id || null, req.params.id);
   res.json({ ok: true });
+});
+
+// PUT /contracts/templates/:id/required — admin only: which form fields are obligatory
+app.put("/contracts/templates/:id/required", authenticate, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  const clean = {};
+  for (const [k, v] of Object.entries(req.body?.required_fields || {})) if (v === true) clean[k] = true;
+  db.prepare("UPDATE contract_templates SET required_fields=? WHERE id=?").run(JSON.stringify(clean), req.params.id);
+  res.json({ ok: true, required_fields: clean });
 });
 
 // PUT /contracts/templates/:id/fields
@@ -2553,11 +2564,53 @@ app.delete("/contracts/templates/:id", authenticate, (req, res) => {
 });
 
 // POST /contracts/generate — fill template and return PDF or Word
+// Logical form field -> the data keys that hold its value (per program for the program fields).
+const REQ_FIELD_LABELS = {
+  party2_name: "Client Title", party2_tax_office: "Tax Office", party2_tax_no: "Tax Number", party2_address: "Address",
+  financier: "Financier", program_name: "Program Name", down_payment: "Service Fee", down_payment_deadline: "Service Fee Deadline",
+  success_bonus_type: "Success Bonus Type", success_bonus_type_2: "Success Bonus Type 2", success_bonus: "Success Bonus 1 (%)",
+  sb1ddl: "Success Bonus 1 Deadline", sb1ddl_type: "Success Bonus 1 Deadline Type", success_bonus_2: "Success Bonus 2 (%)",
+  success_bonus_2_deadline: "Success Bonus 2 Deadline", sb1ddl_2_type: "Success Bonus 2 Deadline Type",
+  contract_date: "Contract Date", notes: "Notes", payment_schedule: "Payment Schedule",
+};
+const REQ_PROGRAM_KEYS = {
+  program_name: ["program_name", "program2_name", "program3_name"],
+  down_payment: ["down_payment", "program2_fee", "program3_fee"],
+  down_payment_deadline: ["down_payment_deadline", "program2_fee_deadline", "program3_fee_deadline"],
+  success_bonus: ["success_bonus", "program2_bonus", "program3_bonus"],
+  sb1ddl: ["sb1ddl", "program2_bonus_deadline", "program3_bonus_deadline"],
+  success_bonus_2: ["success_bonus_2", "program2_bonus_2", "program3_bonus_2"],
+  success_bonus_2_deadline: ["success_bonus_2_deadline", "program2_bonus_2_deadline", "program3_bonus_2_deadline"],
+};
+const REQ_HTML_KEYS = ["party2_name", "financier", "program_name", "down_payment", "success_bonus", "success_bonus_type", "success_bonus_type_2", "contract_date", "notes"];
+function missingRequiredFields(tplRow, data) {
+  let req = {}, vis = {};
+  try { req = tplRow.required_fields ? JSON.parse(tplRow.required_fields) : {}; } catch {}
+  try { vis = tplRow.visible_fields ? JSON.parse(tplRow.visible_fields) : {}; } catch {}
+  const isHtml = tplRow.template_type === "html" || (tplRow.filename || "").toLowerCase().endsWith(".html");
+  const nProg = Math.min(3, Math.max(1, Number(data._programCount) || 1));
+  const empty = v => v === undefined || v === null || String(v).trim() === "";
+  const out = [];
+  for (const k of Object.keys(req)) {
+    if (!req[k] || vis?.[k] === false || !REQ_FIELD_LABELS[k]) continue;
+    if (isHtml && !REQ_HTML_KEYS.includes(k)) continue; // the simplified pricing form shows only some fields
+    if (k === "payment_schedule") { if (!Array.isArray(data.payment_schedule) || !data.payment_schedule.length) out.push(REQ_FIELD_LABELS[k]); continue; }
+    const keys = REQ_PROGRAM_KEYS[k] ? REQ_PROGRAM_KEYS[k].slice(0, nProg) : [k];
+    if (keys.some(dk => empty(data[dk]))) out.push(REQ_FIELD_LABELS[k]);
+  }
+  return out;
+}
+
 app.post("/contracts/generate", authenticate, async (req, res) => {
   const { templateId, data, format, filename } = req.body || {};
   const returnWord = format === "word";
+  // Word copies are editable, so only admins may download them.
+  if (returnWord && req.user.role !== "admin") return res.status(403).json({ error: "Word downloads are restricted to admins." });
   const row = db.prepare("SELECT * FROM contract_templates WHERE id=?").get(templateId);
   if (!row) return res.status(404).json({ error: "Template not found" });
+  // Admin-chosen obligatory fields: refuse the file while any visible one is empty.
+  const missingReq = missingRequiredFields(row, data || {});
+  if (missingReq.length) return res.status(400).json({ error: "Zorunlu alanlar boş / Required fields are empty: " + missingReq.join(", ") });
 
   const tmpId   = Date.now() + "_" + Math.random().toString(36).slice(2);
   const pdfPath = path.join(TMP_DIR, tmpId + ".pdf");
@@ -3473,6 +3526,8 @@ function serveStored(table) {
     if (req.user?.role !== "admin" && row.created_by_name !== req.user?.name)
       return res.status(403).json({ error: "Forbidden" });
     const fp = path.resolve(STORAGE_DIR, row.stored_file);
+    if (table === "contracts" && /\.docx$/i.test(row.stored_file) && req.user?.role !== "admin")
+      return res.status(403).json({ error: "Word files are restricted to admins." });
     if (!fs.existsSync(fp)) return res.status(404).json({ error: "File missing on server" });
 
     // Rebuild the ORIGINAL filename the user got at generation time, then prefix
