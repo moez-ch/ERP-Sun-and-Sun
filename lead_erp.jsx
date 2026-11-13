@@ -6213,11 +6213,11 @@ Kurallar:
 
           // ── Obligatory fields (admin chooses per template; * for everyone, ☆/★ toggle for admins) ──
           const reqMap = contractTemplate?.required_fields || {};
-          const isReq = k => !!reqMap[k];
+          const isReq = k => reqMap[k] !== false; // every field is obligatory unless an admin exempted it
           const toggleRequired = async k => {
             if (!contractTemplate) { alert(lang === "tr" ? "Önce bir şablon seçin." : "Select a template first."); return; }
-            const next = { ...reqMap, [k]: !reqMap[k] };
-            if (!next[k]) delete next[k];
+            const next = { ...reqMap };
+            if (isReq(k)) next[k] = false; else delete next[k];
             const token = localStorage.getItem("sns_token");
             const r = await fetch(`/contracts/templates/${contractTemplate.id}/required`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ required_fields: next }) });
             const d = await r.json().catch(() => ({}));
@@ -6227,10 +6227,10 @@ Kurallar:
           };
           const reqMark = k => isAdmin
             ? <button type="button" onClick={e => { e.preventDefault(); toggleRequired(k); }}
-                title={lang === "tr" ? "Bu alanı zorunlu yap / kaldır (yalnızca yönetici)" : "Make this field obligatory / optional (admin only)"}
+                title={lang === "tr" ? "Tüm alanlar zorunludur; bu alanı isteğe bağlı yapmak / geri zorunlu yapmak için tıklayın (yalnızca yönetici)" : "All fields are obligatory; click to make this one optional / obligatory again (admin only)"}
                 style={{ marginLeft: 6, padding: "0 7px", fontSize: 10, fontWeight: 600, borderRadius: 10, cursor: "pointer", lineHeight: "16px",
                   border: `1px solid ${isReq(k) ? "#e57373" : colors.border}`, background: isReq(k) ? "rgba(229,115,115,0.15)" : "transparent", color: isReq(k) ? "#e57373" : colors.textMuted }}>
-                {isReq(k) ? (lang === "tr" ? "★ Zorunlu" : "★ Required") : (lang === "tr" ? "☆ Zorunlu yap" : "☆ Make required")}
+                {isReq(k) ? (lang === "tr" ? "★ Zorunlu" : "★ Required") : (lang === "tr" ? "☆ İsteğe bağlı" : "☆ Optional")}
               </button>
             : (isReq(k) ? <span style={{ color: "#e57373", marginLeft: 3 }}>*</span> : null);
           // logical field -> data keys, per program (same table as the server's missingRequiredFields)
@@ -6241,11 +6241,13 @@ Kurallar:
             success_bonus_2: ["success_bonus_2", "program2_bonus_2", "program3_bonus_2"],
             success_bonus_2_deadline: ["success_bonus_2_deadline", "program2_bonus_2_deadline", "program3_bonus_2_deadline"],
           };
+          const REQ_PARENT = { down_payment_deadline: "down_payment", sb1ddl: "success_bonus", sb1ddl_type: "sb1ddl", success_bonus_2_deadline: "success_bonus_2", sb1ddl_2_type: "success_bonus_2_deadline", success_bonus_type_2: "success_bonus_2" };
           const HTML_FORM_KEYS = ["party2_name", "financier", "program_name", "down_payment", "success_bonus", "success_bonus_type", "success_bonus_type_2", "contract_date", "notes"];
           const missingRequired = () => {
             const out = [];
-            Object.keys(reqMap).forEach(k => {
-              if (!reqMap[k] || !fieldVisible(k)) return;
+            Object.keys(REQ_PARENT).concat(ALL_CONTRACT_FIELDS.map(f => f.key)).filter((k, i, a) => a.indexOf(k) === i).forEach(k => {
+              if (k === "party3" || k === "multi_program" || !isReq(k) || !fieldVisible(k)) return;
+              if (REQ_PARENT[k] && !fieldVisible(REQ_PARENT[k])) return;
               if (contractTemplate?.template_type === "html" && !HTML_FORM_KEYS.includes(k)) return;
               const label = ALL_CONTRACT_FIELDS.find(f => f.key === k)?.label || k;
               if (k === "payment_schedule") { if (!(dataWithCompany.payment_schedule || []).length) out.push(label); return; }

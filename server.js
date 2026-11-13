@@ -2284,7 +2284,7 @@ app.put("/contracts/templates/:id/party1", authenticate, (req, res) => {
 app.put("/contracts/templates/:id/required", authenticate, (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
   const clean = {};
-  for (const [k, v] of Object.entries(req.body?.required_fields || {})) if (v === true) clean[k] = true;
+  for (const [k, v] of Object.entries(req.body?.required_fields || {})) if (v === false) clean[k] = false; // false = admin exempted this field
   db.prepare("UPDATE contract_templates SET required_fields=? WHERE id=?").run(JSON.stringify(clean), req.params.id);
   res.json({ ok: true, required_fields: clean });
 });
@@ -2583,6 +2583,8 @@ const REQ_PROGRAM_KEYS = {
   success_bonus_2_deadline: ["success_bonus_2_deadline", "program2_bonus_2_deadline", "program3_bonus_2_deadline"],
 };
 const REQ_HTML_KEYS = ["party2_name", "financier", "program_name", "down_payment", "success_bonus", "success_bonus_type", "success_bonus_type_2", "contract_date", "notes"];
+// A sub-field is only on the form while its parent field is visible.
+const REQ_PARENT = { down_payment_deadline: "down_payment", sb1ddl: "success_bonus", sb1ddl_type: "sb1ddl", success_bonus_2_deadline: "success_bonus_2", sb1ddl_2_type: "success_bonus_2_deadline", success_bonus_type_2: "success_bonus_2" };
 function missingRequiredFields(tplRow, data) {
   let req = {}, vis = {};
   try { req = tplRow.required_fields ? JSON.parse(tplRow.required_fields) : {}; } catch {}
@@ -2591,8 +2593,10 @@ function missingRequiredFields(tplRow, data) {
   const nProg = Math.min(3, Math.max(1, Number(data._programCount) || 1));
   const empty = v => v === undefined || v === null || String(v).trim() === "";
   const out = [];
-  for (const k of Object.keys(req)) {
-    if (!req[k] || vis?.[k] === false || !REQ_FIELD_LABELS[k]) continue;
+  // Every visible field is obligatory unless an admin exempted it (req[k] === false).
+  for (const k of Object.keys(REQ_FIELD_LABELS)) {
+    if (req[k] === false || vis?.[k] === false) continue;
+    if (REQ_PARENT[k] && vis?.[REQ_PARENT[k]] === false) continue;
     if (isHtml && !REQ_HTML_KEYS.includes(k)) continue; // the simplified pricing form shows only some fields
     if (k === "payment_schedule") { if (!Array.isArray(data.payment_schedule) || !data.payment_schedule.length) out.push(REQ_FIELD_LABELS[k]); continue; }
     const keys = REQ_PROGRAM_KEYS[k] ? REQ_PROGRAM_KEYS[k].slice(0, nProg) : [k];
