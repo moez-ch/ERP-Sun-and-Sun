@@ -1483,7 +1483,7 @@ tr.leave{background:#f0f9ff}
     <div style={{ animation: "slideIn .3s ease" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-        <button onClick={onBack} style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, padding: "6px 14px", cursor: "pointer", color: colors.textMuted, fontSize: 12, fontFamily: font }}>← {tr("Back","Geri")}</button>
+        {onBack && <button onClick={onBack} style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, padding: "6px 14px", cursor: "pointer", color: colors.textMuted, fontSize: 12, fontFamily: font }}>← {tr("Back","Geri")}</button>}
         <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: font }}>⏱ {tr("Attendance Tracker","Mesai Takibi")}</h1>
         <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
           {[{ id:"sheet", label:`🗓 ${tr("Monthly sheet","Aylık çizelge")}` }, { id:"table", label:`📋 ${tr("Table","Tablo")}` }, { id:"dashboard", label:`📊 ${tr("Dashboard","Özet")}` }].map((s,si,arr) => (
@@ -2027,9 +2027,12 @@ export default function App() {
   // Odoo hand-off: ?app=<slug> => open straight on that screen with the ERP
   // chrome hidden (kiosk); ?sso_token=... => log the user in automatically.
   // Each Odoo app tile passes a slug that maps to the ERP view it should land on.
-  const KIOSK_VIEWS = { contracts: "contracts", teklif: "pricing", excelgen: "tools" };
+  const KIOSK_VIEWS = { contracts: "contracts", teklif: "pricing", excelgen: "tools", attendance: "tools" };
+  // tool screens opened directly (inside the Tools view)
+  const KIOSK_TOOLS = { excelgen: "excel_generator", attendance: "attendance" };
   const appParam = new URLSearchParams(window.location.search).get("app");
   const kioskView = KIOSK_VIEWS[appParam] || null;
+  const kioskTool = KIOSK_TOOLS[appParam] || null;
   const kiosk = !!kioskView;
 
   useEffect(() => {
@@ -2086,7 +2089,7 @@ export default function App() {
     </div>
   );
   if (!authUser) return <LoginPage onLogin={handleLogin} />;
-  return <Dashboard authUser={authUser} onLogout={handleLogout} kiosk={kiosk} kioskView={kioskView} />;
+  return <Dashboard authUser={authUser} onLogout={handleLogout} kiosk={kiosk} kioskView={kioskView} kioskTool={kioskTool} />;
 }
 
 function EmailHistory({ colors, token, lang }) {
@@ -2312,7 +2315,7 @@ function handleRichPaste(e) {
   e.currentTarget.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-function Dashboard({ authUser, onLogout: handleLogout, kiosk = false, kioskView = null }) {
+function Dashboard({ authUser, onLogout: handleLogout, kiosk = false, kioskView = null, kioskTool = null }) {
   // ── LEADS STATE ─────────────────────────────────────────────────
   const [leads, setLeads] = useState(() => {
     try {
@@ -2321,7 +2324,7 @@ function Dashboard({ authUser, onLogout: handleLogout, kiosk = false, kioskView 
     } catch { return []; }
   });
   const [view, setView] = useState(kioskView || "dashboard"); // dashboard | leads | agent | pipeline | detail
-  const [toolsSubView, setToolsSubView] = useState(kioskView === "tools" ? "excel_generator" : null); // null | "keyword_hunter" | "excel_cleaner"
+  const [toolsSubView, setToolsSubView] = useState(kioskView === "tools" ? (kioskTool || "excel_generator") : null); // null | "keyword_hunter" | "excel_cleaner"
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
@@ -3682,7 +3685,7 @@ Kurallar:
               <div style={{ width: 32, height: 32, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
                 <img src={snsLogo} alt="Sun&Sun" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
-              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>{view === "pricing" ? "Fiyat Teklifi" : view === "tools" ? (lang === "tr" ? "Excel Oluşturucu" : "Excel Generator") : "Sözleşmeler"}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>{view === "pricing" ? "Fiyat Teklifi" : view === "tools" ? (toolsSubView === "attendance" ? (lang === "tr" ? "Mesai Takibi" : "Attendance Tracker") : (lang === "tr" ? "Excel Oluşturucu" : "Excel Generator")) : "Sözleşmeler"}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ fontSize: 12, color: colors.textDim }}>{authUser.name}</span>
@@ -8336,8 +8339,11 @@ Kurallar:
             {toolsSubView === "excel_generator" && isAdmin && (
               <ExcelGeneratorView colors={colors} font={font} lang={lang} onBack={kiosk ? undefined : () => setToolsSubView(null)} />
             )}
-            {toolsSubView === "attendance" && (
-              <AttendanceView colors={colors} font={font} lang={lang} isAdmin={isAdmin} onBack={() => setToolsSubView(null)} />
+            {toolsSubView === "attendance" && (!kiosk || isAdmin) && (
+              <AttendanceView colors={colors} font={font} lang={lang} isAdmin={isAdmin} onBack={kiosk ? undefined : () => setToolsSubView(null)} />
+            )}
+            {toolsSubView === "attendance" && kiosk && !isAdmin && (
+              <div style={{ padding: 40, textAlign: "center", color: colors.textDim, fontFamily: font }}>{lang === "tr" ? "Bu araca erişim yetkiniz yok." : "You do not have access to this tool."}</div>
             )}
           </div>
         )}
