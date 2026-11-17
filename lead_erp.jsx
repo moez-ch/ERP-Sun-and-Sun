@@ -1497,7 +1497,7 @@ tr.leave{background:#f0f9ff}
             👥 {tr("Employees","Çalışanlar")}
           </button>
           <button onClick={syncMonthToOdoo}
-            style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>
+            style={{ display: screen === "sheet" ? "none" : undefined, padding: "6px 14px", background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, color: colors.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>
             ⇄ {tr("Sync month to Odoo","Ayı Odoo'ya aktar")}
           </button>
         </div>

@@ -5,7 +5,7 @@
 //   İ = on leave, R = sick leave / medical report. The month starts pre-filled as if everyone worked their full schedule;
 //   only cells someone changes are stored (server table attendance_sheet). Old tracker leave/holiday days show as İ / RT.
 // Every label has an English and a Turkish version (the ERP's TR/EN switch).
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 
 const DOW_TR = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
 const DOW_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -13,8 +13,8 @@ const DOW_FULL_TR = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "
 const DOW_FULL_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 // stored key -> what is shown in the cell
-const CODE_LABEL = { M: "M", HT: "HT", RT: "RT", HRT: "½RT", I: "İ", R: "R", L: "L" };
-const EDITABLE_CODES = ["M", "HT", "I", "R", "L"];
+const CODE_LABEL = { M: "M", HT: "HT", RT: "RT", HRT: "½RT", I: "İ", U: "Üİ", R: "R", L: "L" };
+const EDITABLE_CODES = ["M", "HT", "I", "U", "R", "L"];
 
 // working hours: 08:30–18:30 on site = 10h incl. the 1h lunch (same rule as the old Table); a ½RT day expects 4.5h
 const WORK_START = 510, WORK_END = 1110, WORK_DAY = 600, HALF_DAY = 270;
@@ -112,7 +112,7 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
     });
     fetch(`/attendance/sheet/${encodeURIComponent(emp.key)}/${day.key}`, {
       method: "PUT", headers: authHeaders(), body: JSON.stringify({ code: stored, emp_name: emp.name }),
-    }).then(r => { if (!r.ok) throw new Error(r.status); })
+    }).then(r => { if (!r.ok) throw new Error(r.status); schedulePush(emp); })
       .catch(() => window.alert(tr("Could not save — please reload the page.", "Kaydedilemedi — lütfen sayfayı yenileyin.")));
   }
 
@@ -138,12 +138,12 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
       return { ...s, cells: { ...s.cells, [emp.key]: empCells } };
     });
     fetch(`/attendance/sheet/${encodeURIComponent(emp.key)}/${day.key}`, { method: "PUT", headers: authHeaders(), body: JSON.stringify(body) })
-      .then(r => { if (!r.ok) throw new Error(r.status); })
+      .then(r => { if (!r.ok) throw new Error(r.status); schedulePush(emp); })
       .catch(() => window.alert(tr("Could not save — please reload the page.", "Kaydedilemedi — lütfen sayfayı yenileyin.")));
   }
   // per-person totals for the summary on the right (a ½RT day counts half M, half RT)
   const summaryOf = empKey => {
-    const t = { M: 0, HT: 0, RT: 0, I: 0, R: 0, L: 0, multinet: 0, travel: 0, units: 0, lateArr: 0, earlyArr: 0, earlyDep: 0, lateDep: 0, net: 0, hourLeave: 0, restWork: 0 };
+    const t = { M: 0, HT: 0, RT: 0, I: 0, U: 0, R: 0, L: 0, multinet: 0, travel: 0, units: 0, lateArr: 0, earlyArr: 0, earlyDep: 0, lateDep: 0, net: 0, hourLeave: 0, restWork: 0 };
     days.forEach(d => {
       const code = codeOf(empKey, d);
       if (code === "HRT") { t.M += 0.5; t.RT += 0.5; } else if (code in t) t[code] += 1;
@@ -171,7 +171,7 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
     const ym = `${year}-${String(month + 1).padStart(2, "0")}`;
     setSheet(s => ({ ...s, month: { ...s.month, [emp.key]: apply({ ...(s.month[emp.key] || {}) }) } }));
     fetch(`/attendance/month/${encodeURIComponent(emp.key)}/${ym}`, { method: "PUT", headers: authHeaders(), body: JSON.stringify(body) })
-      .then(r => { if (!r.ok) throw new Error(r.status); })
+      .then(r => { if (!r.ok) throw new Error(r.status); schedulePush(emp); })
       .catch(() => window.alert(tr("Could not save — please reload the page.", "Kaydedilemedi — lütfen sayfayı yenileyin.")));
   }
   // clicking the active button again clears the decision; "carry" freezes the amount shown (own + already carried in)
@@ -185,11 +185,55 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
     saveMonth(emp, { added_ot: v }, m => ({ ...m, added_ot: v }));
   }
   const fmtN = n => (Number.isInteger(n) ? String(n) : String(n).replace(".", lang === "tr" ? "," : "."));
+
+  // ── Odoo link ── every day goes to Odoo work entries and the month's totals to "Aylık Puantaj" (Bordro > Raporlama).
+  // A change is sent ~30 s later (several quick changes = one send); the month button sends everyone at once.
+  const rowFor = emp => ({ emp_key: emp.key, name: emp.name, company: emp.company || "",
+    days: days.map(d => ({ date: d.key, code: codeOf(emp.key, d) })), summary: summaryOf(emp.key) });
+  const rowForRef = useRef(rowFor);
+  rowForRef.current = rowFor;
+  const pushTimers = useRef({});
+  const [odooStatus, setOdooStatus] = useState("");
+  const sendToOdoo = async emps => {
+    const rows = emps.filter(e => /^o:/.test(e.key)).map(e => rowForRef.current(e));
+    if (!rows.length) return null;
+    const r = await fetch("/attendance/sheet/push", { method: "POST", headers: authHeaders(), body: JSON.stringify({ year, month: month + 1, rows }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.status);
+    return j;
+  };
+  function schedulePush(emp) {
+    if (!/^o:/.test(emp.key)) return;
+    clearTimeout(pushTimers.current[emp.key]);
+    setOdooStatus(tr("Odoo: waiting to send…", "Odoo: gönderilmeyi bekliyor…"));
+    pushTimers.current[emp.key] = setTimeout(async () => {
+      delete pushTimers.current[emp.key];
+      try {
+        await sendToOdoo([emp]);
+        setOdooStatus(`${tr("Odoo: sent", "Odoo: gönderildi")} ${new Date().toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-GB", { hour: "2-digit", minute: "2-digit" })}`);
+      } catch (e) { setOdooStatus(`${tr("Odoo: not sent", "Odoo: gönderilemedi")} (${e.message})`); }
+    }, 30000);
+  }
+  async function syncMonth() {
+    if (!window.confirm(tr("Send this whole month (every person, every day + the totals) to Odoo? Days already the same are left alone; days on a payslip or with Odoo leave are skipped.",
+      "Bu ayın tamamı (herkes, her gün + toplamlar) Odoo'ya gönderilsin mi? Aynı olan günlere dokunulmaz; bordroya girmiş veya Odoo izni olan günler atlanır."))) return;
+    setOdooStatus(tr("Odoo: sending the month…", "Odoo: ay gönderiliyor…"));
+    try {
+      const j = await sendToOdoo(sheet.employees);
+      setOdooStatus(`${tr("Odoo: sent", "Odoo: gönderildi")} ${new Date().toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-GB", { hour: "2-digit", minute: "2-digit" })}`);
+      window.alert(tr(`Odoo updated: ${j.yazildi || 0} days written, ${j.ayni || 0} already the same, ${j.atlandi_bordro || 0} on a payslip, ${j.atlandi_izin || 0} with Odoo leave (skipped); ${j.puantaj || 0} monthly records.`,
+        `Odoo güncellendi: ${j.yazildi || 0} gün yazıldı, ${j.ayni || 0} gün zaten aynı, ${j.atlandi_bordro || 0} gün bordroda, ${j.atlandi_izin || 0} gün Odoo izinli (atlandı); ${j.puantaj || 0} aylık kayıt.`)
+        + (j.surum_yok ? "\n" + tr(`${j.surum_yok} days skipped: no employment record in Odoo.`, `${j.surum_yok} gün atlandı: Odoo'da sözleşme kaydı yok.`) : ""));
+    } catch (e) {
+      setOdooStatus(`${tr("Odoo: not sent", "Odoo: gönderilemedi")} (${e.message})`);
+      window.alert(tr("Odoo sync failed: ", "Odoo aktarımı başarısız: ") + e.message);
+    }
+  }
   // [key, header, tooltip, width, format]
   const SUMMARY_COLS = [
     ["M", "M", tr("Working days", "Çalışma günü"), 36, "n"], ["HT", "HT", tr("Weekly rest", "Hafta tatili"), 36, "n"],
     ["RT", "RT", tr("Public holiday", "Resmi tatil"), 36, "n"], ["L", "L", tr("Leave (from the leave system)", "İzin (izin sisteminden)"), 36, "n"],
-    ["I", "İ", tr("On leave", "İzinli"), 36, "n"], ["R", "R", tr("Sick leave / report", "Raporlu"), 36, "n"],
+    ["I", "İ", tr("Paid leave", "Ücretli izin"), 36, "n"], ["U", "Üİ", tr("Unpaid leave", "Ücretsiz izin"), 36, "n"], ["R", "R", tr("Sick leave / report", "Raporlu"), 36, "n"],
     ["multinet", "🍽", tr("Days with Multinet", "Multinet'li gün"), 36, "n"], ["travel", "✈", tr("Travel days (double)", "Seyahat günü (çift)"), 36, "n"],
     ["units", "Σ🍽", tr("Multinet units (travel counts twice)", "Multinet birimi (seyahat iki sayılır)"), 40, "n"],
     ["lateArr", tr("Late in", "Geç gir."), tr("Late arrivals (after 08:30), total h:mm", "Geç girişler (08:30 sonrası), toplam s:dk"), 50, "t"],
@@ -224,6 +268,7 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
     I:   { bg: `${colors.warning}26`, fg: colors.warning },
     R:   { bg: `${colors.danger || "#e57373"}26`, fg: colors.danger || "#e57373" },
     L:   { bg: "#9c6ade26", fg: "#9c6ade" },
+    U:   { bg: "#d9773326", fg: "#d97733" },
   }[code] || { bg: "transparent", fg: colors.text });
 
   const DOW = lang === "tr" ? DOW_TR : DOW_EN;
@@ -236,7 +281,7 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
   const legend = [
     ["M", tr("Working day", "Çalışma günü")], ["HT", tr("Weekly rest (Sunday)", "Hafta tatili (Pazar)")],
     ["RT", tr("Public holiday", "Resmi tatil")], ["HRT", tr("Half-day public holiday (eve)", "Yarım gün resmi tatil (arife)")],
-    ["I", tr("On leave", "İzinli")], ["R", tr("Sick leave / medical report", "Raporlu")], ["L", tr("Leave (from the leave system)", "İzin (izin sisteminden)")],
+    ["I", tr("Paid leave", "Ücretli izin")], ["U", tr("Unpaid leave", "Ücretsiz izin")], ["R", tr("Sick leave / medical report", "Raporlu")], ["L", tr("Leave (from the leave system)", "İzin (izin sisteminden)")],
   ];
 
   return (
@@ -258,6 +303,13 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
           style={{ background: colors.primary, border: `1px solid ${colors.primary}`, borderRadius: 6, padding: "6px 10px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}>
           ⏱ {tr("Log hourly attendance", "Saatlik mesai gir")}
         </button>
+        {isAdmin && (
+          <button onClick={syncMonth} title={tr("Send every person's days and totals for this month to Odoo", "Bu ayın herkese ait günlerini ve toplamlarını Odoo'ya gönder")}
+            style={{ background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, padding: "6px 10px", color: colors.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>
+            ⇄ {tr("Sync month to Odoo", "Ayı Odoo'ya aktar")}
+          </button>
+        )}
+        {odooStatus && <span style={{ fontSize: 11, color: colors.textDim }}>{odooStatus}</span>}
         <button onClick={() => setShowHolidays(s => !s)}
           style={{ background: showHolidays ? `${colors.primary}20` : "transparent", border: `1px solid ${showHolidays ? colors.primary : colors.border}`, borderRadius: 6, padding: "6px 10px", color: showHolidays ? colors.primaryLight : colors.textMuted, fontSize: 12, cursor: "pointer", fontFamily: font }}>
           🗓 {tr("Public holidays", "Resmi tatiller")}
@@ -296,7 +348,8 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
       {showHourly && (
         <HourlyLog colors={colors} font={font} lang={lang} employees={shown} days={days} recName={sheet.recName} hourly={sheet.hourly}
           codeOf={codeOf} leaves={sheet.leaves} onClose={() => setShowHourly(false)}
-          onSaved={(empKey, dateKey, ent) => setSheet(s => ({ ...s, hourly: { ...s.hourly, [empKey]: { ...(s.hourly[empKey] || {}), [dateKey]: ent } } }))} />
+          onSaved={(empKey, dateKey, ent) => { setSheet(s => ({ ...s, hourly: { ...s.hourly, [empKey]: { ...(s.hourly[empKey] || {}), [dateKey]: ent } } }));
+            const e = sheet.employees.find(x => x.key === empKey); if (e) schedulePush(e); }} />
       )}
 
       {showHolidays && <HolidayPanel colors={colors} font={font} lang={lang} year={year} isAdmin={isAdmin} onChanged={() => setReload(r => r + 1)} />}
@@ -419,6 +472,8 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
             "Her günün altında: ilk kutu = Multinet (yemek), ikinci kutu = Seyahat (çift yemek; Multinet'i de işaretler). Multinet yalnızca tam çalışma günlerinde (M) otomatik işaretlidir, yarım günde (½RT) değil. ")}
         {tr("Right: M / HT / RT / L / İ / R day counts, 🍽 days with Multinet, ✈ travel days, Σ🍽 Multinet units (a travel day counts twice), late/early arrivals and departures, total status and hourly leave (h:mm). L and hourly leave (⏱) come from approved leave in Odoo. ",
             "Sağda: M / HT / RT / L / İ / R gün sayıları, 🍽 Multinet'li gün, ✈ seyahat günü, Σ🍽 Multinet birimi (seyahat günü iki sayılır), geç/erken giriş ve çıkışlar, toplam durum ve saatlik izin (s:dk). L ve saatlik izin (⏱) Odoo'daki onaylı izinlerden gelir. ")}
+        {tr("Linked to Odoo: each change is sent about 30 seconds later — every day becomes an Odoo work entry (M = Attendance, ½RT = half Attendance + half holiday, RT = holiday, İ = Paid Time Off, Üİ = Unpaid, R = Sick; L comes from Odoo itself) and the totals go to Bordro > Raporlama > Aylık Puantaj. ",
+            "Odoo'ya bağlı: her değişiklik yaklaşık 30 saniye sonra gönderilir — her gün Odoo iş girişi olur (M = Attendance, ½RT = yarım Attendance + yarım tatil, RT = tatil, İ = Ücretli izin, Üİ = Ücretsiz, R = Rapor; L zaten Odoo'dan gelir) ve toplamlar Bordro > Raporlama > Aylık Puantaj'a yazılır. ")}
         {tr("Total status, Hourly leave and Overtime: ✓ includes the amount in this month's calculation, → carries it over to next month, where it shows as ↪ and is added to that month's amount (admins only). Work on a Sunday (HT) counts as overtime. ",
             "Toplam durum, Saatlik izin ve Fazla mesai: ✓ tutarı bu ayın hesabına dahil eder, → sonraki aya devreder; orada ↪ olarak görünür ve o ayın tutarına eklenir (yalnızca yöneticiler). Pazar (HT) günü çalışma fazla mesai sayılır. ")}
         {tr("Cells with a dashed frame were changed by hand; choosing the automatic value again resets them. Public holidays are locked.",

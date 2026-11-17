@@ -2084,7 +2084,8 @@ app.post("/attendance/sync-odoo", authenticate, async (req, res) => {
 });
 
 // ── Attendance monthly sheet (puantaj) ──────────────────────────────────────────────────────────
-const ATT_SHEET_CODES = new Set(["", "M", "HT", "RT", "HRT", "I", "R", "L"]);
+// I = paid leave (İ), U = unpaid leave (Üİ)
+const ATT_SHEET_CODES = new Set(["", "M", "HT", "RT", "HRT", "I", "U", "R", "L"]);
 // active Odoo employees + the company each one is insured under (hr.employee.x_sirket_id), cached 5 min
 let _attOdooEmp = { at: 0, list: null };
 async function attendanceOdooEmployees(force) {
@@ -2148,8 +2149,8 @@ app.get("/attendance/sheet", authenticate, async (req, res) => {
       const partial = (r.type === "paid_leave" || r.type === "unpaid_leave") && r.leave_start && r.leave_end && r.check_in && r.check_out;
       let hint = "";
       if (r.type === "holiday") hint = "RT";
-      else if ((r.type === "paid_leave" || r.type === "unpaid_leave") && !partial) hint = "I";
-      else if (r.type === "half_holiday" && r.half_with) hint = "I";
+      else if ((r.type === "paid_leave" || r.type === "unpaid_leave") && !partial) hint = r.type === "unpaid_leave" ? "U" : "I";
+      else if (r.type === "half_holiday" && r.half_with) hint = r.half_with === "unpaid_leave" ? "U" : "I";
       if (hint) (legacy[k] = legacy[k] || {})[r.date] = hint;
     });
   const holidays = db.prepare("SELECT date, name_tr, name_en, half FROM attendance_holidays WHERE date LIKE ? ORDER BY date").all(prefix + "%");
@@ -2167,6 +2168,7 @@ app.get("/attendance/sheet", authenticate, async (req, res) => {
         if (!l.employee_id) return;
         const k = "o:" + l.employee_id[0], type = l.holiday_status_id ? l.holiday_status_id[1] : "";
         const sick = /rapor|sick|hastal/i.test(type);
+        const unpaid = /ücretsiz|ucretsiz|unpaid/i.test(type);
         const oneDay = l.request_date_from === l.request_date_to;
         const hoursOnly = oneDay && ((l.request_unit_hours && (l.number_of_hours || 0) < 9) || (l.request_unit_half && (l.number_of_days || 0) <= 0.5));
         const mine = leaves[k] = leaves[k] || {};
@@ -2178,7 +2180,7 @@ app.get("/attendance/sheet", authenticate, async (req, res) => {
         const [y1, m1, d1] = l.request_date_from.split("-").map(Number), [y2, m2, d2] = l.request_date_to.split("-").map(Number);
         for (let t = Date.UTC(y1, m1 - 1, d1); t <= Date.UTC(y2, m2 - 1, d2); t += 86400000) {
           const d = new Date(t).toISOString().slice(0, 10);
-          if (d >= mStart && d <= mEnd) mine[d] = { ...(mine[d] || {}), code: sick ? "R" : "L", type };
+          if (d >= mStart && d <= mEnd) mine[d] = { ...(mine[d] || {}), code: sick ? "R" : unpaid ? "U" : "L", type };
         }
       });
     } catch (e) { leavesError = e.message; }
@@ -2239,6 +2241,46 @@ app.put("/attendance/month/:empKey/:ym", authenticate, requireAdmin, (req, res) 
   }
   const r = db.prepare("SELECT added_ot, net_dec, leave_dec, ot_dec FROM attendance_month WHERE emp_key = ? AND ym = ?").get(empKey, ym);
   res.json({ ok: true, month: r });
+});
+
+// POST /attendance/sheet/push { year, month, rows: [{ emp_key, name, company, days: [{date, code}], summary: {...} }] }
+// The sheet -> Odoo: every day becomes work entries (automation "SNS ERP mesai -> iş girişleri" understands the codes;
+// L is left to Odoo, Sunday skipped, payslip / Odoo-leave days skipped) and the month's totals go to x_puantaj_ay
+// ("Aylık Puantaj", one record per person per month). Sent by the screen ~30 s after a change, and by the month button.
+app.post("/attendance/sheet/push", authenticate, async (req, res) => {
+  const { year, month, rows } = req.body || {};
+  if (!year || !month || !Array.isArray(rows)) return res.status(400).json({ error: "year, month, rows required" });
+  const ym = `${year}-${String(month).padStart(2, "0")}`;
+  const items = [];
+  const valid = rows.filter(r => /^o:\d+$/.test(r.emp_key || ""));
+  valid.forEach(r => (r.days || []).forEach(d => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d.date || "") && d.date.startsWith(ym) && ATT_SHEET_CODES.has(d.code) && d.code)
+      items.push({ emp_id: parseInt(r.emp_key.slice(2), 10), name: r.name || "", date: d.date, code: d.code });
+  }));
+  try {
+    const result = items.length ? await pushAttendanceToOdoo(items) : { yazildi: 0, ayni: 0 };
+    const h = m => Math.round(((Number(m) || 0) / 60) * 100) / 100;
+    let puantaj = 0;
+    for (const r of valid) {
+      const s = r.summary || {}, empId = parseInt(r.emp_key.slice(2), 10);
+      const vals = {
+        x_employee_id: empId, x_ym: ym, x_donem: `${ym}-01`, x_sirket: r.company || "",
+        x_m: s.M || 0, x_ht: s.HT || 0, x_rt: s.RT || 0, x_l: s.L || 0, x_i: s.I || 0, x_u: s.U || 0, x_r: s.R || 0,
+        x_multinet_gun: s.multinet || 0, x_seyahat_gun: s.travel || 0, x_multinet_birim: s.units || 0,
+        x_gec_giris: h(s.lateArr), x_erken_giris: h(s.earlyArr), x_erken_cikis: h(s.earlyDep), x_gec_cikis: h(s.lateDep),
+        x_toplam_durum: h(s.net), x_saatlik_izin: h(s.hourLeave), x_ek_mesai: h(s.addOT), x_fazla_mesai: h(s.overtime),
+        x_devreden_durum: h(s.carried?.net), x_devreden_izin: h(s.carried?.hourLeave), x_devreden_fm: h(s.carried?.overtime),
+        x_durum_karar: s.dec?.net || false, x_izin_karar: s.dec?.hourLeave || false, x_fm_karar: s.dec?.overtime || false,
+        x_son_aktarim: new Date().toISOString().slice(0, 19).replace("T", " "),
+      };
+      const found = await odooExec("x_puantaj_ay", "search", [[["x_employee_id", "=", empId], ["x_ym", "=", ym]]], { limit: 1 });
+      if (found === null) throw new Error("Odoo connection is not configured on this server (.env)");
+      if (found.length) await odooExec("x_puantaj_ay", "write", [found, vals]);
+      else await odooExec("x_puantaj_ay", "create", [vals]);
+      puantaj++;
+    }
+    res.json({ ok: true, ...result, puantaj });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // public holidays: everyone reads, admins edit
