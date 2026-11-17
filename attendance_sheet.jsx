@@ -76,6 +76,53 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
       .catch(() => window.alert(tr("Could not save — please reload the page.", "Kaydedilemedi — lütfen sayfayı yenileyin.")));
   }
 
+  // ── Multinet / Travel (step 2) ──
+  // Multinet ticked = meal allowance that day; Travel ticked = double allowance (Travel always includes Multinet).
+  // Neither = 0, Multinet only = 1 unit, Multinet + Travel = 2 units. No money is shown here, only days / units.
+  // Automatic (nothing stored): Multinet on for M and ½RT days, off otherwise; Travel off.
+  const autoMultinet = code => code === "M" || code === "HRT";
+  const flagsOf = (empKey, day) => {
+    const c = cellOf(empKey, day) || {};
+    const code = codeOf(empKey, day);
+    const travel = c.travel == null ? false : !!c.travel;
+    const multinet = travel || (c.multinet == null ? autoMultinet(code) : !!c.multinet);
+    return { multinet, travel, manual: c.multinet != null || c.travel != null };
+  };
+  function setFlags(emp, day, multinet, travel) {
+    if (travel) multinet = true;
+    const code = codeOf(emp.key, day);
+    const body = { multinet: multinet === autoMultinet(code) ? null : multinet, travel: travel ? true : null, emp_name: emp.name };
+    setSheet(s => {
+      const empCells = { ...(s.cells[emp.key] || {}) };
+      empCells[day.key] = { ...(empCells[day.key] || { code: "" }), multinet: body.multinet == null ? null : (body.multinet ? 1 : 0), travel: body.travel ? 1 : null };
+      return { ...s, cells: { ...s.cells, [emp.key]: empCells } };
+    });
+    fetch(`/attendance/sheet/${encodeURIComponent(emp.key)}/${day.key}`, { method: "PUT", headers: authHeaders(), body: JSON.stringify(body) })
+      .then(r => { if (!r.ok) throw new Error(r.status); })
+      .catch(() => window.alert(tr("Could not save — please reload the page.", "Kaydedilemedi — lütfen sayfayı yenileyin.")));
+  }
+  // per-person totals for the summary on the right (a ½RT day counts half M, half RT)
+  const summaryOf = empKey => {
+    const t = { M: 0, HT: 0, RT: 0, I: 0, R: 0, multinet: 0, travel: 0, units: 0 };
+    days.forEach(d => {
+      const code = codeOf(empKey, d);
+      if (code === "HRT") { t.M += 0.5; t.RT += 0.5; } else if (code in t) t[code] += 1;
+      const f = flagsOf(empKey, d);
+      if (f.multinet) { t.multinet += 1; t.units += f.travel ? 2 : 1; }
+      if (f.travel) t.travel += 1;
+    });
+    return t;
+  };
+  const fmtN = n => (Number.isInteger(n) ? String(n) : String(n).replace(".", lang === "tr" ? "," : "."));
+  const SUMMARY_COLS = [
+    ["M", tr("Working days", "Çalışma günü")], ["HT", tr("Weekly rest", "Hafta tatili")], ["RT", tr("Public holiday", "Resmi tatil")],
+    ["I", tr("On leave", "İzinli")], ["R", tr("Sick leave / report", "Raporlu")],
+    ["multinet", tr("Days with Multinet", "Multinet'li gün")], ["travel", tr("Travel days (double)", "Seyahat günü (çift)")],
+    ["units", tr("Multinet units (travel counts twice)", "Multinet birimi (seyahat iki sayılır)")],
+  ];
+  const SUM_W = 40;
+  const SUMMARY_HEAD = { M: "M", HT: "HT", RT: "RT", I: "İ", R: "R", multinet: "🍽", travel: "✈", units: "Σ🍽" };
+
   const companies = useMemo(() => {
     const m = new Map();
     sheet.employees.forEach(e => m.set(e.company || "", (m.get(e.company || "") || 0) + 1));
@@ -162,6 +209,12 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
                     </th>
                   );
                 })}
+                {SUMMARY_COLS.map(([k, label], i) => (
+                  <th key={k} title={label}
+                    style={{ ...th, minWidth: SUM_W, maxWidth: SUM_W, right: (SUMMARY_COLS.length - 1 - i) * SUM_W, zIndex: 4, background: "#26262c", borderLeft: i === 0 ? `2px solid ${colors.accent}` : undefined }}>
+                    {SUMMARY_HEAD[k]}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -188,19 +241,36 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
                             {opts.map(c => <option key={c} value={c} style={{ color: "#000" }}>{CODE_LABEL[c]}</option>)}
                           </select>
                         )}
+                        {(() => { const f = flagsOf(emp.key, d); return (
+                          <div style={{ display: "flex", justifyContent: "center", gap: 1, paddingBottom: 3, outline: f.manual ? `1px dashed ${colors.textDim}` : "none", outlineOffset: -1 }}>
+                            <input type="checkbox" checked={f.multinet} onChange={e => setFlags(emp, d, e.target.checked, e.target.checked ? f.travel : false)}
+                              title={tr("Multinet (meal allowance)", "Multinet (yemek)")} style={{ width: 12, height: 12, margin: 0, cursor: "pointer", accentColor: colors.success }} />
+                            <input type="checkbox" checked={f.travel} onChange={e => setFlags(emp, d, f.multinet || e.target.checked, e.target.checked)}
+                              title={tr("Travel (double meal allowance)", "Seyahat (çift yemek)")} style={{ width: 12, height: 12, margin: 0, cursor: "pointer", accentColor: colors.accent }} />
+                          </div>); })()}
                       </td>
                     );
                   })}
+                  {(() => { const t = summaryOf(emp.key); return SUMMARY_COLS.map(([k, label], i) => (
+                    <td key={k} title={label}
+                      style={{ ...td, position: "sticky", right: (SUMMARY_COLS.length - 1 - i) * SUM_W, zIndex: 1, minWidth: SUM_W, maxWidth: SUM_W, background: colors.surface,
+                        fontSize: 11, fontWeight: k === "units" ? 800 : 700, color: k === "units" ? colors.accent : colors.text, borderLeft: i === 0 ? `2px solid ${colors.accent}` : undefined }}>
+                      {fmtN(t[k])}
+                    </td>)); })()}
                 </tr>
               ))}
               {!shown.length && (
-                <tr><td colSpan={days.length + 2} style={{ ...td, padding: 20, color: colors.textDim, fontSize: 12 }}>{tr("No employees to show.", "Gösterilecek çalışan yok.")}</td></tr>
+                <tr><td colSpan={days.length + 2 + SUMMARY_COLS.length} style={{ ...td, padding: 20, color: colors.textDim, fontSize: 12 }}>{tr("No employees to show.", "Gösterilecek çalışan yok.")}</td></tr>
               )}
             </tbody>
           </table>
         </div>
       )}
       <div style={{ fontSize: 10, color: colors.textDim, marginTop: 6 }}>
+        {tr("Under each day: first box = Multinet (meal allowance), second box = Travel (double allowance; also ticks Multinet). Multinet is ticked automatically on M and ½RT days. ",
+            "Her günün altında: ilk kutu = Multinet (yemek), ikinci kutu = Seyahat (çift yemek; Multinet'i de işaretler). Multinet, M ve ½RT günlerinde otomatik işaretlidir. ")}
+        {tr("Right: M / HT / RT / İ / R day counts, 🍽 days with Multinet, ✈ travel days, Σ🍽 Multinet units (a travel day counts twice). ",
+            "Sağda: M / HT / RT / İ / R gün sayıları, 🍽 Multinet'li gün, ✈ seyahat günü, Σ🍽 Multinet birimi (seyahat günü iki sayılır). ")}
         {tr("Cells with a dashed frame were changed by hand; choosing the automatic value again resets them. Public holidays are locked.",
             "Kesik çerçeveli hücreler elle değiştirildi; otomatik değeri tekrar seçmek sıfırlar. Resmi tatiller kilitlidir.")}
       </div>
