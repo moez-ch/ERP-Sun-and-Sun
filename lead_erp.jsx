@@ -3,6 +3,7 @@ import snsLogo from "./sns_logo.png";
 import * as XLSX from "xlsx";
 import LoginPage from "./LoginPage.jsx";
 import ExcelGeneratorView from "./ExcelGenerator.jsx";
+import AttendanceSheet from "./attendance_sheet.jsx";
 import { TRANSLATIONS } from "./i18n.js";
 
 // ─── CONSTANTS & UTILITIES ───────────────────────────────────────
@@ -1125,7 +1126,7 @@ function attDayBreakdown(ent) {
   return b;
 }
 
-function AttendanceView({ colors, font, lang, onBack }) {
+function AttendanceView({ colors, font, lang, onBack, isAdmin }) {
   const tr = (en, t) => lang === "tr" ? t : en;
   const MONTHS = lang === "tr" ? ATT_MONTHS_TR : ATT_MONTHS_EN;
   const DAYS   = lang === "tr" ? ATT_DAYS_TR   : ATT_DAYS_EN;
@@ -1173,7 +1174,7 @@ function AttendanceView({ colors, font, lang, onBack }) {
   const [year,    setYear]    = useState(now.getFullYear());
   const [month,   setMonth]   = useState(now.getMonth());
   const [weekIdx, setWeekIdx] = useState(0);
-  const [screen,  setScreen]  = useState("table"); // "table" | "dashboard"
+  const [screen,  setScreen]  = useState("sheet"); // "sheet" (monthly puantaj) | "table" | "dashboard"
   const [showEmpMgr, setShowEmpMgr] = useState(false);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [newEmp,  setNewEmp]  = useState("");
@@ -1485,9 +1486,9 @@ tr.leave{background:#f0f9ff}
         <button onClick={onBack} style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 8, padding: "6px 14px", cursor: "pointer", color: colors.textMuted, fontSize: 12, fontFamily: font }}>← {tr("Back","Geri")}</button>
         <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: font }}>⏱ {tr("Attendance Tracker","Mesai Takibi")}</h1>
         <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-          {[{ id:"table", label:`📋 ${tr("Table","Tablo")}` }, { id:"dashboard", label:`📊 ${tr("Dashboard","Özet")}` }].map((s,si) => (
+          {[{ id:"sheet", label:`🗓 ${tr("Monthly sheet","Aylık çizelge")}` }, { id:"table", label:`📋 ${tr("Table","Tablo")}` }, { id:"dashboard", label:`📊 ${tr("Dashboard","Özet")}` }].map((s,si,arr) => (
             <button key={s.id} onClick={() => setScreen(s.id)}
-              style={{ padding: "6px 14px", background: screen===s.id ? colors.primary : "transparent", border: `1px solid ${screen===s.id ? colors.primary : colors.border}`, borderRadius: si===0 ? "6px 0 0 6px" : "0 6px 6px 0", color: screen===s.id ? "#fff" : colors.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font, marginLeft: si===1 ? -1 : 0 }}>
+              style={{ padding: "6px 14px", background: screen===s.id ? colors.primary : "transparent", border: `1px solid ${screen===s.id ? colors.primary : colors.border}`, borderRadius: si===0 ? "6px 0 0 6px" : si===arr.length-1 ? "0 6px 6px 0" : 0, color: screen===s.id ? "#fff" : colors.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font, marginLeft: si>0 ? -1 : 0 }}>
               {s.label}
             </button>
           ))}
@@ -1557,8 +1558,12 @@ tr.leave{background:#f0f9ff}
         </div>
       </div>
 
+      {screen === "sheet" && (
+        <AttendanceSheet colors={colors} font={font} lang={lang} year={year} month={month} isAdmin={isAdmin} />
+      )}
+
       {/* Week tabs */}
-      <div style={{ display:"flex", gap:8, marginBottom:16, flexWrap:"wrap" }}>
+      <div style={{ display: screen === "sheet" ? "none" : "flex", gap:8, marginBottom:16, flexWrap:"wrap" }}>
         {weeks.map((wd,wii) => (
           <button key={wii} onClick={()=>setWeekIdx(wii)}
             style={{ padding:"6px 16px", background: wi===wii ? colors.surface : "transparent", border:`1px solid ${wi===wii ? colors.primaryLight : colors.border}`, borderRadius:8, color: wi===wii ? colors.primaryLight : colors.textMuted, fontSize:12, fontWeight:wi===wii?700:400, cursor:"pointer", fontFamily:font, transition:"all .15s" }}>
@@ -8332,7 +8337,7 @@ Kurallar:
               <ExcelGeneratorView colors={colors} font={font} lang={lang} onBack={kiosk ? undefined : () => setToolsSubView(null)} />
             )}
             {toolsSubView === "attendance" && (
-              <AttendanceView colors={colors} font={font} lang={lang} onBack={() => setToolsSubView(null)} />
+              <AttendanceView colors={colors} font={font} lang={lang} isAdmin={isAdmin} onBack={() => setToolsSubView(null)} />
             )}
           </div>
         )}

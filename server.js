@@ -575,6 +575,70 @@ if (db.prepare("SELECT COUNT(*) as c FROM attendance_employees").get().c === 0) 
   ].forEach((name, i) => ins.run(name, i + 1));
 }
 
+// ── Attendance monthly sheet (puantaj): one cell per person per day ─────────────────────────────
+// Sits ON TOP of attendance_records (the old check-in/out entries stay untouched). A cell only exists once someone
+// changes it; everything else is derived: Mon–Sat = M, Sunday = HT, public holiday = RT (attendance_holidays).
+// emp_key = "o:<Odoo hr.employee id>" (or "n:<name>" when Odoo is not reachable).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS attendance_sheet (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    emp_key    TEXT NOT NULL,
+    emp_name   TEXT DEFAULT '',
+    date       TEXT NOT NULL,
+    code       TEXT DEFAULT '',
+    multinet   INTEGER,
+    travel     INTEGER,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT DEFAULT '',
+    UNIQUE(emp_key, date)
+  );
+  CREATE TABLE IF NOT EXISTS attendance_holidays (
+    date    TEXT PRIMARY KEY,
+    name_tr TEXT NOT NULL,
+    name_en TEXT DEFAULT '',
+    half    INTEGER DEFAULT 0
+  );
+`);
+if (db.prepare("SELECT COUNT(*) as c FROM attendance_holidays").get().c === 0) {
+  // official Turkish public holidays; half = arife (afternoon off). Religious holidays follow the Diyanet calendar.
+  const ins = db.prepare("INSERT INTO attendance_holidays (date, name_tr, name_en, half) VALUES (?, ?, ?, ?)");
+  [
+    ["2026-01-01", "Yılbaşı", "New Year's Day", 0],
+    ["2026-03-19", "Ramazan Bayramı Arifesi", "Eid al-Fitr Eve", 1],
+    ["2026-03-20", "Ramazan Bayramı 1. Gün", "Eid al-Fitr Day 1", 0],
+    ["2026-03-21", "Ramazan Bayramı 2. Gün", "Eid al-Fitr Day 2", 0],
+    ["2026-03-22", "Ramazan Bayramı 3. Gün", "Eid al-Fitr Day 3", 0],
+    ["2026-04-23", "Ulusal Egemenlik ve Çocuk Bayramı", "National Sovereignty and Children's Day", 0],
+    ["2026-05-01", "Emek ve Dayanışma Günü", "Labour and Solidarity Day", 0],
+    ["2026-05-19", "Atatürk'ü Anma, Gençlik ve Spor Bayramı", "Youth and Sports Day", 0],
+    ["2026-05-26", "Kurban Bayramı Arifesi", "Eid al-Adha Eve", 1],
+    ["2026-05-27", "Kurban Bayramı 1. Gün", "Eid al-Adha Day 1", 0],
+    ["2026-05-28", "Kurban Bayramı 2. Gün", "Eid al-Adha Day 2", 0],
+    ["2026-05-29", "Kurban Bayramı 3. Gün", "Eid al-Adha Day 3", 0],
+    ["2026-05-30", "Kurban Bayramı 4. Gün", "Eid al-Adha Day 4", 0],
+    ["2026-07-15", "Demokrasi ve Milli Birlik Günü", "Democracy and National Unity Day", 0],
+    ["2026-08-30", "Zafer Bayramı", "Victory Day", 0],
+    ["2026-10-28", "Cumhuriyet Bayramı Arifesi", "Republic Day Eve", 1],
+    ["2026-10-29", "Cumhuriyet Bayramı", "Republic Day", 0],
+    ["2027-01-01", "Yılbaşı", "New Year's Day", 0],
+    ["2027-03-08", "Ramazan Bayramı Arifesi", "Eid al-Fitr Eve", 1],
+    ["2027-03-09", "Ramazan Bayramı 1. Gün", "Eid al-Fitr Day 1", 0],
+    ["2027-03-10", "Ramazan Bayramı 2. Gün", "Eid al-Fitr Day 2", 0],
+    ["2027-03-11", "Ramazan Bayramı 3. Gün", "Eid al-Fitr Day 3", 0],
+    ["2027-04-23", "Ulusal Egemenlik ve Çocuk Bayramı", "National Sovereignty and Children's Day", 0],
+    ["2027-05-01", "Emek ve Dayanışma Günü", "Labour and Solidarity Day", 0],
+    ["2027-05-15", "Kurban Bayramı Arifesi", "Eid al-Adha Eve", 1],
+    ["2027-05-16", "Kurban Bayramı 1. Gün", "Eid al-Adha Day 1", 0],
+    ["2027-05-17", "Kurban Bayramı 2. Gün", "Eid al-Adha Day 2", 0],
+    ["2027-05-18", "Kurban Bayramı 3. Gün", "Eid al-Adha Day 3", 0],
+    ["2027-05-19", "Kurban Bayramı 4. Gün / Gençlik ve Spor Bayramı", "Eid al-Adha Day 4 / Youth and Sports Day", 0],
+    ["2027-07-15", "Demokrasi ve Milli Birlik Günü", "Democracy and National Unity Day", 0],
+    ["2027-08-30", "Zafer Bayramı", "Victory Day", 0],
+    ["2027-10-28", "Cumhuriyet Bayramı Arifesi", "Republic Day Eve", 1],
+    ["2027-10-29", "Cumhuriyet Bayramı", "Republic Day", 0],
+  ].forEach(h => ins.run(...h));
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS canva_config (
     key   TEXT PRIMARY KEY,
@@ -2001,6 +2065,116 @@ app.post("/attendance/sync-odoo", authenticate, async (req, res) => {
     const rows = db.prepare("SELECT * FROM attendance_records WHERE date LIKE ?").all(`${year}-${String(month).padStart(2, "0")}%`);
     res.json(await pushAttendanceToOdoo(attendancePayload(rows)));
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Attendance monthly sheet (puantaj) ──────────────────────────────────────────────────────────
+const ATT_SHEET_CODES = new Set(["", "M", "HT", "RT", "HRT", "I", "R"]);
+// active Odoo employees + the company each one is insured under (hr.employee.x_sirket_id), cached 5 min
+let _attOdooEmp = { at: 0, list: null };
+async function attendanceOdooEmployees(force) {
+  if (!force && _attOdooEmp.list && Date.now() - _attOdooEmp.at < 5 * 60 * 1000) return _attOdooEmp.list;
+  let rows;
+  try {
+    rows = await odooExec("hr.employee", "search_read", [[["active", "=", true]]], { fields: ["name", "x_sirket_id"], order: "name" });
+  } catch (e) {
+    rows = await odooExec("hr.employee", "search_read", [[["active", "=", true]]], { fields: ["name"], order: "name" });
+  }
+  if (rows === null) return null;
+  _attOdooEmp = { at: Date.now(), list: rows.map(r => ({
+    key: "o:" + r.id, odoo_id: r.id, name: r.name,
+    company_id: r.x_sirket_id ? r.x_sirket_id[0] : null, company: r.x_sirket_id ? r.x_sirket_id[1] : "" })) };
+  return _attOdooEmp.list;
+}
+// the old tracker stores people under its own spelling ("Mohamed Ali Naguez" vs Odoo "Mohamed Ali"):
+// exact match first, otherwise one name's words must all appear in the other's
+function attendanceNameMatcher(employees) {
+  const norm = s => String(s || "").replace(/İ/g, "i").replace(/I/g, "ı").toLocaleLowerCase("tr").replace(/\s+/g, " ").trim();
+  const list = employees.map(e => ({ key: e.key, n: norm(e.name), w: norm(e.name).split(" ") }));
+  const cache = {};
+  return name => {
+    if (name in cache) return cache[name];
+    const n = norm(name), w = n.split(" ");
+    let hit = list.find(e => e.n === n);
+    if (!hit) {
+      const cands = list.filter(e => e.w.every(x => w.includes(x)) || w.every(x => e.w.includes(x)));
+      if (cands.length === 1) hit = cands[0];
+    }
+    return (cache[name] = hit ? hit.key : null);
+  };
+}
+// GET /attendance/sheet?year=&month=  (month 1-12)
+app.get("/attendance/sheet", authenticate, async (req, res) => {
+  const year = parseInt(req.query.year, 10), month = parseInt(req.query.month, 10);
+  if (!year || !month) return res.status(400).json({ error: "year and month required" });
+  const prefix = `${year}-${String(month).padStart(2, "0")}`;
+  let employees = null, odooError = "";
+  try { employees = await attendanceOdooEmployees(req.query.refresh === "1"); } catch (e) { odooError = e.message; }
+  const fromOdoo = !!employees;
+  if (!employees) employees = db.prepare("SELECT name FROM attendance_employees ORDER BY sort_order, id").all()
+    .map(r => ({ key: "n:" + r.name, odoo_id: null, name: r.name, company_id: null, company: "" }));
+  const cells = {};
+  db.prepare("SELECT emp_key, date, code, multinet, travel FROM attendance_sheet WHERE date LIKE ?").all(prefix + "%")
+    .forEach(r => { (cells[r.emp_key] = cells[r.emp_key] || {})[r.date] = { code: r.code || "", multinet: r.multinet, travel: r.travel }; });
+  // full-day leave / holiday already entered in the old tracker -> suggested automatic code (İ / RT)
+  const legacy = {};
+  const keyOf = attendanceNameMatcher(employees);
+  db.prepare("SELECT employee, date, type, half_with, check_in, check_out, leave_start, leave_end FROM attendance_records WHERE date LIKE ?")
+    .all(prefix + "%").forEach(r => {
+      const k = keyOf(r.employee);
+      if (!k) return;
+      const partial = (r.type === "paid_leave" || r.type === "unpaid_leave") && r.leave_start && r.leave_end && r.check_in && r.check_out;
+      let hint = "";
+      if (r.type === "holiday") hint = "RT";
+      else if ((r.type === "paid_leave" || r.type === "unpaid_leave") && !partial) hint = "I";
+      else if (r.type === "half_holiday" && r.half_with) hint = "I";
+      if (hint) (legacy[k] = legacy[k] || {})[r.date] = hint;
+    });
+  const holidays = db.prepare("SELECT date, name_tr, name_en, half FROM attendance_holidays WHERE date LIKE ? ORDER BY date").all(prefix + "%");
+  res.json({ employees, cells, legacy, holidays, fromOdoo, odooError });
+});
+// PUT /attendance/sheet/:empKey/:date { code?, multinet?, travel?, emp_name? } — code '' = back to automatic
+app.put("/attendance/sheet/:empKey/:date", authenticate, (req, res) => {
+  const { empKey, date } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^[on]:/.test(empKey)) return res.status(400).json({ error: "bad key or date" });
+  const b = req.body || {};
+  const cur = db.prepare("SELECT code, multinet, travel FROM attendance_sheet WHERE emp_key = ? AND date = ?").get(empKey, date)
+    || { code: "", multinet: null, travel: null };
+  const next = { ...cur };
+  if ("code" in b) {
+    if (!ATT_SHEET_CODES.has(b.code)) return res.status(400).json({ error: "unknown code" });
+    next.code = b.code;
+  }
+  if ("multinet" in b) next.multinet = b.multinet == null ? null : (b.multinet ? 1 : 0);
+  if ("travel" in b) next.travel = b.travel == null ? null : (b.travel ? 1 : 0);
+  db.prepare(`
+    INSERT INTO attendance_sheet (emp_key, emp_name, date, code, multinet, travel, updated_at, updated_by)
+    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+    ON CONFLICT(emp_key, date) DO UPDATE SET code = excluded.code, multinet = excluded.multinet, travel = excluded.travel,
+      emp_name = CASE WHEN excluded.emp_name <> '' THEN excluded.emp_name ELSE attendance_sheet.emp_name END,
+      updated_at = CURRENT_TIMESTAMP, updated_by = excluded.updated_by
+  `).run(empKey, String(b.emp_name || ""), date, next.code, next.multinet, next.travel, String(req.user?.name || req.user?.email || ""));
+  res.json({ ok: true, cell: next });
+});
+// public holidays: everyone reads, admins edit
+app.get("/attendance/holidays", authenticate, (req, res) => {
+  const y = String(req.query.year || "");
+  const rows = /^\d{4}$/.test(y)
+    ? db.prepare("SELECT date, name_tr, name_en, half FROM attendance_holidays WHERE date LIKE ? ORDER BY date").all(y + "%")
+    : db.prepare("SELECT date, name_tr, name_en, half FROM attendance_holidays ORDER BY date").all();
+  res.json(rows);
+});
+app.put("/attendance/holidays/:date", authenticate, requireAdmin, (req, res) => {
+  const { date } = req.params;
+  const { name_tr, name_en, half } = req.body || {};
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !String(name_tr || "").trim()) return res.status(400).json({ error: "date and name required" });
+  db.prepare(`INSERT INTO attendance_holidays (date, name_tr, name_en, half) VALUES (?, ?, ?, ?)
+    ON CONFLICT(date) DO UPDATE SET name_tr = excluded.name_tr, name_en = excluded.name_en, half = excluded.half`)
+    .run(date, String(name_tr).trim(), String(name_en || "").trim(), half ? 1 : 0);
+  res.json({ ok: true });
+});
+app.delete("/attendance/holidays/:date", authenticate, requireAdmin, (req, res) => {
+  db.prepare("DELETE FROM attendance_holidays WHERE date = ?").run(req.params.date);
+  res.json({ ok: true });
 });
 
 // GET /dropdown-options — all custom options grouped by key
