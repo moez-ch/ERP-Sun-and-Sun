@@ -79,8 +79,8 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
   // ── Multinet / Travel (step 2) ──
   // Multinet ticked = meal allowance that day; Travel ticked = double allowance (Travel always includes Multinet).
   // Neither = 0, Multinet only = 1 unit, Multinet + Travel = 2 units. No money is shown here, only days / units.
-  // Automatic (nothing stored): Multinet on for M and ½RT days, off otherwise; Travel off.
-  const autoMultinet = code => code === "M" || code === "HRT";
+  // Automatic (nothing stored): Multinet on for full M days only (no Multinet for a half-day ½RT day); Travel off.
+  const autoMultinet = code => code === "M";
   const flagsOf = (empKey, day) => {
     const c = cellOf(empKey, day) || {};
     const code = codeOf(empKey, day);
@@ -267,8 +267,8 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
         </div>
       )}
       <div style={{ fontSize: 10, color: colors.textDim, marginTop: 6 }}>
-        {tr("Under each day: first box = Multinet (meal allowance), second box = Travel (double allowance; also ticks Multinet). Multinet is ticked automatically on M and ½RT days. ",
-            "Her günün altında: ilk kutu = Multinet (yemek), ikinci kutu = Seyahat (çift yemek; Multinet'i de işaretler). Multinet, M ve ½RT günlerinde otomatik işaretlidir. ")}
+        {tr("Under each day: first box = Multinet (meal allowance), second box = Travel (double allowance; also ticks Multinet). Multinet is ticked automatically on full working days (M) only, not on half days (½RT). ",
+            "Her günün altında: ilk kutu = Multinet (yemek), ikinci kutu = Seyahat (çift yemek; Multinet'i de işaretler). Multinet yalnızca tam çalışma günlerinde (M) otomatik işaretlidir, yarım günde (½RT) değil. ")}
         {tr("Right: M / HT / RT / İ / R day counts, 🍽 days with Multinet, ✈ travel days, Σ🍽 Multinet units (a travel day counts twice). ",
             "Sağda: M / HT / RT / İ / R gün sayıları, 🍽 Multinet'li gün, ✈ seyahat günü, Σ🍽 Multinet birimi (seyahat günü iki sayılır). ")}
         {tr("Cells with a dashed frame were changed by hand; choosing the automatic value again resets them. Public holidays are locked.",
