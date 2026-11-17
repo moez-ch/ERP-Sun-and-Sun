@@ -2068,7 +2068,7 @@ app.post("/attendance/sync-odoo", authenticate, async (req, res) => {
 });
 
 // ── Attendance monthly sheet (puantaj) ──────────────────────────────────────────────────────────
-const ATT_SHEET_CODES = new Set(["", "M", "HT", "RT", "HRT", "I", "R"]);
+const ATT_SHEET_CODES = new Set(["", "M", "HT", "RT", "HRT", "I", "R", "L"]);
 // active Odoo employees + the company each one is insured under (hr.employee.x_sirket_id), cached 5 min
 let _attOdooEmp = { at: 0, list: null };
 async function attendanceOdooEmployees(force) {
@@ -2117,11 +2117,18 @@ app.get("/attendance/sheet", authenticate, async (req, res) => {
     .forEach(r => { (cells[r.emp_key] = cells[r.emp_key] || {})[r.date] = { code: r.code || "", multinet: r.multinet, travel: r.travel }; });
   // full-day leave / holiday already entered in the old tracker -> suggested automatic code (İ / RT)
   const legacy = {};
+  const hourly = {};   // check-in / check-out per person per day (the old tracker's records; the hourly log edits these)
   const keyOf = attendanceNameMatcher(employees);
-  db.prepare("SELECT employee, date, type, half_with, check_in, check_out, leave_start, leave_end FROM attendance_records WHERE date LIKE ?")
+  // name under which a person's hourly records are stored: the old tracker's spelling if it has one, else the Odoo name
+  const recName = {};
+  employees.forEach(e => { recName[e.key] = e.name; });
+  db.prepare("SELECT name FROM attendance_employees").all().forEach(r => { const k = keyOf(r.name); if (k) recName[k] = r.name; });
+  db.prepare("SELECT employee, date, type, half_with, check_in, check_out, leave_start, leave_end, lunch_break FROM attendance_records WHERE date LIKE ?")
     .all(prefix + "%").forEach(r => {
       const k = keyOf(r.employee);
       if (!k) return;
+      if (r.employee === recName[k]) (hourly[k] = hourly[k] || {})[r.date] = { in: r.check_in || "", out: r.check_out || "", type: r.type || "",
+        leaveStart: r.leave_start || "", leaveEnd: r.leave_end || "", halfWith: r.half_with || "", lunchBreak: !!r.lunch_break };
       const partial = (r.type === "paid_leave" || r.type === "unpaid_leave") && r.leave_start && r.leave_end && r.check_in && r.check_out;
       let hint = "";
       if (r.type === "holiday") hint = "RT";
@@ -2130,7 +2137,37 @@ app.get("/attendance/sheet", authenticate, async (req, res) => {
       if (hint) (legacy[k] = legacy[k] || {})[r.date] = hint;
     });
   const holidays = db.prepare("SELECT date, name_tr, name_en, half FROM attendance_holidays WHERE date LIKE ? ORDER BY date").all(prefix + "%");
-  res.json({ employees, cells, legacy, holidays, fromOdoo, odooError });
+  // approved leave from Odoo (Time Off): a full day -> L (sick leave type "Rapor" -> R); hourly / half-day leave -> hours on that day
+  const leaves = {};
+  let leavesError = "";
+  if (fromOdoo) {
+    try {
+      const last = new Date(year, month, 0).getDate();
+      const mStart = `${prefix}-01`, mEnd = `${prefix}-${String(last).padStart(2, "0")}`;
+      const rows = await odooExec("hr.leave", "search_read",
+        [[["state", "=", "validate"], ["request_date_from", "<=", mEnd], ["request_date_to", ">=", mStart]]],
+        { fields: ["employee_id", "holiday_status_id", "request_date_from", "request_date_to", "request_unit_hours", "request_unit_half", "number_of_hours", "number_of_days"] });
+      (rows || []).forEach(l => {
+        if (!l.employee_id) return;
+        const k = "o:" + l.employee_id[0], type = l.holiday_status_id ? l.holiday_status_id[1] : "";
+        const sick = /rapor|sick|hastal/i.test(type);
+        const oneDay = l.request_date_from === l.request_date_to;
+        const hoursOnly = oneDay && ((l.request_unit_hours && (l.number_of_hours || 0) < 9) || (l.request_unit_half && (l.number_of_days || 0) <= 0.5));
+        const mine = leaves[k] = leaves[k] || {};
+        if (hoursOnly) {
+          const d = l.request_date_from, h = l.number_of_hours || 4.5;
+          mine[d] = { ...(mine[d] || {}), hours: Math.round(((mine[d]?.hours || 0) + h) * 100) / 100, type };
+          return;
+        }
+        const [y1, m1, d1] = l.request_date_from.split("-").map(Number), [y2, m2, d2] = l.request_date_to.split("-").map(Number);
+        for (let t = Date.UTC(y1, m1 - 1, d1); t <= Date.UTC(y2, m2 - 1, d2); t += 86400000) {
+          const d = new Date(t).toISOString().slice(0, 10);
+          if (d >= mStart && d <= mEnd) mine[d] = { ...(mine[d] || {}), code: sick ? "R" : "L", type };
+        }
+      });
+    } catch (e) { leavesError = e.message; }
+  }
+  res.json({ employees, cells, legacy, hourly, recName, leaves, holidays, fromOdoo, odooError, leavesError });
 });
 // PUT /attendance/sheet/:empKey/:date { code?, multinet?, travel?, emp_name? } — code '' = back to automatic
 app.put("/attendance/sheet/:empKey/:date", authenticate, (req, res) => {

@@ -1,4 +1,4 @@
-// Attendance Tracker — monthly sheet (puantaj). Esra's spec, part 1 (points 1–4):
+// Attendance Tracker — monthly sheet (puantaj). Esra's spec points 1–8 (steps 1–3):
 //   people down the side (active Odoo employees + the company they are insured under, filterable),
 //   every day of the month across with its weekday, and one code per person per day.
 //   Mon–Sat = M (working day), Sunday = HT (weekly rest), public holiday = RT (locked), arife = ½RT,
@@ -13,15 +13,41 @@ const DOW_FULL_TR = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "
 const DOW_FULL_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 // stored key -> what is shown in the cell
-const CODE_LABEL = { M: "M", HT: "HT", RT: "RT", HRT: "½RT", I: "İ", R: "R" };
-const EDITABLE_CODES = ["M", "HT", "I", "R"];
+const CODE_LABEL = { M: "M", HT: "HT", RT: "RT", HRT: "½RT", I: "İ", R: "R", L: "L" };
+const EDITABLE_CODES = ["M", "HT", "I", "R", "L"];
+
+// working hours: 08:30–18:30 on site = 10h incl. the 1h lunch (same rule as the old Table); a ½RT day expects 4.5h
+const WORK_START = 510, WORK_END = 1110, WORK_DAY = 600, HALF_DAY = 270;
+const t2m = s => { const m = /^(\d{1,2}):(\d{2})/.exec(s || ""); return m ? +m[1] * 60 + +m[2] : null; };
+function fmtTimeInput(raw) {
+  const digits = String(raw || "").replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  const h = String(Math.min(parseInt(digits.slice(0, 2), 10), 23)).padStart(2, "0");
+  const mm = digits.slice(2);
+  if (mm.length < 2) return `${h}:${mm}`;
+  return `${h}:${String(Math.min(parseInt(mm, 10), 59)).padStart(2, "0")}`;
+}
+const fmtHM = mins => { if (!mins) return "—"; const a = Math.abs(Math.round(mins)); return `${Math.floor(a / 60)}:${String(a % 60).padStart(2, "0")}`; };
+const fmtSigned = mins => (mins == null || Math.round(mins) === 0 ? "—" : (mins > 0 ? "+" : "−") + fmtHM(mins));
+// one day's clock times against the schedule; only working days (M, ½RT) or a worked rest day are evaluated
+function dayClock(ent, code) {
+  const r = { lateArr: 0, earlyArr: 0, earlyDep: 0, lateDep: 0, net: null };
+  if (!ent || !["M", "HRT", "HT"].includes(code)) return r;
+  const i = t2m(ent.in), o = t2m(ent.out);
+  if (code === "HT") { if (i != null && o != null) { let w = o - i; if (w < 0) w += 1440; r.net = w; } return r; } // Sunday work: all of it is extra
+  if (i != null) { if (i > WORK_START) r.lateArr = i - WORK_START; else r.earlyArr = WORK_START - i; }
+  if (o != null && code !== "HRT") { if (o < WORK_END) r.earlyDep = WORK_END - o; else r.lateDep = o - WORK_END; }
+  if (i != null && o != null) { let w = o - i; if (w < 0) w += 1440; r.net = w - (code === "HRT" ? HALF_DAY : WORK_DAY); }
+  return r;
+}
 
 const dk = (y, m, d) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 const authHeaders = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sns_token")}` });
 
 export default function AttendanceSheet({ colors, font, lang, year, month, isAdmin }) {
   const tr = (en, t) => (lang === "tr" ? t : en);
-  const [sheet, setSheet] = useState({ employees: [], cells: {}, legacy: {}, holidays: [], fromOdoo: true, odooError: "" });
+  const [sheet, setSheet] = useState({ employees: [], cells: {}, legacy: {}, hourly: {}, recName: {}, leaves: {}, holidays: [], fromOdoo: true, odooError: "", leavesError: "" });
+  const [showHourly, setShowHourly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [company, setCompany] = useState("__all__");
   const [search, setSearch] = useState("");
@@ -32,7 +58,8 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
     setLoading(true);
     fetch(`/attendance/sheet?year=${year}&month=${month + 1}${reload ? "&refresh=1" : ""}`, { headers: authHeaders() })
       .then(r => r.json())
-      .then(d => setSheet({ employees: d.employees || [], cells: d.cells || {}, legacy: d.legacy || {}, holidays: d.holidays || [], fromOdoo: !!d.fromOdoo, odooError: d.odooError || "" }))
+      .then(d => setSheet({ employees: d.employees || [], cells: d.cells || {}, legacy: d.legacy || {}, hourly: d.hourly || {}, recName: d.recName || {},
+        leaves: d.leaves || {}, holidays: d.holidays || [], fromOdoo: !!d.fromOdoo, odooError: d.odooError || "", leavesError: d.leavesError || "" }))
       .catch(() => setSheet(s => ({ ...s, employees: [], cells: {} })))
       .finally(() => setLoading(false));
   }, [year, month, reload]);
@@ -51,6 +78,8 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
     if (day.dow === 0) return "HT";
     if (h && !h.half) return "RT";
     if (h && h.half) return "HRT";
+    const lv = sheet.leaves[empKey]?.[day.key];   // approved full-day leave in Odoo Time Off -> L (Rapor -> R)
+    if (lv?.code) return lv.code;
     const lg = sheet.legacy[empKey]?.[day.key];
     if (lg) return lg;
     return "M";
@@ -103,25 +132,37 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
   }
   // per-person totals for the summary on the right (a ½RT day counts half M, half RT)
   const summaryOf = empKey => {
-    const t = { M: 0, HT: 0, RT: 0, I: 0, R: 0, multinet: 0, travel: 0, units: 0 };
+    const t = { M: 0, HT: 0, RT: 0, I: 0, R: 0, L: 0, multinet: 0, travel: 0, units: 0, lateArr: 0, earlyArr: 0, earlyDep: 0, lateDep: 0, net: 0, hourLeave: 0 };
     days.forEach(d => {
       const code = codeOf(empKey, d);
       if (code === "HRT") { t.M += 0.5; t.RT += 0.5; } else if (code in t) t[code] += 1;
       const f = flagsOf(empKey, d);
       if (f.multinet) { t.multinet += 1; t.units += f.travel ? 2 : 1; }
       if (f.travel) t.travel += 1;
+      const c = dayClock(sheet.hourly[empKey]?.[d.key], code);
+      t.lateArr += c.lateArr; t.earlyArr += c.earlyArr; t.earlyDep += c.earlyDep; t.lateDep += c.lateDep;
+      if (c.net != null) t.net += c.net;
+      t.hourLeave += (sheet.leaves[empKey]?.[d.key]?.hours || 0) * 60;
     });
     return t;
   };
   const fmtN = n => (Number.isInteger(n) ? String(n) : String(n).replace(".", lang === "tr" ? "," : "."));
+  // [key, header, tooltip, width, format]
   const SUMMARY_COLS = [
-    ["M", tr("Working days", "Çalışma günü")], ["HT", tr("Weekly rest", "Hafta tatili")], ["RT", tr("Public holiday", "Resmi tatil")],
-    ["I", tr("On leave", "İzinli")], ["R", tr("Sick leave / report", "Raporlu")],
-    ["multinet", tr("Days with Multinet", "Multinet'li gün")], ["travel", tr("Travel days (double)", "Seyahat günü (çift)")],
-    ["units", tr("Multinet units (travel counts twice)", "Multinet birimi (seyahat iki sayılır)")],
+    ["M", "M", tr("Working days", "Çalışma günü"), 36, "n"], ["HT", "HT", tr("Weekly rest", "Hafta tatili"), 36, "n"],
+    ["RT", "RT", tr("Public holiday", "Resmi tatil"), 36, "n"], ["L", "L", tr("Leave (from the leave system)", "İzin (izin sisteminden)"), 36, "n"],
+    ["I", "İ", tr("On leave", "İzinli"), 36, "n"], ["R", "R", tr("Sick leave / report", "Raporlu"), 36, "n"],
+    ["multinet", "🍽", tr("Days with Multinet", "Multinet'li gün"), 36, "n"], ["travel", "✈", tr("Travel days (double)", "Seyahat günü (çift)"), 36, "n"],
+    ["units", "Σ🍽", tr("Multinet units (travel counts twice)", "Multinet birimi (seyahat iki sayılır)"), 40, "n"],
+    ["lateArr", tr("Late in", "Geç gir."), tr("Late arrivals (after 08:30), total h:mm", "Geç girişler (08:30 sonrası), toplam s:dk"), 50, "t"],
+    ["earlyArr", tr("Early in", "Erk. gir."), tr("Early arrivals (before 08:30), total h:mm", "Erken girişler (08:30 öncesi), toplam s:dk"), 50, "t"],
+    ["earlyDep", tr("Early out", "Erk. çık."), tr("Early departures (before 18:30), total h:mm", "Erken çıkışlar (18:30 öncesi), toplam s:dk"), 50, "t"],
+    ["lateDep", tr("Late out", "Geç çık."), tr("Late departures (after 18:30), total h:mm", "Geç çıkışlar (18:30 sonrası), toplam s:dk"), 50, "t"],
+    ["net", tr("Total", "Durum"), tr("Total status: time on site minus the expected 10h per working day (days with both times entered)", "Toplam durum: işyerinde geçen süre eksi çalışma günü başına beklenen 10 saat (iki saati de girilmiş günler)"), 58, "s"],
+    ["hourLeave", tr("Hr leave", "Saatlik izin"), tr("Hourly leave from the leave system, total h:mm", "İzin sisteminden saatlik izin, toplam s:dk"), 52, "t"],
   ];
-  const SUM_W = 40;
-  const SUMMARY_HEAD = { M: "M", HT: "HT", RT: "RT", I: "İ", R: "R", multinet: "🍽", travel: "✈", units: "Σ🍽" };
+  const sumRight = i => SUMMARY_COLS.slice(i + 1).reduce((a, c) => a + c[3], 0);
+  const fmtSum = (v, kind) => (kind === "n" ? fmtN(v) : kind === "s" ? fmtSigned(v) : fmtHM(v));
 
   const companies = useMemo(() => {
     const m = new Map();
@@ -139,6 +180,7 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
     HRT: { bg: `${colors.primary}18`, fg: colors.primaryLight || colors.primary },
     I:   { bg: `${colors.warning}26`, fg: colors.warning },
     R:   { bg: `${colors.danger || "#e57373"}26`, fg: colors.danger || "#e57373" },
+    L:   { bg: "#9c6ade26", fg: "#9c6ade" },
   }[code] || { bg: "transparent", fg: colors.text });
 
   const DOW = lang === "tr" ? DOW_TR : DOW_EN;
@@ -151,7 +193,7 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
   const legend = [
     ["M", tr("Working day", "Çalışma günü")], ["HT", tr("Weekly rest (Sunday)", "Hafta tatili (Pazar)")],
     ["RT", tr("Public holiday", "Resmi tatil")], ["HRT", tr("Half-day public holiday (eve)", "Yarım gün resmi tatil (arife)")],
-    ["I", tr("On leave", "İzinli")], ["R", tr("Sick leave / medical report", "Raporlu")],
+    ["I", tr("On leave", "İzinli")], ["R", tr("Sick leave / medical report", "Raporlu")], ["L", tr("Leave (from the leave system)", "İzin (izin sisteminden)")],
   ];
 
   return (
@@ -168,6 +210,10 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
         <button onClick={() => setReload(r => r + 1)} title={tr("Reload employees from Odoo", "Çalışanları Odoo'dan yenile")}
           style={{ background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 6, padding: "6px 10px", color: colors.textMuted, fontSize: 12, cursor: "pointer", fontFamily: font }}>
           ↻ {tr("Refresh", "Yenile")}
+        </button>
+        <button onClick={() => setShowHourly(true)}
+          style={{ background: colors.primary, border: `1px solid ${colors.primary}`, borderRadius: 6, padding: "6px 10px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}>
+          ⏱ {tr("Log hourly attendance", "Saatlik mesai gir")}
         </button>
         <button onClick={() => setShowHolidays(s => !s)}
           style={{ background: showHolidays ? `${colors.primary}20` : "transparent", border: `1px solid ${showHolidays ? colors.primary : colors.border}`, borderRadius: 6, padding: "6px 10px", color: showHolidays ? colors.primaryLight : colors.textMuted, fontSize: 12, cursor: "pointer", fontFamily: font }}>
@@ -186,6 +232,17 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
           {tr("Odoo could not be reached — showing the tracker's own employee list, without companies.", "Odoo'ya ulaşılamadı — şirketsiz, takip listesindeki çalışanlar gösteriliyor.")}
           {sheet.odooError ? ` (${sheet.odooError})` : ""}
         </div>
+      )}
+
+      {sheet.leavesError && !loading && (
+        <div style={{ fontSize: 11, color: colors.warning, marginBottom: 8 }}>
+          {tr("Leave could not be read from Odoo: ", "İzinler Odoo'dan okunamadı: ")}{sheet.leavesError}
+        </div>
+      )}
+      {showHourly && (
+        <HourlyLog colors={colors} font={font} lang={lang} employees={shown} days={days} recName={sheet.recName} hourly={sheet.hourly}
+          codeOf={codeOf} leaves={sheet.leaves} onClose={() => setShowHourly(false)}
+          onSaved={(empKey, dateKey, ent) => setSheet(s => ({ ...s, hourly: { ...s.hourly, [empKey]: { ...(s.hourly[empKey] || {}), [dateKey]: ent } } }))} />
       )}
 
       {showHolidays && <HolidayPanel colors={colors} font={font} lang={lang} year={year} isAdmin={isAdmin} onChanged={() => setReload(r => r + 1)} />}
@@ -209,10 +266,10 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
                     </th>
                   );
                 })}
-                {SUMMARY_COLS.map(([k, label], i) => (
+                {SUMMARY_COLS.map(([k, head, label, w], i) => (
                   <th key={k} title={label}
-                    style={{ ...th, minWidth: SUM_W, maxWidth: SUM_W, right: (SUMMARY_COLS.length - 1 - i) * SUM_W, zIndex: 4, background: "#26262c", borderLeft: i === 0 ? `2px solid ${colors.accent}` : undefined }}>
-                    {SUMMARY_HEAD[k]}
+                    style={{ ...th, minWidth: w, maxWidth: w, right: sumRight(i), zIndex: 4, background: "#26262c", whiteSpace: "normal", lineHeight: 1.15, borderLeft: i === 0 ? `2px solid ${colors.accent}` : undefined }}>
+                    {head}
                   </th>
                 ))}
               </tr>
@@ -229,7 +286,10 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
                     const locked = code === "RT" && !!holidayMap[d.key] && !holidayMap[d.key].half;
                     const opts = code === "HRT" ? ["HRT", ...EDITABLE_CODES] : EDITABLE_CODES;
                     return (
-                      <td key={d.key} style={{ ...td, background: s.bg }}>
+                      <td key={d.key} style={{ ...td, background: s.bg, position: "relative" }}
+                        title={[sheet.leaves[emp.key]?.[d.key]?.type, sheet.leaves[emp.key]?.[d.key]?.hours ? `${tr("Hourly leave", "Saatlik izin")}: ${fmtHM(sheet.leaves[emp.key][d.key].hours * 60)}` : "",
+                          sheet.hourly[emp.key]?.[d.key]?.in || sheet.hourly[emp.key]?.[d.key]?.out ? `${sheet.hourly[emp.key][d.key].in || "—"} – ${sheet.hourly[emp.key][d.key].out || "—"}` : ""].filter(Boolean).join(" · ") || undefined}>
+                        {sheet.leaves[emp.key]?.[d.key]?.hours ? <span style={{ position: "absolute", top: 1, right: 2, fontSize: 8, color: "#9c6ade" }}>⏱</span> : null}
                         {locked ? (
                           <span title={tr("Public holiday — change it in the holiday list", "Resmi tatil — tatil listesinden değiştirilir")}
                             style={{ display: "block", padding: "6px 0", fontSize: 11, fontWeight: 700, color: s.fg, cursor: "not-allowed" }}>{CODE_LABEL[code]}</span>
@@ -251,11 +311,13 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
                       </td>
                     );
                   })}
-                  {(() => { const t = summaryOf(emp.key); return SUMMARY_COLS.map(([k, label], i) => (
+                  {(() => { const t = summaryOf(emp.key); return SUMMARY_COLS.map(([k, head, label, w, kind], i) => (
                     <td key={k} title={label}
-                      style={{ ...td, position: "sticky", right: (SUMMARY_COLS.length - 1 - i) * SUM_W, zIndex: 1, minWidth: SUM_W, maxWidth: SUM_W, background: colors.surface,
-                        fontSize: 11, fontWeight: k === "units" ? 800 : 700, color: k === "units" ? colors.accent : colors.text, borderLeft: i === 0 ? `2px solid ${colors.accent}` : undefined }}>
-                      {fmtN(t[k])}
+                      style={{ ...td, position: "sticky", right: sumRight(i), zIndex: 1, minWidth: w, maxWidth: w, background: colors.surface, whiteSpace: "nowrap",
+                        fontSize: 11, fontWeight: k === "units" || k === "net" ? 800 : 700,
+                        color: k === "units" ? colors.accent : k === "net" ? (t.net > 0 ? colors.success : t.net < 0 ? (colors.danger || "#e57373") : colors.textDim) : colors.text,
+                        borderLeft: i === 0 ? `2px solid ${colors.accent}` : undefined }}>
+                      {fmtSum(t[k], kind)}
                     </td>)); })()}
                 </tr>
               ))}
@@ -269,10 +331,98 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
       <div style={{ fontSize: 10, color: colors.textDim, marginTop: 6 }}>
         {tr("Under each day: first box = Multinet (meal allowance), second box = Travel (double allowance; also ticks Multinet). Multinet is ticked automatically on full working days (M) only, not on half days (½RT). ",
             "Her günün altında: ilk kutu = Multinet (yemek), ikinci kutu = Seyahat (çift yemek; Multinet'i de işaretler). Multinet yalnızca tam çalışma günlerinde (M) otomatik işaretlidir, yarım günde (½RT) değil. ")}
-        {tr("Right: M / HT / RT / İ / R day counts, 🍽 days with Multinet, ✈ travel days, Σ🍽 Multinet units (a travel day counts twice). ",
-            "Sağda: M / HT / RT / İ / R gün sayıları, 🍽 Multinet'li gün, ✈ seyahat günü, Σ🍽 Multinet birimi (seyahat günü iki sayılır). ")}
+        {tr("Right: M / HT / RT / L / İ / R day counts, 🍽 days with Multinet, ✈ travel days, Σ🍽 Multinet units (a travel day counts twice), late/early arrivals and departures, total status and hourly leave (h:mm). L and hourly leave (⏱) come from approved leave in Odoo. ",
+            "Sağda: M / HT / RT / L / İ / R gün sayıları, 🍽 Multinet'li gün, ✈ seyahat günü, Σ🍽 Multinet birimi (seyahat günü iki sayılır), geç/erken giriş ve çıkışlar, toplam durum ve saatlik izin (s:dk). L ve saatlik izin (⏱) Odoo'daki onaylı izinlerden gelir. ")}
         {tr("Cells with a dashed frame were changed by hand; choosing the automatic value again resets them. Public holidays are locked.",
             "Kesik çerçeveli hücreler elle değiştirildi; otomatik değeri tekrar seçmek sıfırlar. Resmi tatiller kilitlidir.")}
+      </div>
+    </div>
+  );
+}
+
+// "Log hourly attendance": enter the timesheet in/out times of one person for the month. Stored in the old tracker's
+// records (attendance_records, same as the Table tab), so the existing Odoo sync keeps working.
+function HourlyLog({ colors, font, lang, employees, days, recName, hourly, codeOf, leaves, onClose, onSaved }) {
+  const tr = (en, t) => (lang === "tr" ? t : en);
+  const DOWS = lang === "tr" ? DOW_TR : DOW_EN;
+  const [empKey, setEmpKey] = useState(employees[0]?.key || "");
+  const [draft, setDraft] = useState({});
+  useEffect(() => { setDraft({}); }, [empKey]);
+  const emp = employees.find(e => e.key === empKey);
+  const base = d => hourly[empKey]?.[d.key] || { in: "", out: "", type: "", leaveStart: "", leaveEnd: "", halfWith: "", lunchBreak: false };
+  const val = (d, f) => (draft[d.key] && f in draft[d.key] ? draft[d.key][f] : base(d)[f]);
+  const commit = d => {
+    const dr = draft[d.key];
+    if (!dr) return;
+    const ent = { ...base(d), ...dr };
+    if (ent.in === base(d).in && ent.out === base(d).out) return;
+    const name = recName[empKey] || emp?.name;
+    fetch(`/attendance/records/${encodeURIComponent(name)}/${d.key}`, { method: "PUT", headers: authHeaders(), body: JSON.stringify(ent) })
+      .then(r => { if (!r.ok) throw new Error(r.status); onSaved(empKey, d.key, ent); })
+      .catch(() => window.alert(tr("Could not save — please try again.", "Kaydedilemedi — lütfen tekrar deneyin.")));
+  };
+  const inp = { width: 62, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 4, padding: "3px 5px", color: colors.text, fontSize: 12, fontFamily: font, textAlign: "center" };
+  const cellSt = { padding: "4px 8px", borderBottom: `1px solid ${colors.border}`, fontSize: 12, color: colors.text, whiteSpace: "nowrap" };
+  const tot = { lateArr: 0, earlyArr: 0, earlyDep: 0, lateDep: 0, net: 0 };
+  const netColor = n => (n > 0 ? colors.success : n < 0 ? (colors.danger || "#e57373") : colors.textDim);
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflow: "auto" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 16, width: "min(900px, 100%)", fontFamily: font }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+          <b style={{ fontSize: 15, color: colors.text }}>⏱ {tr("Log hourly attendance", "Saatlik mesai gir")}</b>
+          <select value={empKey} onChange={e => setEmpKey(e.target.value)}
+            style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, padding: "5px 8px", color: colors.text, fontSize: 12, fontFamily: font }}>
+            {employees.map(e => <option key={e.key} value={e.key}>{e.name}</option>)}
+          </select>
+          <span style={{ fontSize: 11, color: colors.textDim }}>{tr("Schedule 08:30–18:30 (10h incl. lunch). Type 0830 for 08:30; saved when you leave the box.", "Mesai 08:30–18:30 (öğle dahil 10 saat). 08:30 için 0830 yazın; kutudan çıkınca kaydedilir.")}</span>
+          <button onClick={onClose} style={{ marginLeft: "auto", background: "none", border: "none", color: colors.textMuted, fontSize: 20, cursor: "pointer" }}>×</button>
+        </div>
+        <div style={{ maxHeight: "65vh", overflow: "auto" }}>
+          <table style={{ borderCollapse: "collapse", width: "100%" }}>
+            <thead><tr>
+              {[tr("Date", "Tarih"), tr("Day", "Gün"), tr("Code", "Kod"), tr("In", "Giriş"), tr("Out", "Çıkış"), tr("Late in", "Geç giriş"), tr("Early in", "Erken giriş"),
+                tr("Early out", "Erken çıkış"), tr("Late out", "Geç çıkış"), tr("Status", "Durum"), tr("Hourly leave", "Saatlik izin")].map(h =>
+                <th key={h} style={{ ...cellSt, position: "sticky", top: 0, background: "#1a1a1a", color: colors.accent, fontSize: 11 }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {days.map(d => {
+                const code = codeOf(empKey, d);
+                const c = dayClock({ in: val(d, "in"), out: val(d, "out") }, code);
+                tot.lateArr += c.lateArr; tot.earlyArr += c.earlyArr; tot.earlyDep += c.earlyDep; tot.lateDep += c.lateDep; if (c.net != null) tot.net += c.net;
+                const lvH = leaves[empKey]?.[d.key]?.hours;
+                return (
+                  <tr key={d.key} style={{ opacity: ["M", "HRT"].includes(code) ? 1 : 0.6 }}>
+                    <td style={cellSt}>{String(d.day).padStart(2, "0")}</td>
+                    <td style={cellSt}>{DOWS[d.dow]}</td>
+                    <td style={{ ...cellSt, fontWeight: 700 }}>{CODE_LABEL[code]}</td>
+                    {["in", "out"].map(f => (
+                      <td key={f} style={cellSt}>
+                        <input value={val(d, f)} placeholder="--:--" style={inp}
+                          onChange={e => setDraft(p => ({ ...p, [d.key]: { ...(p[d.key] || {}), [f]: fmtTimeInput(e.target.value) } }))}
+                          onBlur={() => commit(d)} />
+                      </td>
+                    ))}
+                    <td style={cellSt}>{fmtHM(c.lateArr)}</td>
+                    <td style={cellSt}>{fmtHM(c.earlyArr)}</td>
+                    <td style={cellSt}>{fmtHM(c.earlyDep)}</td>
+                    <td style={cellSt}>{fmtHM(c.lateDep)}</td>
+                    <td style={{ ...cellSt, fontWeight: 700, color: netColor(c.net) }}>{fmtSigned(c.net)}</td>
+                    <td style={{ ...cellSt, color: "#9c6ade" }}>{lvH ? fmtHM(lvH * 60) : "—"}</td>
+                  </tr>
+                );
+              })}
+              <tr>
+                <td colSpan={5} style={{ ...cellSt, fontWeight: 700 }}>{tr("Month total", "Ay toplamı")}</td>
+                <td style={{ ...cellSt, fontWeight: 700 }}>{fmtHM(tot.lateArr)}</td>
+                <td style={{ ...cellSt, fontWeight: 700 }}>{fmtHM(tot.earlyArr)}</td>
+                <td style={{ ...cellSt, fontWeight: 700 }}>{fmtHM(tot.earlyDep)}</td>
+                <td style={{ ...cellSt, fontWeight: 700 }}>{fmtHM(tot.lateDep)}</td>
+                <td style={{ ...cellSt, fontWeight: 800, color: netColor(tot.net) }}>{fmtSigned(tot.net)}</td>
+                <td style={cellSt}></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
