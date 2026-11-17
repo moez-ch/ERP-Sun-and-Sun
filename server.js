@@ -592,6 +592,22 @@ db.exec(`
     updated_by TEXT DEFAULT '',
     UNIQUE(emp_key, date)
   );
+  -- per person per month: overtime added by hand (minutes) and the discretionary decision for Total status / Hourly leave /
+  -- Overtime: 'include' = counted this month, 'carry' = moved to next month (the amount carried is frozen in *_carry)
+  CREATE TABLE IF NOT EXISTS attendance_month (
+    emp_key     TEXT NOT NULL,
+    ym          TEXT NOT NULL,
+    added_ot    INTEGER DEFAULT 0,
+    net_dec     TEXT DEFAULT '',
+    leave_dec   TEXT DEFAULT '',
+    ot_dec      TEXT DEFAULT '',
+    net_carry   INTEGER DEFAULT 0,
+    leave_carry INTEGER DEFAULT 0,
+    ot_carry    INTEGER DEFAULT 0,
+    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_by  TEXT DEFAULT '',
+    PRIMARY KEY (emp_key, ym)
+  );
   CREATE TABLE IF NOT EXISTS attendance_holidays (
     date    TEXT PRIMARY KEY,
     name_tr TEXT NOT NULL,
@@ -2167,7 +2183,17 @@ app.get("/attendance/sheet", authenticate, async (req, res) => {
       });
     } catch (e) { leavesError = e.message; }
   }
-  res.json({ employees, cells, legacy, hourly, recName, leaves, holidays, fromOdoo, odooError, leavesError });
+  // this month's decisions + what the previous month carried over into this one
+  const monthRows = {}, carryIn = {};
+  db.prepare("SELECT * FROM attendance_month WHERE ym = ?").all(prefix).forEach(r => {
+    monthRows[r.emp_key] = { added_ot: r.added_ot || 0, net_dec: r.net_dec || "", leave_dec: r.leave_dec || "", ot_dec: r.ot_dec || "" };
+  });
+  const prevYm = month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, "0")}`;
+  db.prepare("SELECT * FROM attendance_month WHERE ym = ?").all(prevYm).forEach(r => {
+    const c = { net: r.net_dec === "carry" ? r.net_carry || 0 : 0, hourLeave: r.leave_dec === "carry" ? r.leave_carry || 0 : 0, overtime: r.ot_dec === "carry" ? r.ot_carry || 0 : 0 };
+    if (c.net || c.hourLeave || c.overtime) carryIn[r.emp_key] = c;
+  });
+  res.json({ employees, cells, legacy, hourly, recName, leaves, holidays, fromOdoo, odooError, leavesError, month: monthRows, carryIn, prevYm });
 });
 // PUT /attendance/sheet/:empKey/:date { code?, multinet?, travel?, emp_name? } — code '' = back to automatic
 app.put("/attendance/sheet/:empKey/:date", authenticate, (req, res) => {
@@ -2192,6 +2218,29 @@ app.put("/attendance/sheet/:empKey/:date", authenticate, (req, res) => {
   `).run(empKey, String(b.emp_name || ""), date, next.code, next.multinet, next.travel, String(req.user?.name || req.user?.email || ""));
   res.json({ ok: true, cell: next });
 });
+// PUT /attendance/month/:empKey/:ym  (admin) { added_ot? (minutes) } or { item: net|hourLeave|overtime, decision: ''|include|carry, amount? (minutes) }
+app.put("/attendance/month/:empKey/:ym", authenticate, requireAdmin, (req, res) => {
+  const { empKey, ym } = req.params;
+  if (!/^\d{4}-\d{2}$/.test(ym) || !/^[on]:/.test(empKey)) return res.status(400).json({ error: "bad key or month" });
+  const b = req.body || {};
+  db.prepare("INSERT OR IGNORE INTO attendance_month (emp_key, ym) VALUES (?, ?)").run(empKey, ym);
+  const who = String(req.user?.name || req.user?.email || "");
+  if ("added_ot" in b) {
+    const v = Math.round(Number(b.added_ot) || 0);
+    if (v < 0 || v > 31 * 24 * 60) return res.status(400).json({ error: "bad overtime" });
+    db.prepare("UPDATE attendance_month SET added_ot = ?, updated_at = CURRENT_TIMESTAMP, updated_by = ? WHERE emp_key = ? AND ym = ?").run(v, who, empKey, ym);
+  }
+  if ("item" in b) {
+    const col = { net: ["net_dec", "net_carry"], hourLeave: ["leave_dec", "leave_carry"], overtime: ["ot_dec", "ot_carry"] }[b.item];
+    if (!col || !["", "include", "carry"].includes(b.decision)) return res.status(400).json({ error: "bad item or decision" });
+    const amount = b.decision === "carry" ? Math.round(Number(b.amount) || 0) : 0;
+    db.prepare(`UPDATE attendance_month SET ${col[0]} = ?, ${col[1]} = ?, updated_at = CURRENT_TIMESTAMP, updated_by = ? WHERE emp_key = ? AND ym = ?`)
+      .run(b.decision, amount, who, empKey, ym);
+  }
+  const r = db.prepare("SELECT added_ot, net_dec, leave_dec, ot_dec FROM attendance_month WHERE emp_key = ? AND ym = ?").get(empKey, ym);
+  res.json({ ok: true, month: r });
+});
+
 // public holidays: everyone reads, admins edit
 app.get("/attendance/holidays", authenticate, (req, res) => {
   const y = String(req.query.year || "");

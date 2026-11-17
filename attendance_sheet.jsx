@@ -1,4 +1,4 @@
-// Attendance Tracker — monthly sheet (puantaj). Esra's spec points 1–8 (steps 1–3):
+// Attendance Tracker — monthly sheet (puantaj). Esra's spec points 1–10 (steps 1–4):
 //   people down the side (active Odoo employees + the company they are insured under, filterable),
 //   every day of the month across with its weekday, and one code per person per day.
 //   Mon–Sat = M (working day), Sunday = HT (weekly rest), public holiday = RT (locked), arife = ½RT,
@@ -30,11 +30,21 @@ function fmtTimeInput(raw) {
 const fmtHM = mins => { if (!mins) return "—"; const a = Math.abs(Math.round(mins)); return `${Math.floor(a / 60)}:${String(a % 60).padStart(2, "0")}`; };
 const fmtSigned = mins => (mins == null || Math.round(mins) === 0 ? "—" : (mins > 0 ? "+" : "−") + fmtHM(mins));
 // one day's clock times against the schedule; only working days (M, ½RT) or a worked rest day are evaluated
+// "h:mm", "2.5" or "2,5" (hours) -> minutes; empty -> 0; anything else -> null
+function parseHM(txt) {
+  const t = String(txt || "").trim();
+  if (!t) return 0;
+  let m = /^(\d{1,3}):(\d{1,2})$/.exec(t);
+  if (m) return +m[1] * 60 + Math.min(59, +m[2]);
+  m = /^(\d{1,3})(?:[.,](\d+))?$/.exec(t);
+  if (m) return Math.round(parseFloat(m[1] + "." + (m[2] || "0")) * 60);
+  return null;
+}
 function dayClock(ent, code) {
-  const r = { lateArr: 0, earlyArr: 0, earlyDep: 0, lateDep: 0, net: null };
+  const r = { lateArr: 0, earlyArr: 0, earlyDep: 0, lateDep: 0, net: null, restWork: 0 };
   if (!ent || !["M", "HRT", "HT"].includes(code)) return r;
   const i = t2m(ent.in), o = t2m(ent.out);
-  if (code === "HT") { if (i != null && o != null) { let w = o - i; if (w < 0) w += 1440; r.net = w; } return r; } // Sunday work: all of it is extra
+  if (code === "HT") { if (i != null && o != null) { let w = o - i; if (w < 0) w += 1440; r.restWork = w; } return r; } // work on the rest day: all of it is overtime
   if (i != null) { if (i > WORK_START) r.lateArr = i - WORK_START; else r.earlyArr = WORK_START - i; }
   if (o != null && code !== "HRT") { if (o < WORK_END) r.earlyDep = WORK_END - o; else r.lateDep = o - WORK_END; }
   if (i != null && o != null) { let w = o - i; if (w < 0) w += 1440; r.net = w - (code === "HRT" ? HALF_DAY : WORK_DAY); }
@@ -46,7 +56,7 @@ const authHeaders = () => ({ "Content-Type": "application/json", Authorization: 
 
 export default function AttendanceSheet({ colors, font, lang, year, month, isAdmin }) {
   const tr = (en, t) => (lang === "tr" ? t : en);
-  const [sheet, setSheet] = useState({ employees: [], cells: {}, legacy: {}, hourly: {}, recName: {}, leaves: {}, holidays: [], fromOdoo: true, odooError: "", leavesError: "" });
+  const [sheet, setSheet] = useState({ employees: [], cells: {}, legacy: {}, hourly: {}, recName: {}, leaves: {}, holidays: [], fromOdoo: true, odooError: "", leavesError: "", month: {}, carryIn: {}, prevYm: "" });
   const [showHourly, setShowHourly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [company, setCompany] = useState("__all__");
@@ -59,7 +69,8 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
     fetch(`/attendance/sheet?year=${year}&month=${month + 1}${reload ? "&refresh=1" : ""}`, { headers: authHeaders() })
       .then(r => r.json())
       .then(d => setSheet({ employees: d.employees || [], cells: d.cells || {}, legacy: d.legacy || {}, hourly: d.hourly || {}, recName: d.recName || {},
-        leaves: d.leaves || {}, holidays: d.holidays || [], fromOdoo: !!d.fromOdoo, odooError: d.odooError || "", leavesError: d.leavesError || "" }))
+        leaves: d.leaves || {}, holidays: d.holidays || [], fromOdoo: !!d.fromOdoo, odooError: d.odooError || "", leavesError: d.leavesError || "",
+        month: d.month || {}, carryIn: d.carryIn || {}, prevYm: d.prevYm || "" }))
       .catch(() => setSheet(s => ({ ...s, employees: [], cells: {} })))
       .finally(() => setLoading(false));
   }, [year, month, reload]);
@@ -132,7 +143,7 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
   }
   // per-person totals for the summary on the right (a ½RT day counts half M, half RT)
   const summaryOf = empKey => {
-    const t = { M: 0, HT: 0, RT: 0, I: 0, R: 0, L: 0, multinet: 0, travel: 0, units: 0, lateArr: 0, earlyArr: 0, earlyDep: 0, lateDep: 0, net: 0, hourLeave: 0 };
+    const t = { M: 0, HT: 0, RT: 0, I: 0, R: 0, L: 0, multinet: 0, travel: 0, units: 0, lateArr: 0, earlyArr: 0, earlyDep: 0, lateDep: 0, net: 0, hourLeave: 0, restWork: 0 };
     days.forEach(d => {
       const code = codeOf(empKey, d);
       if (code === "HRT") { t.M += 0.5; t.RT += 0.5; } else if (code in t) t[code] += 1;
@@ -142,10 +153,37 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
       const c = dayClock(sheet.hourly[empKey]?.[d.key], code);
       t.lateArr += c.lateArr; t.earlyArr += c.earlyArr; t.earlyDep += c.earlyDep; t.lateDep += c.lateDep;
       if (c.net != null) t.net += c.net;
+      t.restWork += c.restWork;
       t.hourLeave += (sheet.leaves[empKey]?.[d.key]?.hours || 0) * 60;
     });
+    // step 4: overtime = work on rest days + overtime added by hand; each of the three discretionary amounts also
+    // gets whatever the previous month carried over into this one
+    const mo = sheet.month[empKey] || {}, ci = sheet.carryIn[empKey] || {};
+    t.addOT = mo.added_ot || 0;
+    t.overtime = t.restWork + t.addOT;
+    t.own = { net: t.net, hourLeave: t.hourLeave, overtime: t.overtime };
+    t.carried = { net: ci.net || 0, hourLeave: ci.hourLeave || 0, overtime: ci.overtime || 0 };
+    t.net += t.carried.net; t.hourLeave += t.carried.hourLeave; t.overtime += t.carried.overtime;
+    t.dec = { net: mo.net_dec || "", hourLeave: mo.leave_dec || "", overtime: mo.ot_dec || "" };
     return t;
   };
+  function saveMonth(emp, body, apply) {
+    const ym = `${year}-${String(month + 1).padStart(2, "0")}`;
+    setSheet(s => ({ ...s, month: { ...s.month, [emp.key]: apply({ ...(s.month[emp.key] || {}) }) } }));
+    fetch(`/attendance/month/${encodeURIComponent(emp.key)}/${ym}`, { method: "PUT", headers: authHeaders(), body: JSON.stringify(body) })
+      .then(r => { if (!r.ok) throw new Error(r.status); })
+      .catch(() => window.alert(tr("Could not save — please reload the page.", "Kaydedilemedi — lütfen sayfayı yenileyin.")));
+  }
+  // clicking the active button again clears the decision; "carry" freezes the amount shown (own + already carried in)
+  function setDecision(emp, item, decision, amount) {
+    const col = { net: "net_dec", hourLeave: "leave_dec", overtime: "ot_dec" }[item];
+    saveMonth(emp, { item, decision, amount: Math.round(amount || 0) }, m => ({ ...m, [col]: decision }));
+  }
+  function setAddedOt(emp, txt) {
+    const v = parseHM(txt);
+    if (v == null) { window.alert(tr("Enter hours as h:mm (e.g. 2:30) or a number of hours (e.g. 2,5).", "Saati s:dk (ör. 2:30) veya saat sayısı (ör. 2,5) olarak girin.")); return; }
+    saveMonth(emp, { added_ot: v }, m => ({ ...m, added_ot: v }));
+  }
   const fmtN = n => (Number.isInteger(n) ? String(n) : String(n).replace(".", lang === "tr" ? "," : "."));
   // [key, header, tooltip, width, format]
   const SUMMARY_COLS = [
@@ -158,11 +196,16 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
     ["earlyArr", tr("Early in", "Erk. gir."), tr("Early arrivals (before 08:30), total h:mm", "Erken girişler (08:30 öncesi), toplam s:dk"), 50, "t"],
     ["earlyDep", tr("Early out", "Erk. çık."), tr("Early departures (before 18:30), total h:mm", "Erken çıkışlar (18:30 öncesi), toplam s:dk"), 50, "t"],
     ["lateDep", tr("Late out", "Geç çık."), tr("Late departures (after 18:30), total h:mm", "Geç çıkışlar (18:30 sonrası), toplam s:dk"), 50, "t"],
-    ["net", tr("Total", "Durum"), tr("Total status: time on site minus the expected 10h per working day (days with both times entered)", "Toplam durum: işyerinde geçen süre eksi çalışma günü başına beklenen 10 saat (iki saati de girilmiş günler)"), 58, "s"],
-    ["hourLeave", tr("Hr leave", "Saatlik izin"), tr("Hourly leave from the leave system, total h:mm", "İzin sisteminden saatlik izin, toplam s:dk"), 52, "t"],
+    ["net", tr("Total status", "Toplam durum"), tr("Total status: time on site minus the expected 10h per working day (days with both times entered), plus anything carried over from last month. ✓ = include in this month's calculation, → = carry over to next month", "Toplam durum: işyerinde geçen süre eksi çalışma günü başına beklenen 10 saat (iki saati de girilmiş günler), artı geçen aydan devreden. ✓ = bu ayın hesabına dahil et, → = sonraki aya devret"), 74, "d"],
+    ["hourLeave", tr("Hourly leave", "Saatlik izin"), tr("Hourly leave from the leave system (h:mm), plus anything carried over. ✓ = include in this month's calculation, → = carry over to next month", "İzin sisteminden saatlik izin (s:dk), artı devreden. ✓ = bu ayın hesabına dahil et, → = sonraki aya devret"), 74, "d"],
+    ["addOT", tr("Add overtime", "Ek mesai ekle"), tr("Extra work added by hand for this month (h:mm or hours) — admins only", "Bu ay için elle eklenen ek çalışma (s:dk veya saat) — yalnızca yöneticiler"), 62, "in"],
+    ["overtime", tr("Overtime", "Fazla mesai"), tr("Overtime: work on rest days (HT) + added overtime, plus anything carried over. ✓ = include in this month's calculation, → = carry over to next month", "Fazla mesai: hafta tatilinde (HT) çalışma + eklenen ek mesai, artı devreden. ✓ = bu ayın hesabına dahil et, → = sonraki aya devret"), 74, "d"],
   ];
   const sumRight = i => SUMMARY_COLS.slice(i + 1).reduce((a, c) => a + c[3], 0);
   const fmtSum = (v, kind) => (kind === "n" ? fmtN(v) : kind === "s" ? fmtSigned(v) : fmtHM(v));
+  const MONTH_NAMES = lang === "tr" ? ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+    : ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const prevLabel = sheet.prevYm ? `${MONTH_NAMES[+sheet.prevYm.slice(5, 7) - 1]} ${sheet.prevYm.slice(0, 4)}` : "";
 
   const companies = useMemo(() => {
     const m = new Map();
@@ -239,6 +282,17 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
           {tr("Leave could not be read from Odoo: ", "İzinler Odoo'dan okunamadı: ")}{sheet.leavesError}
         </div>
       )}
+      {!loading && Object.keys(sheet.carryIn).length > 0 && (
+        <div style={{ background: `${colors.warning}14`, border: `1px solid ${colors.warning}55`, borderRadius: 8, padding: "6px 10px", marginBottom: 8, fontSize: 11, color: colors.text }}>
+          <b style={{ color: colors.warning }}>↪ {tr(`Carried over from ${prevLabel}:`, `${prevLabel} ayından devreden:`)}</b>{" "}
+          {sheet.employees.filter(e => sheet.carryIn[e.key]).map(e => {
+            const c = sheet.carryIn[e.key];
+            const parts = [c.net ? `${tr("total status", "toplam durum")} ${fmtSigned(c.net)}` : "", c.hourLeave ? `${tr("hourly leave", "saatlik izin")} ${fmtHM(c.hourLeave)}` : "",
+              c.overtime ? `${tr("overtime", "fazla mesai")} ${fmtHM(c.overtime)}` : ""].filter(Boolean).join(", ");
+            return <span key={e.key} style={{ marginRight: 12 }}>{e.name}: {parts}</span>;
+          })}
+        </div>
+      )}
       {showHourly && (
         <HourlyLog colors={colors} font={font} lang={lang} employees={shown} days={days} recName={sheet.recName} hourly={sheet.hourly}
           codeOf={codeOf} leaves={sheet.leaves} onClose={() => setShowHourly(false)}
@@ -311,14 +365,46 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
                       </td>
                     );
                   })}
-                  {(() => { const t = summaryOf(emp.key); return SUMMARY_COLS.map(([k, head, label, w, kind], i) => (
-                    <td key={k} title={label}
-                      style={{ ...td, position: "sticky", right: sumRight(i), zIndex: 1, minWidth: w, maxWidth: w, background: colors.surface, whiteSpace: "nowrap",
-                        fontSize: 11, fontWeight: k === "units" || k === "net" ? 800 : 700,
-                        color: k === "units" ? colors.accent : k === "net" ? (t.net > 0 ? colors.success : t.net < 0 ? (colors.danger || "#e57373") : colors.textDim) : colors.text,
-                        borderLeft: i === 0 ? `2px solid ${colors.accent}` : undefined }}>
-                      {fmtSum(t[k], kind)}
-                    </td>)); })()}
+                  {(() => { const t = summaryOf(emp.key); return SUMMARY_COLS.map(([k, head, label, w, kind], i) => {
+                    const base = { ...td, position: "sticky", right: sumRight(i), zIndex: 1, minWidth: w, maxWidth: w, background: colors.surface, whiteSpace: "nowrap",
+                      fontSize: 11, fontWeight: 700, color: colors.text, borderLeft: i === 0 ? `2px solid ${colors.accent}` : undefined };
+                    if (kind === "in") return (
+                      <td key={k} title={label} style={base}>
+                        {isAdmin ? (
+                          <input key={`${emp.key}-${t.addOT}`} defaultValue={t.addOT ? fmtHM(t.addOT) : ""} placeholder="0:00"
+                            onBlur={e => { const v = parseHM(e.target.value); if (v !== t.addOT) setAddedOt(emp, e.target.value); }}
+                            style={{ width: w - 10, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 4, padding: "2px 3px", color: colors.text, fontSize: 11, textAlign: "center", fontFamily: font }} />
+                        ) : fmtHM(t.addOT)}
+                      </td>);
+                    if (kind === "d") {
+                      const signed = k === "net";
+                      const val = t[k], dec = t.dec[k], car = t.carried[k];
+                      const valColor = signed ? (val > 0 ? colors.success : val < 0 ? (colors.danger || "#e57373") : colors.textDim) : colors.text;
+                      const btn = (code, sym, tip) => {
+                        const on = dec === code;
+                        return (
+                          <button key={code} disabled={!isAdmin} title={tip} onClick={() => setDecision(emp, k, on ? "" : code, val)}
+                            style={{ border: `1px solid ${on ? (code === "carry" ? colors.warning : colors.success) : colors.border}`, background: on ? (code === "carry" ? `${colors.warning}33` : `${colors.success}33`) : "transparent",
+                              color: on ? (code === "carry" ? colors.warning : colors.success) : colors.textDim, borderRadius: 4, fontSize: 10, lineHeight: "12px", padding: "1px 5px", cursor: isAdmin ? "pointer" : "default", fontFamily: font }}>
+                            {sym}
+                          </button>);
+                      };
+                      return (
+                        <td key={k} title={`${label}${car ? `\n${tr("Carried over from", "Devreden:")} ${prevLabel}: ${signed ? fmtSigned(car) : fmtHM(car)}` : ""}`} style={{ ...base, padding: "2px 2px" }}>
+                          <div style={{ color: valColor, fontWeight: 800 }}>{signed ? fmtSigned(val) : fmtHM(val)}</div>
+                          {car ? <div style={{ fontSize: 9, fontWeight: 400, color: colors.warning }}>↪ {signed ? fmtSigned(car) : fmtHM(car)}</div> : null}
+                          <div style={{ display: "flex", gap: 2, justifyContent: "center", marginTop: 1 }}>
+                            {btn("include", "✓", tr("Include in this month's calculation", "Bu ayın hesabına dahil et"))}
+                            {btn("carry", "→", tr("Carry over to next month", "Sonraki aya devret"))}
+                          </div>
+                        </td>);
+                    }
+                    return (
+                      <td key={k} title={label}
+                        style={{ ...base, fontWeight: k === "units" ? 800 : 700, color: k === "units" ? colors.accent : colors.text }}>
+                        {fmtSum(t[k], kind)}
+                      </td>);
+                  }); })()}
                 </tr>
               ))}
               {!shown.length && (
@@ -333,6 +419,8 @@ export default function AttendanceSheet({ colors, font, lang, year, month, isAdm
             "Her günün altında: ilk kutu = Multinet (yemek), ikinci kutu = Seyahat (çift yemek; Multinet'i de işaretler). Multinet yalnızca tam çalışma günlerinde (M) otomatik işaretlidir, yarım günde (½RT) değil. ")}
         {tr("Right: M / HT / RT / L / İ / R day counts, 🍽 days with Multinet, ✈ travel days, Σ🍽 Multinet units (a travel day counts twice), late/early arrivals and departures, total status and hourly leave (h:mm). L and hourly leave (⏱) come from approved leave in Odoo. ",
             "Sağda: M / HT / RT / L / İ / R gün sayıları, 🍽 Multinet'li gün, ✈ seyahat günü, Σ🍽 Multinet birimi (seyahat günü iki sayılır), geç/erken giriş ve çıkışlar, toplam durum ve saatlik izin (s:dk). L ve saatlik izin (⏱) Odoo'daki onaylı izinlerden gelir. ")}
+        {tr("Total status, Hourly leave and Overtime: ✓ includes the amount in this month's calculation, → carries it over to next month, where it shows as ↪ and is added to that month's amount (admins only). Work on a Sunday (HT) counts as overtime. ",
+            "Toplam durum, Saatlik izin ve Fazla mesai: ✓ tutarı bu ayın hesabına dahil eder, → sonraki aya devreder; orada ↪ olarak görünür ve o ayın tutarına eklenir (yalnızca yöneticiler). Pazar (HT) günü çalışma fazla mesai sayılır. ")}
         {tr("Cells with a dashed frame were changed by hand; choosing the automatic value again resets them. Public holidays are locked.",
             "Kesik çerçeveli hücreler elle değiştirildi; otomatik değeri tekrar seçmek sıfırlar. Resmi tatiller kilitlidir.")}
       </div>
@@ -406,7 +494,10 @@ function HourlyLog({ colors, font, lang, employees, days, recName, hourly, codeO
                     <td style={cellSt}>{fmtHM(c.earlyArr)}</td>
                     <td style={cellSt}>{fmtHM(c.earlyDep)}</td>
                     <td style={cellSt}>{fmtHM(c.lateDep)}</td>
-                    <td style={{ ...cellSt, fontWeight: 700, color: netColor(c.net) }}>{fmtSigned(c.net)}</td>
+                    <td style={{ ...cellSt, fontWeight: 700, color: netColor(c.net ?? c.restWork) }}
+                      title={c.restWork ? tr("Work on the rest day — counted as overtime", "Hafta tatilinde çalışma — fazla mesai sayılır") : undefined}>
+                      {c.restWork ? `+${fmtHM(c.restWork)} ${tr("OT", "FM")}` : fmtSigned(c.net)}
+                    </td>
                     <td style={{ ...cellSt, color: "#9c6ade" }}>{lvH ? fmtHM(lvH * 60) : "—"}</td>
                   </tr>
                 );
